@@ -1,0 +1,43 @@
+name: Scorecard
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  schedule:
+    - cron: '31 2 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  analysis:
+    if: github.repository == 'eunjjang3/ograph'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      id-token: write
+      issues: read
+      pull-requests: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run OpenSSF Scorecard
+        uses: ossf/scorecard-action@v2.4.3
+        with:
+          results_file: scorecard-results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: scorecard-results.sarif

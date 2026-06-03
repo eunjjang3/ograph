@@ -1,0 +1,93 @@
+{
+  "name": "@afterglow/ograph",
+  "version": "0.1.0",
+  "description": "Reusable interactive force-directed canvas graph component for React applications.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist/index.d.ts",
+    "dist/GraphView.d.ts",
+    "dist/types.d.ts",
+    "dist/presets.d.ts",
+    "dist/index.js",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "SECURITY.md",
+    "docs/api.md",
+    "docs/architecture.md",
+    "docs/debug-harness.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eunjjang3/ograph.git"
+  },
+  "homepage": "https://github.com/eunjjang3/ograph#readme",
+  "bugs": {
+    "url": "https://github.com/eunjjang3/ograph/issues"
+  },
+  "keywords": [
+    "react",
+    "canvas",
+    "graph",
+    "knowledge-graph",
+    "interactive-graph",
+    "network-visualization",
+    "force-directed"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "vite --port=3000 --host=0.0.0.0",
+    "build": "npm run build:demo && npm run build:lib",
+    "build:demo": "vite build --outDir dist/demo",
+    "build:lib": "tsc -p tsconfig.lib.json && vite build --config vite.lib.config.ts",
+    "prepare": "npm run build:lib",
+    "preview": "vite preview",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "test": "npm run build:lib && node --test tests/*.test.mjs && npm run check:budgets",
+    "check:budgets": "node scripts/check-package-budgets.mjs",
+    "check:examples": "npm run build:lib && tsc -p examples/tsconfig.json",
+    "verify:consumer": "node scripts/verify-consumer-package.mjs"
+  },
+  "dependencies": {
+    "d3-force": "^3.0.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/d3-force": "^3.0.10",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.0.4",
+    "autoprefixer": "^10.4.21",
+    "esbuild": "^0.25.0",
+    "lucide-react": "^0.546.0",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "tailwindcss": "^4.1.14",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.3"
+  }
+}

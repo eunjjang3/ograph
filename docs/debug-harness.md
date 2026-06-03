@@ -1,0 +1,159 @@
+# Debug Harness
+
+The local app is a Vite-powered stress-test harness for `GraphView`.
+
+Run it with:
+
+```sh
+npm install
+npm run dev
+```
+
+Then open the Vite URL printed by the dev server, usually `http://localhost:3000`.
+
+## Purpose
+
+The harness exists to test graph rendering, force tuning, local/global mode behavior, interaction responsiveness, and visual themes without depending on a downstream app.
+
+It is not part of the production package API. Consumers should not import anything from `src/components/graph/debug`.
+
+## Files
+
+| File | Responsibility |
+| --- | --- |
+| `GraphDebugHarness.tsx` | Full-screen debug layout, graph event wiring, render count, and graph viewport telemetry. |
+| `DebugControlPanel.tsx` | Debug side-panel controls, preset selectors, command buttons, and telemetry readouts. |
+| `useDebugGraphState.ts` | Generated graph data, local/global mode state, root selection, selected/hovered node state, and active element counts. |
+| `useDebugGraphPreset.ts` | Debug preset selection, force/style slider state, and derived graph preset/theme values. |
+| `useFpsCounter.ts` | Lightweight requestAnimationFrame FPS sampling for rough stress-test feedback. |
+| `generateMockGraphData.ts` | Deterministic graph generator for typed nodes, groups, attachments, unresolved references, hubs, communities, and links. |
+| `mockGraphPresets.ts` | Debug-only visual theme and force preset options. |
+
+## Controls
+
+### Mock Generator Setup
+
+| Control | Effect |
+| --- | --- |
+| `Seed Node Capacity` | Chooses generated node count: `100`, `500`, `1000`, `2500`, `5000`, or `10000`. |
+| `Avg Links / Node` | Controls the target average degree. Total target link count is `nodeCount * avgLinksPerNode / 2`. |
+| `Random Seed` | Regenerates deterministic graph data from a new seed. |
+
+The generator is deterministic for the same node count, average links value, and seed.
+
+### Interactive Scopes
+
+| Control | Effect |
+| --- | --- |
+| `global` | Renders the complete generated graph. |
+| `local` | Applies a breadth-first focus lens around the root node while retaining one hidden physics halo ring. |
+| `Local Depth BFS Level` | Chooses local traversal depth from `1` to `4`. |
+| `Focus Anchor Core` | Selects the local root node. |
+| `Random Hub` | Picks a generated hub node as the local root. |
+
+Double-clicking a node in the canvas also sets it as the root and switches into local mode. The double-click focus action clears the transient `Selected Node ID` readout, and switching back to global mode clears it again so root focus does not linger as a selected-node highlight.
+
+### Preset Styles And Overrides
+
+Debug presets combine partial theme overrides and partial force preset overrides.
+
+Included debug presets:
+
+- `Default Dark`
+- `Neon Cyberpunk`
+- `Warm Redwood`
+- `Stellar Constellation`
+
+Runtime sliders override the active preset:
+
+| Control | Mapped Field |
+| --- | --- |
+| `Label Culling Limit` | `GraphPreset.labelDensity`; shifts the soft zoom/degree reveal band for non-focused label opacity |
+| `Node Size Weight` | `GraphPreset.nodeSizeScale`; visual and hit-test size only, not physics |
+| `Force Link Distance` | `GraphPreset.linkDistance` |
+| `Node Charge (Repulsion)` | `GraphPreset.chargeStrength` |
+| `Collision Boundary Buffer` | `GraphPreset.collisionRadius` |
+| `Simulation Viscosity` | `GraphPreset.velocityDecay`; lower values keep motion floaty longer, higher values damp motion faster |
+| `Neighborhood Contrast (Dim)` | `GraphPreset.selectionDimming` and derived `hoverDimming` |
+
+### Control Diagnostics
+
+`Node Size Weight` intentionally does not affect d3-force collision, charge, link distance, or simulation restart behavior. Use `Collision Boundary Buffer`, `Force Link Distance`, `Node Charge (Repulsion)`, and `Simulation Viscosity` when tuning layout physics.
+
+| Button | Effect |
+| --- | --- |
+| `Re-heat Forces` | Calls `restartSimulation()` on the graph ref. |
+| `Reset Zoom Scale` | Calls `fitToView()` on the graph ref. |
+
+## Telemetry
+
+The harness displays:
+
+- estimated FPS,
+- current zoom multiplier,
+- visible node and link counts,
+- active simulated node and link counts, including the hidden local-lens halo,
+- React render count,
+- drag phase, dragged node ID, and drag event count,
+- active drag alpha targets for drag start and drag movement,
+- whether connected-neighbor wake is enabled for the current mode,
+- hovered node ID,
+- selected node ID.
+
+`Hovered Node ID` and `Selected Node ID` are diagnostic state only. `Selected Node ID` should become `none` after changing the local root or returning to global mode; `Focus Anchor Core` is the separate local-lens root.
+
+The drag telemetry is intentionally mode-sensitive. In global mode it reports the high-heat drag policy with connected-neighbor wake enabled. In local mode it reports the low-heat drag policy with connected-neighbor wake disabled, so local lens drags remain live in the d3 simulation without re-running the full global wake inside the scoped halo.
+
+FPS is measured with a lightweight `requestAnimationFrame` loop in the harness. It is useful for rough comparison while tuning, not for formal benchmark reporting.
+
+## Mock Data Shape
+
+`generateMockGraphData(nodeCount, avgLinksPerNode, seed)` returns:
+
+```ts
+{
+  nodes: GraphNode[];
+  links: GraphLink[];
+}
+```
+
+The generator creates:
+
+- community centers arranged around the origin,
+- node groups assigned to communities,
+- default `note`, `tag`, `attachment`, `unresolved`, and `hub` node categories,
+- hub links,
+- tag links,
+- mostly intra-community links with some cross-community bridge links,
+- final degree values written to each node.
+
+Approximate generated node type distribution:
+
+| Type | Weight |
+| --- | --- |
+| `note` | `70%` |
+| `tag` | `10%` |
+| `attachment` | `8%` |
+| `unresolved` | `8%` |
+| `hub` | `4%` |
+
+Attachments are skipped as primary source nodes during random link generation so they behave more like linked resources than graph hubs.
+
+## Stress-Test Notes
+
+The largest built-in size is 10,000 nodes. After the initial global layout stabilizes, useful checks are:
+
+- simulation still appears and cools,
+- pan and zoom remain responsive,
+- hover hit testing still finds nearby nodes,
+- hover clears when the pointer leaves a node or exits the canvas,
+- labels do not dominate the canvas at low zoom and reveal gradually while crossing culling boundaries,
+- hover and selection line highlights fade cleanly instead of holding stale full-strength focus,
+- local mode fades into the focused neighborhood without abrupt node movement,
+- local node drag keeps the simulation live at low heat while preserving the visible lens shape,
+- sparse local mode cases at `Avg Links / Node` values near `1.5` or lower still zoom to the selected root neighborhood instead of sliding toward an unrelated origin,
+- local mode reduces simulated node and link counts to the visible lens plus hidden halo,
+- returning to global mode restores the previous global viewport,
+- pan, zoom, and local transitions remain at or above roughly 30 FPS in the harness telemetry.
+
+For repeatable visual or performance comparisons, keep `nodeCount`, `avgLinks`, `seed`, selected preset, and slider values fixed.

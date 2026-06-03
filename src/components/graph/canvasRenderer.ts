@@ -1,0 +1,461 @@
+import type { GraphNode, GraphLink, GraphTheme, GraphPreset } from './types';
+import type { Viewport } from './graphMath';
+import { getNodeRadius, resolveLabelVisibilityTarget } from './graphMath';
+import {
+  getPaddedViewportWorldBounds,
+  isLinkInBounds,
+  querySpatialIndex,
+  type GraphSpatialIndex,
+  type WorldBounds
+} from './spatialIndex';
+
+interface FocusRenderState {
+  hasActiveFocus: boolean;
+  focusNodeId: string | null | undefined;
+  focusProgress: number;
+  selectedNodeId: string | null | undefined;
+  hoveredNodeId: string | null | undefined;
+  rootNodeId: string | null | undefined;
+  neighbors: Set<string>;
+  resolveDimAlpha: (dimAlpha: number) => number;
+  isSelected: (id: string) => boolean;
+  isHovered: (id: string) => boolean;
+  isRoot: (id: string) => boolean;
+  isNeighbor: (id: string) => boolean;
+}
+
+function createFocusRenderState(
+  selectedNodeId: string | null | undefined,
+  hoveredNodeId: string | null | undefined,
+  rootNodeId: string | null | undefined,
+  neighbors: Set<string>,
+  dimProgress: number
+): FocusRenderState {
+  const hasActiveFocus = !!selectedNodeId || !!hoveredNodeId;
+  const focusNodeId = hoveredNodeId || selectedNodeId;
+  const focusProgress = Math.max(0, Math.min(1, dimProgress));
+
+  return {
+    hasActiveFocus,
+    focusNodeId,
+    focusProgress,
+    selectedNodeId,
+    hoveredNodeId,
+    rootNodeId,
+    neighbors,
+    resolveDimAlpha: (dimAlpha: number) => 1 + (dimAlpha - 1) * focusProgress,
+    isSelected: (id: string) => id === selectedNodeId,
+    isHovered: (id: string) => id === hoveredNodeId,
+    isRoot: (id: string) => id === rootNodeId,
+    isNeighbor: (id: string) => neighbors.has(id)
+  };
+}
+
+function resolveFocusDimming(preset: GraphPreset, focus: FocusRenderState) {
+  const dimVal = focus.focusNodeId === focus.hoveredNodeId
+    ? preset.hoverDimming
+    : preset.selectionDimming;
+  return focus.resolveDimAlpha(dimVal);
+}
+
+function resolveNodeBaseColor(node: GraphNode, theme: GraphTheme, focus: FocusRenderState) {
+  if (focus.isRoot(node.id)) {
+    return theme.nodeRootColor;
+  }
+
+  switch (node.type) {
+    case 'note':
+      return theme.nodeNoteColor;
+    case 'tag':
+      return theme.nodeTagColor;
+    case 'attachment':
+      return theme.nodeAttachmentColor;
+    case 'unresolved':
+      return theme.nodeUnresolvedColor;
+    case 'hub':
+    case 'structure':
+    case 'domain':
+      return theme.nodeHubColor;
+    default:
+      return theme.nodeDefaultColor;
+  }
+}
+
+interface Circle {
+  node: GraphNode;
+  radius: number;
+}
+
+interface Line {
+  source: GraphNode;
+  target: GraphNode;
+}
+
+function getBatchKey(color: string, alpha: number, lineWidth = 0): string {
+  return `${color}|${alpha.toFixed(3)}|${lineWidth.toFixed(3)}`;
+}
+
+function addLineBatch(
+  batches: Map<string, { color: string; alpha: number; lineWidth: number; lines: Line[] }>,
+  source: GraphNode,
+  target: GraphNode,
+  color: string,
+  alpha: number,
+  lineWidth: number
+) {
+  if (alpha <= 0.001) return;
+  const key = getBatchKey(color, alpha, lineWidth);
+  const batch = batches.get(key);
+
+  if (batch) {
+    batch.lines.push({ source, target });
+  } else {
+    batches.set(key, { color, alpha, lineWidth, lines: [{ source, target }] });
+  }
+}
+
+function flushLineBatches(
+  ctx: CanvasRenderingContext2D,
+  batches: Map<string, { color: string; alpha: number; lineWidth: number; lines: Line[] }>
+) {
+  for (const batch of batches.values()) {
+    ctx.strokeStyle = batch.color;
+    ctx.globalAlpha = batch.alpha;
+    ctx.lineWidth = batch.lineWidth;
+    ctx.beginPath();
+
+    for (const line of batch.lines) {
+      ctx.moveTo(line.source.x ?? 0, line.source.y ?? 0);
+      ctx.lineTo(line.target.x ?? 0, line.target.y ?? 0);
+    }
+
+    ctx.stroke();
+  }
+}
+
+function addCircleBatch(
+  batches: Map<string, { color: string; alpha: number; lineWidth: number; circles: Circle[] }>,
+  node: GraphNode,
+  radius: number,
+  color: string,
+  alpha: number,
+  lineWidth = 0
+) {
+  if (alpha <= 0.001) return;
+  const key = getBatchKey(color, alpha, lineWidth);
+  const batch = batches.get(key);
+
+  if (batch) {
+    batch.circles.push({ node, radius });
+  } else {
+    batches.set(key, { color, alpha, lineWidth, circles: [{ node, radius }] });
+  }
+}
+
+function flushCircleBatches(
+  ctx: CanvasRenderingContext2D,
+  batches: Map<string, { color: string; alpha: number; lineWidth: number; circles: Circle[] }>,
+  stroke = false
+) {
+  for (const batch of batches.values()) {
+    ctx.globalAlpha = batch.alpha;
+    ctx.beginPath();
+
+    for (const circle of batch.circles) {
+      ctx.moveTo((circle.node.x ?? 0) + circle.radius, circle.node.y ?? 0);
+      ctx.arc(circle.node.x ?? 0, circle.node.y ?? 0, circle.radius, 0, 2 * Math.PI);
+    }
+
+    if (stroke) {
+      ctx.strokeStyle = batch.color;
+      ctx.lineWidth = batch.lineWidth;
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = batch.color;
+      ctx.fill();
+    }
+  }
+}
+
+function resolveLensNodeAlpha(nodeId: string, lensVisibilityByNodeId?: Map<string, number>): number {
+  return lensVisibilityByNodeId?.get(nodeId) ?? 1;
+}
+
+function resolveLensLinkAlpha(
+  sourceId: string,
+  targetId: string,
+  lensVisibilityByNodeId?: Map<string, number>
+): number {
+  return Math.pow(
+    Math.min(
+      resolveLensNodeAlpha(sourceId, lensVisibilityByNodeId),
+      resolveLensNodeAlpha(targetId, lensVisibilityByNodeId)
+    ),
+    1.6
+  );
+}
+
+function drawLinks(
+  ctx: CanvasRenderingContext2D,
+  links: GraphLink[],
+  viewport: Viewport,
+  theme: GraphTheme,
+  preset: GraphPreset,
+  focus: FocusRenderState,
+  bounds: WorldBounds,
+  lensVisibilityByNodeId?: Map<string, number>
+) {
+  const baseBatches = new Map<string, { color: string; alpha: number; lineWidth: number; lines: Line[] }>();
+  const overlayBatches = new Map<string, { color: string; alpha: number; lineWidth: number; lines: Line[] }>();
+  const lineWidth = 1.1 / Math.max(0.6, Math.min(viewport.scale, 2.0));
+
+  for (let i = 0; i < links.length; i++) {
+    const link = links[i];
+    const sourceNode = typeof link.source === 'object' ? (link.source as GraphNode) : null;
+    const targetNode = typeof link.target === 'object' ? (link.target as GraphNode) : null;
+
+    if (!sourceNode || !targetNode || !isLinkInBounds(link, bounds)) continue;
+
+    const sourceId = sourceNode.id;
+    const targetId = targetNode.id;
+    const lensAlpha = resolveLensLinkAlpha(sourceId, targetId, lensVisibilityByNodeId);
+    if (lensAlpha <= 0.001) continue;
+
+    let baseLinkColor = theme.linkColor;
+    let baseLinkAlpha = 1.0;
+    let overlayLinkColor: string | null = null;
+    let overlayLinkAlpha = 0;
+
+    if (focus.hasActiveFocus) {
+      const isConnectedToFocus = sourceId === focus.focusNodeId || targetId === focus.focusNodeId;
+      if (isConnectedToFocus) {
+        if (focus.isHovered(sourceId) || focus.isHovered(targetId)) {
+          overlayLinkColor = theme.linkHoverColor;
+        } else if (focus.isSelected(sourceId) || focus.isSelected(targetId)) {
+          overlayLinkColor = theme.linkSelectedColor;
+        } else {
+          overlayLinkColor = theme.linkNeighborColor;
+        }
+        overlayLinkAlpha = focus.focusProgress;
+      } else if ((focus.isRoot(sourceId) && focus.isNeighbor(targetId)) || (focus.isRoot(targetId) && focus.isNeighbor(sourceId))) {
+        overlayLinkColor = theme.linkRootColor;
+        overlayLinkAlpha = focus.focusProgress;
+      } else {
+        baseLinkAlpha = resolveFocusDimming(preset, focus);
+      }
+    } else if (focus.isRoot(sourceId) || focus.isRoot(targetId)) {
+      baseLinkColor = theme.linkRootColor;
+    }
+
+    addLineBatch(baseBatches, sourceNode, targetNode, baseLinkColor, baseLinkAlpha * lensAlpha, lineWidth);
+
+    if (overlayLinkColor) {
+      addLineBatch(overlayBatches, sourceNode, targetNode, overlayLinkColor, overlayLinkAlpha * lensAlpha, lineWidth);
+    }
+  }
+
+  flushLineBatches(ctx, baseBatches);
+  flushLineBatches(ctx, overlayBatches);
+}
+
+function isNodeInBounds(node: GraphNode, bounds: WorldBounds, radius: number): boolean {
+  const x = node.x ?? 0;
+  const y = node.y ?? 0;
+  return (
+    x + radius >= bounds.minX &&
+    x - radius <= bounds.maxX &&
+    y + radius >= bounds.minY &&
+    y - radius <= bounds.maxY
+  );
+}
+
+function drawNodes(
+  ctx: CanvasRenderingContext2D,
+  nodes: GraphNode[],
+  viewport: Viewport,
+  theme: GraphTheme,
+  preset: GraphPreset,
+  focus: FocusRenderState,
+  bounds: WorldBounds,
+  lensVisibilityByNodeId?: Map<string, number>
+) {
+  ctx.globalAlpha = 1.0;
+  const baseBatches = new Map<string, { color: string; alpha: number; lineWidth: number; circles: Circle[] }>();
+  const overlayBatches = new Map<string, { color: string; alpha: number; lineWidth: number; circles: Circle[] }>();
+  const borderBatches = new Map<string, { color: string; alpha: number; lineWidth: number; circles: Circle[] }>();
+
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    const nodeRadius = getNodeRadius(preset.nodeRadius, preset.nodeSizeScale ?? 1.0, node.size, node.degree);
+    if (!isNodeInBounds(node, bounds, nodeRadius)) continue;
+
+    const lensAlpha = resolveLensNodeAlpha(node.id, lensVisibilityByNodeId);
+    if (lensAlpha <= 0.001) continue;
+
+    const nodeColor = resolveNodeBaseColor(node, theme, focus);
+    let nodeAlpha = 1.0;
+    let overlayNodeColor: string | null = null;
+    let overlayNodeAlpha = 0;
+
+    if (!focus.isRoot(node.id)) {
+      if (focus.isHovered(node.id)) {
+        overlayNodeColor = theme.nodeHoverColor;
+        overlayNodeAlpha = focus.focusProgress;
+      } else if (focus.isSelected(node.id)) {
+        overlayNodeColor = theme.nodeSelectedColor;
+        overlayNodeAlpha = focus.focusProgress;
+      } else if (focus.hasActiveFocus && focus.isNeighbor(node.id)) {
+        overlayNodeColor = theme.nodeNeighborColor;
+        overlayNodeAlpha = focus.focusProgress;
+      } else if (focus.hasActiveFocus && !focus.isNeighbor(node.id)) {
+        nodeAlpha = resolveFocusDimming(preset, focus);
+      }
+    }
+
+    addCircleBatch(baseBatches, node, nodeRadius, nodeColor, nodeAlpha * lensAlpha);
+
+    if (overlayNodeColor && overlayNodeAlpha > 0) {
+      addCircleBatch(overlayBatches, node, nodeRadius, overlayNodeColor, overlayNodeAlpha * lensAlpha);
+    }
+
+    if (focus.isSelected(node.id) || focus.isHovered(node.id)) {
+      addCircleBatch(
+        borderBatches,
+        node,
+        nodeRadius + 1.5 / viewport.scale,
+        theme.nodeBorderSelectedColor,
+        focus.focusProgress * lensAlpha,
+        1.7 / viewport.scale
+      );
+    } else {
+      addCircleBatch(
+        borderBatches,
+        node,
+        nodeRadius,
+        theme.nodeBorderColor,
+        nodeAlpha * lensAlpha,
+        0.8 / viewport.scale
+      );
+    }
+  }
+
+  flushCircleBatches(ctx, baseBatches);
+  flushCircleBatches(ctx, overlayBatches);
+  flushCircleBatches(ctx, borderBatches, true);
+}
+
+function resolveLabelColor(node: GraphNode, theme: GraphTheme, focus: FocusRenderState, isNodeNeighbor: boolean) {
+  if (focus.isRoot(node.id)) {
+    return theme.labelRootColor;
+  }
+  if (focus.isSelected(node.id)) {
+    return theme.labelSelectedColor;
+  }
+  if (focus.isHovered(node.id)) {
+    return theme.labelHoverColor;
+  }
+  if (isNodeNeighbor) {
+    return theme.labelSelectedColor;
+  }
+  return theme.labelColor;
+}
+
+function drawLabels(
+  ctx: CanvasRenderingContext2D,
+  nodes: GraphNode[],
+  viewport: Viewport,
+  theme: GraphTheme,
+  preset: GraphPreset,
+  focus: FocusRenderState,
+  labelVisibilityByNodeId?: Map<string, number>,
+  lensVisibilityByNodeId?: Map<string, number>
+) {
+  ctx.globalAlpha = 1.0;
+  ctx.font = `${11 / viewport.scale}px ${theme.fontFamily}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    const lensAlpha = resolveLensNodeAlpha(node.id, lensVisibilityByNodeId);
+    if (lensAlpha <= 0.001) continue;
+
+    const isNodeSelected = focus.isSelected(node.id);
+    const isNodeHovered = focus.isHovered(node.id);
+    const isNodeRoot = focus.isRoot(node.id);
+    const isNodeNeighbor = focus.hasActiveFocus && focus.isNeighbor(node.id);
+    const forceLabelVisible = isNodeHovered || isNodeSelected || isNodeRoot || isNodeNeighbor;
+    const labelVisibility = labelVisibilityByNodeId?.get(node.id) ?? resolveLabelVisibilityTarget(
+      node.degree,
+      viewport.scale,
+      preset.labelDensity,
+      forceLabelVisible
+    );
+    if (labelVisibility <= 0.001) continue;
+
+    let labelAlpha = 1.0;
+    if (focus.hasActiveFocus && !isNodeHovered && !isNodeSelected && !isNodeRoot && !isNodeNeighbor) {
+      labelAlpha = resolveFocusDimming(preset, focus);
+    }
+    ctx.globalAlpha = labelAlpha * labelVisibility * lensAlpha;
+
+    const nodeRadius = getNodeRadius(preset.nodeRadius, preset.nodeSizeScale ?? 1.0, node.size, node.degree);
+    const labelX = node.x ?? 0;
+    const labelY = (node.y ?? 0) + nodeRadius + 3.5 / viewport.scale;
+
+    ctx.strokeStyle = theme.backgroundColor;
+    ctx.lineWidth = 3.5 / viewport.scale;
+    ctx.lineJoin = 'round';
+    ctx.strokeText(node.label, labelX, labelY);
+
+    ctx.fillStyle = resolveLabelColor(node, theme, focus, isNodeNeighbor);
+    ctx.fillText(node.label, labelX, labelY);
+  }
+}
+
+/**
+ * Draws the entire graph onto a given Canvas context.
+ * Performs fast rendering and precise styling depending on highlight states.
+ */
+export function drawGraph(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  nodes: GraphNode[],
+  links: GraphLink[],
+  viewport: Viewport,
+  theme: GraphTheme,
+  preset: GraphPreset,
+  selectedNodeId: string | null | undefined,
+  hoveredNodeId: string | null | undefined,
+  rootNodeId: string | null | undefined,
+  neighbors: Set<string>,
+  dimProgress = 1,
+  labelVisibilityByNodeId?: Map<string, number>,
+  lensVisibilityByNodeId?: Map<string, number>,
+  spatialIndex?: GraphSpatialIndex
+) {
+  ctx.fillStyle = theme.backgroundColor;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.save();
+  ctx.translate(viewport.x, viewport.y);
+  ctx.scale(viewport.scale, viewport.scale);
+
+  const focus = createFocusRenderState(
+    selectedNodeId,
+    hoveredNodeId,
+    rootNodeId,
+    neighbors,
+    dimProgress
+  );
+
+  const bounds = getPaddedViewportWorldBounds(width, height, viewport);
+  const visibleNodes = spatialIndex ? querySpatialIndex(spatialIndex, bounds) : nodes;
+
+  drawLinks(ctx, links, viewport, theme, preset, focus, bounds, lensVisibilityByNodeId);
+  drawNodes(ctx, visibleNodes, viewport, theme, preset, focus, bounds, lensVisibilityByNodeId);
+  drawLabels(ctx, visibleNodes, viewport, theme, preset, focus, labelVisibilityByNodeId, lensVisibilityByNodeId);
+
+  ctx.restore();
+}

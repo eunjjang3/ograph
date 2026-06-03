@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "declaration": true,
+    "declarationDir": "dist",
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "stripInternal": true
+  },
+  "include": [
+    "src/components/graph/index.ts",
+    "src/components/graph/GraphView.tsx",
+    "src/components/graph/types.ts",
+    "src/components/graph/presets.ts",
+    "src/components/graph/useGraphSimulation.ts",
+    "src/components/graph/canvasRenderer.ts",
+    "src/components/graph/graphMath.ts",
+    "src/components/graph/hitTest.ts",
+    "src/components/graph/localGraph.ts"
+  ],
+  "exclude": [
+    "src/App.tsx",
+    "src/main.tsx",
+    "src/components/graph/debug/**"
+  ]
+}

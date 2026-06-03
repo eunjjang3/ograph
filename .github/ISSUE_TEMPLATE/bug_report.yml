@@ -1,0 +1,30 @@
+name: Bug report
+description: Report a rendering, interaction, or package API bug.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include a minimal nodes/links sample or a small code snippet when possible.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: "0.1.0 or commit SHA"
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "Browser, OS, device, display scale"
