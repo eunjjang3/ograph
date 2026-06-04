@@ -57,6 +57,7 @@
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "npm run build:demo && npm run build:lib",
     "build:demo": "vite build --outDir dist/demo",
+    "build:demo:pages": "vite build --outDir dist/demo --base=/ograph/",
     "build:lib": "tsc -p tsconfig.lib.json && vite build --config vite.lib.config.ts",
     "prepare": "npm run build:lib",
     "preview": "vite preview",
