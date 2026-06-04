@@ -56,6 +56,7 @@ compatibility.
 | P2 | Protect `v*` release tags from deletion and non-fast-forward updates. | Done | GitHub ruleset / `hardening/p2-release-tag-ruleset` | `55314114401b0d3c7f638a6545e8c885cea396a2` |
 | P2 | Configure npm Trusted Publishing for `@eunjjang/ograph` on the npm registry side. | External first publish and npm 2FA action pending | npm package settings | Pending |
 | P2 | Protect `main` with required CI checks before broad external adoption. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
+| P2 | Enforce `main` required checks for administrators so direct pushes cannot bypass release gates. | Done | GitHub settings / `hardening/p2-main-admin-enforcement` | Pending |
 | P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld at latest score `6.8` | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Harden supply-chain automation with SHA-pinned actions, dependency update configuration, SECURITY reporting links, and CodeQL SAST. | Done | `hardening/p2-supply-chain-ci` | `6c3b6b73719d5154c42b341da6dc6da9fb6be048` |
 | P2 | Add no-new-dependency seeded invariant sweeps for graph normalization and diff behavior. | Done | `hardening/p2-core-invariant-sweep` | `0366bc19ce94195fd84301ef84fa6f35d20cc73a` |
@@ -116,7 +117,8 @@ Current external setting evidence, checked on 2026-06-04 KST:
   before publish jobs can deploy through that environment.
 - `main` branch protection requires the GitHub Actions status check `verify`,
   requires branches to be up to date before merge, requires linear history,
-  requires conversation resolution, and disallows force pushes and deletions.
+  requires conversation resolution, disallows force pushes and deletions, and
+  enforces these rules for administrators.
 - Repository ruleset `Protect release tags` (`17266129`) applies to
   `refs/tags/v*`, is enforced, has no bypass actors, and blocks release tag
   deletion and non-fast-forward updates.
