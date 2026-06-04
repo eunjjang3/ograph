@@ -2,11 +2,10 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "allowJs": false,
-    "baseUrl": "..",
     "noEmit": true,
     "paths": {
       "@eunjjang/ograph": [
-        "dist/index.d.ts"
+        "../dist/index.d.ts"
       ]
     },
     "strict": true

@@ -27,7 +27,11 @@ function isDevelopmentRuntime(): boolean {
     return importMetaEnv.DEV === true || importMetaEnv.MODE === 'development';
   }
 
-  return typeof process !== 'undefined' && process.env.NODE_ENV !== 'production';
+  const processEnv = (globalThis as {
+    process?: { env?: { NODE_ENV?: string } };
+  }).process?.env;
+
+  return processEnv?.NODE_ENV !== 'production';
 }
 
 function warnDuplicateNodeId(nodeId: string): void {

@@ -43,7 +43,14 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Install npm with trusted publishing support
-        run: npm install -g npm@11.5.1
+        env:
+          NPM_CLI_VERSION: 11.16.0
+          NPM_CLI_TARBALL_SHA512: 03be172fc3b199c7a06433163e459be5b110a6983c1dd6305b7ac10f6b0fa12e1440755a8df6b1064ab2ccb789df0474919fb9c684e322dc57685ede21752ccb
+        run: |
+          npm_cli_tgz="npm-${NPM_CLI_VERSION}.tgz"
+          curl -fsSLo "${npm_cli_tgz}" "https://registry.npmjs.org/npm/-/npm-${NPM_CLI_VERSION}.tgz"
+          echo "${NPM_CLI_TARBALL_SHA512}  ${npm_cli_tgz}" | sha512sum --check
+          npm install -g "./${npm_cli_tgz}"
 
       - name: Report toolchain
         run: |
