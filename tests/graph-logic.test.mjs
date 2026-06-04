@@ -26,6 +26,141 @@ async function importSourceModule(relativePath) {
   return loaded;
 }
 
+function createSeededRandom(seed) {
+  let state = seed >>> 0;
+
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
+function choose(random, values) {
+  return values[Math.floor(random() * values.length)];
+}
+
+function maybeAddNodeNumber(random, node, key) {
+  if (random() > 0.65) return;
+
+  node[key] = choose(random, [
+    Math.round((random() - 0.5) * 1000) / 10,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY,
+    null,
+    'invalid'
+  ]);
+}
+
+function createRandomNodeId(random, index) {
+  const roll = random();
+
+  if (roll < 0.5) return `n${Math.floor(random() * 8)}`;
+  if (roll < 0.68) return `unique-${index}`;
+  if (roll < 0.76) return '';
+  if (roll < 0.84) return 42;
+  if (roll < 0.92) return null;
+  return ` spaced ${Math.floor(random() * 3)} `;
+}
+
+function createRandomLabel(random, id) {
+  return choose(random, [
+    undefined,
+    null,
+    99,
+    { text: 'bad label' },
+    `Label ${String(id)}`
+  ]);
+}
+
+function createRandomNode(random, index) {
+  const roll = random();
+
+  if (roll < 0.06) return null;
+  if (roll < 0.12) return `not-node-${index}`;
+
+  const id = createRandomNodeId(random, index);
+  const node = {
+    id,
+    label: createRandomLabel(random, id),
+    metadata: { seedIndex: index, bucket: Math.floor(random() * 4) }
+  };
+
+  for (const key of ['x', 'y', 'vx', 'vy', 'fx', 'fy']) {
+    maybeAddNodeNumber(random, node, key);
+  }
+
+  return node;
+}
+
+function getInputStringIds(nodes) {
+  return nodes
+    .filter(node => node && typeof node === 'object' && typeof node.id === 'string')
+    .map(node => node.id);
+}
+
+function createRandomEndpoint(random, stringIds) {
+  const candidates = stringIds.length > 0 ? stringIds : ['missing-fallback'];
+  const id = choose(random, [...candidates, 'missing-a', 'missing-b', '']);
+  const roll = random();
+
+  if (roll < 0.48) return id;
+  if (roll < 0.76) return { id, label: `Endpoint ${id}` };
+  if (roll < 0.86) return { id: 123 };
+  if (roll < 0.94) return null;
+  return 123;
+}
+
+function createRandomLink(random, stringIds, index) {
+  const roll = random();
+
+  if (roll < 0.06) return null;
+  if (roll < 0.1) return `not-link-${index}`;
+
+  return {
+    source: createRandomEndpoint(random, stringIds),
+    target: createRandomEndpoint(random, stringIds),
+    label: choose(random, [undefined, null, 100, `Link ${index}`]),
+    metadata: { seedIndex: index }
+  };
+}
+
+function createRandomGraphInput(seed) {
+  const random = createSeededRandom(seed);
+  const nodeCount = Math.floor(random() * 18);
+  const nodes = Array.from({ length: nodeCount }, (_, index) => createRandomNode(random, index));
+  const stringIds = getInputStringIds(nodes);
+  const linkCount = Math.floor(random() * 42);
+  const links = Array.from({ length: linkCount }, (_, index) => createRandomLink(random, stringIds, index));
+
+  return {
+    nodes,
+    links,
+    localDepth: choose(random, [undefined, null, Number.NaN, -10, 0, 1, 2.8, '4', 999, 'bad'])
+  };
+}
+
+function getEndpointId(endpoint) {
+  if (typeof endpoint === 'string') return endpoint;
+  if (endpoint && typeof endpoint === 'object' && typeof endpoint.id === 'string') return endpoint.id;
+  return null;
+}
+
+function assertEmptyPatch(patch, message) {
+  assert.deepEqual(patch, {
+    addedNodes: [],
+    removedNodeIds: [],
+    updatedNodes: [],
+    addedLinks: [],
+    removedLinks: [],
+    updatedLinks: []
+  }, message);
+}
+
+function structurallyEqual(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 test('filterLocalGraph handles global, missing-root, and depth-limited local graphs', async () => {
   const { filterLocalGraph } = await importSourceModule('src/components/graph/localGraph.ts');
   const nodes = [
@@ -287,6 +422,78 @@ test('input sanitization clamps local depth to supported positive integers', asy
   assert.equal(sanitizeLocalDepth(1000), 10);
 });
 
+test('seeded graph normalization sweep preserves boundary invariants without mutating caller input', async () => {
+  const { normalizeGraphInput } = await importSourceModule('src/components/graph/inputValidation.ts');
+  const originalNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+
+  try {
+    for (let seed = 1; seed <= 80; seed += 1) {
+      const input = createRandomGraphInput(seed);
+      const inputSnapshot = structuredClone(input);
+      const normalized = normalizeGraphInput(input);
+      const nodeIds = new Set();
+
+      assert.deepEqual(input, inputSnapshot, `seed ${seed} mutated caller input`);
+      assert.equal(Number.isInteger(normalized.localDepth), true, `seed ${seed} localDepth is not an integer`);
+      assert.equal(normalized.localDepth >= 1 && normalized.localDepth <= 10, true, `seed ${seed} localDepth is out of range`);
+      assert.equal(normalized.nodes.length <= input.nodes.length, true, `seed ${seed} increased node count`);
+      assert.equal(normalized.links.length <= input.links.length, true, `seed ${seed} increased link count`);
+      assert.deepEqual([...normalized.nodeIds], normalized.nodes.map(node => node.id), `seed ${seed} nodeIds lost node order`);
+
+      for (const node of normalized.nodes) {
+        assert.equal(typeof node.id, 'string', `seed ${seed} kept a non-string node id`);
+        assert.notEqual(node.id, '', `seed ${seed} kept an empty node id`);
+        assert.equal(nodeIds.has(node.id), false, `seed ${seed} kept duplicate node id ${node.id}`);
+        assert.equal(typeof node.label, 'string', `seed ${seed} kept a non-string label for ${node.id}`);
+
+        for (const key of ['x', 'y', 'vx', 'vy']) {
+          assert.equal(
+            node[key] === undefined || (typeof node[key] === 'number' && Number.isFinite(node[key])),
+            true,
+            `seed ${seed} kept invalid ${key} for ${node.id}`
+          );
+        }
+
+        for (const key of ['fx', 'fy']) {
+          assert.equal(
+            node[key] === undefined || node[key] === null || (typeof node[key] === 'number' && Number.isFinite(node[key])),
+            true,
+            `seed ${seed} kept invalid ${key} for ${node.id}`
+          );
+        }
+
+        nodeIds.add(node.id);
+      }
+
+      for (const link of normalized.links) {
+        const sourceId = getEndpointId(link.source);
+        const targetId = getEndpointId(link.target);
+
+        assert.equal(nodeIds.has(sourceId), true, `seed ${seed} kept dangling source ${sourceId}`);
+        assert.equal(nodeIds.has(targetId), true, `seed ${seed} kept dangling target ${targetId}`);
+        assert.notEqual(sourceId, targetId, `seed ${seed} kept self-link ${sourceId}`);
+      }
+
+      const normalizedAgain = normalizeGraphInput({
+        nodes: normalized.nodes,
+        links: normalized.links,
+        localDepth: normalized.localDepth
+      });
+
+      assert.deepEqual(normalizedAgain.nodes, normalized.nodes, `seed ${seed} normalization is not node-idempotent`);
+      assert.deepEqual(normalizedAgain.links, normalized.links, `seed ${seed} normalization is not link-idempotent`);
+      assert.equal(normalizedAgain.localDepth, normalized.localDepth, `seed ${seed} normalization is not depth-idempotent`);
+    }
+  } finally {
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+  }
+});
+
 test('empty graphs return empty traversal, index, and topology results', async () => {
   const { buildGraphIndexes } = await importSourceModule('src/components/graph/graphIndexes.ts');
   const { buildLocalGraphScope, filterLocalGraph } = await importSourceModule('src/components/graph/localGraph.ts');
@@ -544,6 +751,79 @@ test('diffGraph accepts structural equality comparators for payload-stable recor
     removedLinks: [],
     updatedLinks: []
   });
+});
+
+test('seeded diffGraph sweep remains deterministic and mutation-free across normalized inputs', async () => {
+  const { normalizeGraphInput } = await importSourceModule('src/components/graph/inputValidation.ts');
+  const { diffGraph } = await importSourceModule('src/components/graph/graphDiff.ts');
+  const options = {
+    areNodesEqual: structurallyEqual,
+    areLinksEqual: structurallyEqual
+  };
+  const originalNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+
+  try {
+    for (let seed = 101; seed <= 160; seed += 1) {
+      const previousNormalized = normalizeGraphInput(createRandomGraphInput(seed));
+      const nextNormalized = normalizeGraphInput(createRandomGraphInput(seed + 1000));
+      const previous = {
+        nodes: previousNormalized.nodes,
+        links: previousNormalized.links
+      };
+      const next = {
+        nodes: nextNormalized.nodes,
+        links: nextNormalized.links
+      };
+      const snapshot = structuredClone({ previous, next });
+      const previousIds = new Set(previous.nodes.map(node => node.id));
+      const nextIds = new Set(next.nodes.map(node => node.id));
+
+      const patch = diffGraph(previous, next, options);
+      const patchAgain = diffGraph(previous, next, options);
+      const emptyPatch = diffGraph(previous, previous, options);
+
+      assert.deepEqual(patchAgain, patch, `seed ${seed} diff is not deterministic`);
+      assert.deepEqual({ previous, next }, snapshot, `seed ${seed} diff mutated input graphs`);
+      assertEmptyPatch(emptyPatch, `seed ${seed} self diff is not empty`);
+
+      for (const node of patch.addedNodes) {
+        assert.equal(previousIds.has(node.id), false, `seed ${seed} added existing node ${node.id}`);
+        assert.equal(nextIds.has(node.id), true, `seed ${seed} added missing next node ${node.id}`);
+        assert.equal(next.nodes.includes(node), true, `seed ${seed} added node is not from next graph`);
+      }
+
+      for (const nodeId of patch.removedNodeIds) {
+        assert.equal(previousIds.has(nodeId), true, `seed ${seed} removed missing previous node ${nodeId}`);
+        assert.equal(nextIds.has(nodeId), false, `seed ${seed} removed existing next node ${nodeId}`);
+      }
+
+      for (const node of patch.updatedNodes) {
+        assert.equal(previousIds.has(node.id), true, `seed ${seed} updated missing previous node ${node.id}`);
+        assert.equal(nextIds.has(node.id), true, `seed ${seed} updated missing next node ${node.id}`);
+        assert.equal(next.nodes.includes(node), true, `seed ${seed} updated node is not from next graph`);
+      }
+
+      for (const link of patch.addedLinks) {
+        assert.equal(next.links.includes(link), true, `seed ${seed} added link is not from next graph`);
+      }
+
+      for (const link of patch.updatedLinks) {
+        assert.equal(next.links.includes(link), true, `seed ${seed} updated link is not from next graph`);
+      }
+
+      for (const removed of patch.removedLinks) {
+        assert.equal(previous.links.includes(removed.link), true, `seed ${seed} removed link is not from previous graph`);
+        assert.equal(typeof removed.key, 'string', `seed ${seed} removed link key is not stable text`);
+      }
+    }
+  } finally {
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+  }
 });
 
 test('findNodeAtPosition respects viewport conversion and minimum screen hit target', async () => {
