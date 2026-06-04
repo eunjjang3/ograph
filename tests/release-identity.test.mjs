@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   getReleaseIdentityIssues,
+  getReleaseMainReachabilityIssues,
   verifyReleaseIdentity
 } from '../scripts/verify-release-identity.mjs';
 
@@ -66,6 +67,66 @@ test('release identity accepts release tags that match package version', () => {
       validReleaseChangelog
     ),
     []
+  );
+});
+
+test('release identity accepts release tags whose commit is reachable from origin main', () => {
+  const calls = [];
+  const git = (args) => {
+    calls.push(args);
+    return args[0] === 'rev-parse' ? 'main-commit' : '';
+  };
+
+  assert.doesNotThrow(() =>
+    verifyReleaseIdentity(
+      validPackageJson,
+      {
+        GITHUB_EVENT_NAME: 'release',
+        GITHUB_REF: 'refs/tags/v0.1.0',
+        GITHUB_REPOSITORY: 'eunjjang3/ograph',
+        GITHUB_SHA: 'release-commit'
+      },
+      validReleaseChangelog,
+      { checkMainReachability: true, git }
+    )
+  );
+
+  assert.deepEqual(calls, [
+    ['fetch', '--quiet', 'origin', 'main:refs/remotes/origin/main'],
+    ['rev-parse', '--verify', 'origin/main'],
+    ['merge-base', '--is-ancestor', 'release-commit', 'origin/main']
+  ]);
+});
+
+test('release identity rejects release tags that are not reachable from origin main', () => {
+  const git = (args) => {
+    if (args[0] === 'merge-base') {
+      throw new Error('not an ancestor');
+    }
+
+    return '';
+  };
+
+  assert.deepEqual(
+    getReleaseMainReachabilityIssues(
+      {
+        GITHUB_EVENT_NAME: 'release',
+        GITHUB_REF: 'refs/tags/v0.1.0',
+        GITHUB_SHA: 'unreviewed-commit'
+      },
+      git
+    ),
+    ['release tag commit unreviewed-commit must be reachable from protected origin/main']
+  );
+});
+
+test('release identity rejects release publishes without a commit sha for main reachability', () => {
+  assert.deepEqual(
+    getReleaseMainReachabilityIssues({
+      GITHUB_EVENT_NAME: 'release',
+      GITHUB_REF: 'refs/tags/v0.1.0'
+    }),
+    ['release publish requires GITHUB_SHA so the tag commit can be checked against origin/main']
   );
 });
 

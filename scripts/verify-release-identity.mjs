@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -12,6 +13,14 @@ function isReleasePublish(env) {
   const eventName = env.GITHUB_EVENT_NAME ?? '';
 
   return eventName === 'release' || githubRef.startsWith('refs/tags/');
+}
+
+function runGit(args) {
+  return execFileSync('git', args, {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe']
+  }).trim();
 }
 
 function getMarkdownSectionBody(markdown, heading) {
@@ -74,7 +83,28 @@ export function getReleaseChangelogIssues(packageJson, changelog, env = process.
   return issues;
 }
 
-export function getReleaseIdentityIssues(packageJson, env = process.env, changelog = '') {
+export function getReleaseMainReachabilityIssues(env = process.env, git = runGit) {
+  if (!isReleasePublish(env)) {
+    return [];
+  }
+
+  const githubSha = env.GITHUB_SHA ?? '';
+
+  if (githubSha.length === 0) {
+    return ['release publish requires GITHUB_SHA so the tag commit can be checked against origin/main'];
+  }
+
+  try {
+    git(['fetch', '--quiet', 'origin', 'main:refs/remotes/origin/main']);
+    git(['rev-parse', '--verify', 'origin/main']);
+    git(['merge-base', '--is-ancestor', githubSha, 'origin/main']);
+    return [];
+  } catch {
+    return [`release tag commit ${githubSha} must be reachable from protected origin/main`];
+  }
+}
+
+export function getReleaseIdentityIssues(packageJson, env = process.env, changelog = '', options = {}) {
   const issues = [];
 
   if (packageJson.name !== expectedPackageName) {
@@ -114,11 +144,15 @@ export function getReleaseIdentityIssues(packageJson, env = process.env, changel
 
   issues.push(...getReleaseChangelogIssues(packageJson, changelog, env));
 
+  if (options.checkMainReachability === true) {
+    issues.push(...getReleaseMainReachabilityIssues(env, options.git ?? runGit));
+  }
+
   return issues;
 }
 
-export function verifyReleaseIdentity(packageJson, env = process.env, changelog = '') {
-  const issues = getReleaseIdentityIssues(packageJson, env, changelog);
+export function verifyReleaseIdentity(packageJson, env = process.env, changelog = '', options = {}) {
+  const issues = getReleaseIdentityIssues(packageJson, env, changelog, options);
 
   if (issues.length > 0) {
     throw new Error(`Release identity check failed:\n- ${issues.join('\n- ')}`);
@@ -134,5 +168,7 @@ function readChangelog() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  verifyReleaseIdentity(readPackageJson(), process.env, readChangelog());
+  verifyReleaseIdentity(readPackageJson(), process.env, readChangelog(), {
+    checkMainReachability: true
+  });
 }
