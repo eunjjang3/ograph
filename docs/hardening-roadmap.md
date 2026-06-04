@@ -46,7 +46,11 @@ compatibility.
 | P1 | Track the public canonical repository hardening queue and release gates in this repo. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
 | P1 | Keep release/security docs aligned with the public `main` branch. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
 | P1 | Keep repo-only hardening docs out of the package tarball. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
-| P1 | Add Playwright browser interaction and visual smoke coverage before any stable release. | Done | `hardening/p1-playwright-browser-gate` | `2ce362b623dc306ef4e7d90bf16f451e3a29601b` |
+| P1 | Promote the initial Chromium packed-consumer browser smoke gate into CI. | Done | `hardening/p1-playwright-browser-gate` | `2ce362b623dc306ef4e7d90bf16f451e3a29601b` |
+| P1 | Complete the stable packed-consumer Playwright interaction matrix and visual baselines. | Done; evidence commit pending | `hardening/p1-stable-playwright-gate` | Pending |
+| P1 | Keep reduced-motion local lens viewport effects stable when consumers pass inline callbacks. | Done; evidence commit pending | `hardening/p1-stable-playwright-gate` | Pending |
+| P1 | Normalize malformed public node sizes so invalid input cannot terminate canvas rendering. | Todo | TBD | Pending |
+| P1 | Reject release tags whose commit is not reachable from protected `origin/main`. | Todo | TBD | Pending |
 | P1 | Align CI with the Node 22.14.0 release/development toolchain required by current Vite and Tailwind dev dependencies. | Done | `hardening/p1-ci-node-toolchain` | `3afff1481dd504be92fb10be287096b1c2090ea0` |
 | P2 | Confirm GitHub Private Vulnerability Reporting after public visibility and repository settings are available. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Create and protect the `npm` GitHub environment used by `.github/workflows/release.yml`. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
@@ -64,6 +68,8 @@ compatibility.
 | P2 | Stabilize performance budget measurement against CI runner jitter without raising budget limits. | Done | `hardening/p2-stabilize-budget-measurement` | `3fe6cd32f4697f9762d1aba8a77fe61b17373168` |
 | P2 | Add a repo-only first-publish runbook for npm Trusted Publishing and release verification. | Done | `hardening/p2-release-runbook` | `b1e6386931ee12b2b8f2938e1a89cf3730185b73` |
 | P2 | Keep the npm registry-side Trusted Publishing blocker auditable until package/auth rights exist. | Done | `hardening/p2-npm-blocker-audit` | `cba5d1fd99b2a54b7a0c6fcb96d72ff0b5c2b03c` |
+| P2 | Split packed-consumer verification into a lock-pinned baseline lane and an explicit floating compatibility lane. | Future hardening | TBD | Pending |
+| P2 | Decide whether to replace React wheel handling with a native non-passive listener after explicit scroll-UX review. | Future UX decision | TBD | Pending |
 | P3 | Evaluate property-based tests for graph normalization after dependency approval. | Future decision | TBD | Pending |
 | P3 | Evaluate a headless core export only after preview API feedback. | Future decision | TBD | Pending |
 | P3 | Evaluate public debug events only after consumer diagnostics needs are observed. | Future decision | TBD | Pending |
@@ -99,14 +105,16 @@ The stable Playwright gate should cover:
 - node click, double-click, hover, and drag callbacks fire correctly,
 - drag release clears pins even when terminal pointer events are missed,
 - resize redraws without unexpected viewport reset,
-- local/global mode transitions do not leave stale hover or selection state,
+- local/global mode transitions clear inaccessible hover and honor
+  consumer-controlled selection resets without stale visual state,
 - React StrictMode unmount/remount does not duplicate listeners or leave
   animation frames alive.
 
 Visual smoke coverage should include empty graph, basic graph, selected node,
 hovered node, local lens, and dense graph states. Canvas tests must include a
-pixel-level non-blank assertion before screenshot comparison so empty canvas
-failures are direct.
+pixel-level non-blank assertion before every non-empty screenshot comparison;
+the empty graph comparison must first assert that only the configured
+background is rendered.
 
 ## External Release Settings
 
