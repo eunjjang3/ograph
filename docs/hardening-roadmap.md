@@ -48,10 +48,11 @@ compatibility.
 | P1 | Keep repo-only hardening docs out of the package tarball. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
 | P1 | Add Playwright browser interaction and visual smoke coverage before any stable release. | Done | `hardening/p1-playwright-browser-gate` | `2ce362b623dc306ef4e7d90bf16f451e3a29601b` |
 | P1 | Align CI with the Node 22.14.0 release/development toolchain required by current Vite and Tailwind dev dependencies. | Done | `hardening/p1-ci-node-toolchain` | `3afff1481dd504be92fb10be287096b1c2090ea0` |
-| P2 | Confirm GitHub Private Vulnerability Reporting after public visibility and repository settings are available. | External setting | GitHub settings | Pending |
-| P2 | Configure npm Trusted Publishing for `@afterglow/ograph` through `.github/workflows/release.yml` and the `npm` environment. | External setting | npm/GitHub settings | Pending |
-| P2 | Protect `main` with required CI checks before broad external adoption. | External setting | GitHub settings | Pending |
-| P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | External setting | GitHub Actions | Pending |
+| P2 | Confirm GitHub Private Vulnerability Reporting after public visibility and repository settings are available. | Done; evidence recording in progress | GitHub settings / `hardening/p2-external-release-settings` | Pending |
+| P2 | Create and protect the `npm` GitHub environment used by `.github/workflows/release.yml`. | Done; evidence recording in progress | GitHub settings / `hardening/p2-external-release-settings` | Pending |
+| P2 | Configure npm Trusted Publishing for `@afterglow/ograph` on the npm registry side. | External npm action pending | npm package settings | Pending |
+| P2 | Protect `main` with required CI checks before broad external adoption. | Done; evidence recording in progress | GitHub settings / `hardening/p2-external-release-settings` | Pending |
+| P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld | GitHub Actions / `hardening/p2-external-release-settings` | Pending |
 | P3 | Evaluate property-based tests for graph normalization after dependency approval. | Future decision | TBD | Pending |
 | P3 | Evaluate a headless core export only after preview API feedback. | Future decision | TBD | Pending |
 | P3 | Evaluate public debug events only after consumer diagnostics needs are observed. | Future decision | TBD | Pending |
@@ -94,6 +95,33 @@ Visual smoke coverage should include empty graph, basic graph, selected node,
 hovered node, local lens, and dense graph states. Canvas tests must include a
 pixel-level non-blank assertion before screenshot comparison so empty canvas
 failures are direct.
+
+## External Release Settings
+
+Current external setting evidence, checked on 2026-06-04 KST:
+
+- GitHub Private Vulnerability Reporting is enabled for
+  `eunjjang3/ograph`.
+- GitHub environment `npm` exists and requires reviewer `eunjjang3`
+  before publish jobs can deploy through that environment.
+- `main` branch protection requires the GitHub Actions status check `verify`,
+  requires branches to be up to date before merge, requires linear history,
+  requires conversation resolution, and disallows force pushes and deletions.
+- CI run `26923241380` for commit
+  `950a9d054009966900733aaadfafa11c472cfbca` passed, including the packed
+  browser consumer Playwright gate.
+- OpenSSF Scorecard run `26923241392` for commit
+  `950a9d054009966900733aaadfafa11c472cfbca` passed with score `4.3`.
+  The score is not high enough for a README badge yet. Follow-up candidates
+  include action SHA pinning, dependency-update tooling, SAST, an OpenSSF Best
+  Practices badge, and using pull requests so the code-review/CI checks become
+  meaningful to Scorecard.
+
+Still external to this repository:
+
+- npm Trusted Publishing must be connected in npm package settings for
+  `@afterglow/ograph` against the GitHub release workflow and `npm`
+  environment before the first real publish.
 
 ## Completion Evidence
 
