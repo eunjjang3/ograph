@@ -69,7 +69,7 @@ compatibility.
 | P2 | Add a repo-only first-publish runbook for npm Trusted Publishing and release verification. | Done | `hardening/p2-release-runbook` | `b1e6386931ee12b2b8f2938e1a89cf3730185b73` |
 | P2 | Keep the npm registry-side Trusted Publishing blocker auditable until package/auth rights exist. | Done | `hardening/p2-npm-blocker-audit` | `cba5d1fd99b2a54b7a0c6fcb96d72ff0b5c2b03c` |
 | P2 | Split packed-consumer verification into a lock-pinned baseline lane and an explicit floating compatibility lane. | Done | `hardening/p2-consumer-compat-lanes` | `f11e84ec172846459b3eec0e457eefe142c5bac2` |
-| P2 | Decide whether to replace React wheel handling with a native non-passive listener after explicit scroll-UX review. | Done; keep React wheel path for preview/stable | `hardening/p2-wheel-scroll-ux-decision` | `254286dba4e7dfed1a819b45af5127d994c3f235` |
+| P2 | Decide whether to replace React wheel handling with a native non-passive listener after explicit scroll-UX review. | Done; keep React wheel path for preview/stable | `hardening/p2-wheel-scroll-ux-decision` | `3936a08250af7295273cfafd7751c0fd15fcc759` |
 | P3 | Evaluate property-based tests for graph normalization after dependency approval. | Future decision | TBD | Pending |
 | P3 | Evaluate a headless core export only after preview API feedback. | Future decision | TBD | Pending |
 | P3 | Evaluate public debug events only after consumer diagnostics needs are observed. | Future decision | TBD | Pending |
