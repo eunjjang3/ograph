@@ -62,7 +62,7 @@ compatibility.
 | P2 | Configure npm Trusted Publishing for `@eunjjang/ograph` on the npm registry side. | External first publish and npm 2FA action pending | npm package settings | Pending |
 | P2 | Protect `main` with required CI checks before broad external adoption. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Enforce `main` required checks for administrators so direct pushes cannot bypass release gates. | Done | GitHub settings / `hardening/p2-main-admin-enforcement` | `d52e9c53d738b0be8b219b6a95084239075a8adb` |
-| P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld at latest score `6.8` | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
+| P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld at latest score `6.6` | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Harden supply-chain automation with SHA-pinned actions, dependency update configuration, SECURITY reporting links, and CodeQL SAST. | Done | `hardening/p2-supply-chain-ci` | `6c3b6b73719d5154c42b341da6dc6da9fb6be048` |
 | P2 | Add no-new-dependency seeded invariant sweeps for graph normalization and diff behavior. | Done | `hardening/p2-core-invariant-sweep` | `0366bc19ce94195fd84301ef84fa6f35d20cc73a` |
 | P2 | Stabilize performance budget measurement against CI runner jitter without raising budget limits. | Done | `hardening/p2-stabilize-budget-measurement` | `3fe6cd32f4697f9762d1aba8a77fe61b17373168` |
@@ -146,7 +146,7 @@ the change does not alter the debug harness graph interaction feel.
 
 ## External Release Settings
 
-Current external setting evidence, checked on 2026-06-04 KST:
+Current external setting evidence, checked on 2026-06-05 KST:
 
 - GitHub Private Vulnerability Reporting is enabled for
   `eunjjang3/ograph`.
@@ -159,18 +159,18 @@ Current external setting evidence, checked on 2026-06-04 KST:
 - Repository ruleset `Protect release tags` (`17266129`) applies to
   `refs/tags/v*`, is enforced, has no bypass actors, and blocks release tag
   deletion and non-fast-forward updates.
-- CI run `26924540676` for commit
-  `7cbf1284fe18f910423e1cec1d179ea0e4db5482` passed, including the packed
-  browser consumer Playwright gate.
-- CodeQL run `26924540698` for commit
-  `7cbf1284fe18f910423e1cec1d179ea0e4db5482` passed.
-- OpenSSF Scorecard run `26924540677` for commit
-  `7cbf1284fe18f910423e1cec1d179ea0e4db5482` passed with score `6.8`.
+- CI run `26961777426` for commit
+  `a7049b3598f0c177b8e48f359518f9fd708683b6` passed, including the pinned and
+  floating packed consumer lanes and packed browser consumer Playwright gate.
+- CodeQL run `26961777446` for commit
+  `a7049b3598f0c177b8e48f359518f9fd708683b6` passed.
+- OpenSSF Scorecard run `26961777292` for commit
+  `a7049b3598f0c177b8e48f359518f9fd708683b6` passed with score `6.6`.
   The score is still not high enough for a README badge. Action SHA pinning,
   dependency-update tooling, SAST, and SECURITY reporting link follow-ups are
   now detected by Scorecard. Remaining follow-up candidates include an OpenSSF
-  Best Practices badge, fuzzing, and using pull requests so code-review and PR
-  CI checks become meaningful to Scorecard.
+  Best Practices badge, fuzzing, signed releases, npm package publication, and
+  maintainer-approved code review rules.
 
 Still external to this repository:
 
@@ -178,7 +178,7 @@ Still external to this repository:
   `@eunjjang/ograph` against the GitHub release workflow and `npm`
   environment after the first package bootstrap and before CI-managed
   releases.
-- Local npm registry checks on 2026-06-04 KST with npm CLI `11.12.1` confirm
+- Local npm registry checks on 2026-06-05 KST with npm CLI `11.12.1` confirm
   `npm whoami` returns `eunjjang`, `npm access list packages eunjjang --json`
   returns `{}`, and `npm view @eunjjang/ograph version --json` returns `E404`.
 - `npm publish --dry-run --access public` succeeds for
