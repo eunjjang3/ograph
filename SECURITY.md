@@ -9,9 +9,11 @@ the current `main` branch.
 
 Please do not open a public issue for security-sensitive reports.
 
-Use GitHub Private Vulnerability Reporting for this repository once the feature
-is enabled. Include a minimal reproduction, affected version or commit, and the
-impact you believe the issue has.
+Use GitHub Private Vulnerability Reporting:
+https://github.com/eunjjang3/ograph/security/advisories/new
+
+Include a minimal reproduction, affected version or commit, and the impact you
+believe the issue has.
 
 This package is a client-side React canvas component. Security-sensitive areas
 are expected to involve dependency supply chain issues, unsafe consumer data

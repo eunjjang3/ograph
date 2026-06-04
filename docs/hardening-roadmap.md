@@ -53,6 +53,7 @@ compatibility.
 | P2 | Configure npm Trusted Publishing for `@afterglow/ograph` on the npm registry side. | External npm action pending | npm package settings | Pending |
 | P2 | Protect `main` with required CI checks before broad external adoption. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
+| P2 | Harden supply-chain automation with SHA-pinned actions, dependency update configuration, SECURITY reporting links, and CodeQL SAST. | In progress | `hardening/p2-supply-chain-ci` | Pending |
 | P3 | Evaluate property-based tests for graph normalization after dependency approval. | Future decision | TBD | Pending |
 | P3 | Evaluate a headless core export only after preview API feedback. | Future decision | TBD | Pending |
 | P3 | Evaluate public debug events only after consumer diagnostics needs are observed. | Future decision | TBD | Pending |
