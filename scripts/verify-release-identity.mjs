@@ -23,6 +23,14 @@ function runGit(args) {
   }).trim();
 }
 
+function runNpm(args) {
+  return execFileSync('npm', args, {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe']
+  }).trim();
+}
+
 function getMarkdownSectionBody(markdown, heading) {
   const lines = markdown.split(/\r?\n/);
   const headingIndex = lines.findIndex((line) => line.trim() === `## ${heading}`);
@@ -104,6 +112,42 @@ export function getReleaseMainReachabilityIssues(env = process.env, git = runGit
   }
 }
 
+export function getReleaseRegistryVersionIssues(packageJson, env = process.env, npm = runNpm) {
+  if (!isReleasePublish(env)) {
+    return [];
+  }
+
+  if (typeof packageJson.name !== 'string' || packageJson.name.length === 0) {
+    return ['package name must be known before checking npm release availability'];
+  }
+
+  if (typeof packageJson.version !== 'string' || packageJson.version.length === 0) {
+    return ['package version must be known before checking npm release availability'];
+  }
+
+  const packageVersion = `${packageJson.name}@${packageJson.version}`;
+
+  try {
+    const publishedVersion = npm(['view', packageVersion, 'version', '--json']);
+
+    if (publishedVersion.length > 0) {
+      return [
+        `npm package version ${packageVersion} already exists; bump package.json and CHANGELOG.md before release publish`
+      ];
+    }
+  } catch (error) {
+    const output = [error.stdout, error.stderr, error.message].filter(Boolean).join('\n');
+
+    if (/E404|404 Not Found|not found/i.test(output)) {
+      return [];
+    }
+
+    return [`could not verify npm package version availability for ${packageVersion}`];
+  }
+
+  return [];
+}
+
 export function getReleaseIdentityIssues(packageJson, env = process.env, changelog = '', options = {}) {
   const issues = [];
 
@@ -148,6 +192,10 @@ export function getReleaseIdentityIssues(packageJson, env = process.env, changel
     issues.push(...getReleaseMainReachabilityIssues(env, options.git ?? runGit));
   }
 
+  if (options.checkRegistryVersion === true) {
+    issues.push(...getReleaseRegistryVersionIssues(packageJson, env, options.npm ?? runNpm));
+  }
+
   return issues;
 }
 
@@ -169,6 +217,7 @@ function readChangelog() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   verifyReleaseIdentity(readPackageJson(), process.env, readChangelog(), {
-    checkMainReachability: true
+    checkMainReachability: true,
+    checkRegistryVersion: true
   });
 }

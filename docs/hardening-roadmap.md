@@ -16,8 +16,8 @@ included in the npm package tarball.
 - Baseline date: 2026-06-04 KST
 - Public baseline commit: `f486ee32086f6e35435977d4bf70a59b8eebb294`
 - Public repository: `https://github.com/eunjjang3/ograph`
-- Package candidate: `@eunjjang/ograph@0.1.0`
-- npm publication status: first public npm publication candidate
+- Published package: `@eunjjang/ograph@0.1.0`
+- npm publication status: public preview published on 2026-06-05 KST
 
 The baseline already contains the app-agnostic package snapshot, public
 documentation, CI, release workflow, OpenSSF Scorecard workflow, package
@@ -58,8 +58,9 @@ compatibility.
 | P2 | Guard release publishes against mismatched package identity or version tags before npm publish runs. | Done | `hardening/p2-release-identity-guard` | `5880ba35a2c59c4255d6179cb26debadeaebcf6b` |
 | P2 | Guard release publishes against non-canonical GitHub repository context. | Done | `hardening/p2-release-repository-guard` | `103341980d30557ee3e063354f32b64498004bbc` |
 | P2 | Keep unreleased changelog state accurate and require finalized version/date notes before release publish. | Done | `hardening/p2-release-changelog-guard` | `1351f1c245b5e9021bee5c3b453a564d2c877b9f` |
+| P2 | Reject release publishes when the npm package version already exists. | Done | `hardening/p2-npm-publish-evidence` | Pending |
 | P2 | Protect `v*` release tags from deletion and non-fast-forward updates. | Done | GitHub ruleset / `hardening/p2-release-tag-ruleset` | `55314114401b0d3c7f638a6545e8c885cea396a2` |
-| P2 | Configure npm Trusted Publishing for `@eunjjang/ograph` on the npm registry side. | External first publish and npm 2FA action pending | npm package settings | Pending |
+| P2 | Configure npm Trusted Publishing for `@eunjjang/ograph` on the npm registry side. | Done | npm package settings / `hardening/p2-npm-publish-evidence` | Pending |
 | P2 | Protect `main` with required CI checks before broad external adoption. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Enforce `main` required checks for administrators so direct pushes cannot bypass release gates. | Done | GitHub settings / `hardening/p2-main-admin-enforcement` | `d52e9c53d738b0be8b219b6a95084239075a8adb` |
 | P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld at latest score `6.6` | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
@@ -169,23 +170,20 @@ Current external setting evidence, checked on 2026-06-05 KST:
   The score is still not high enough for a README badge. Action SHA pinning,
   dependency-update tooling, SAST, and SECURITY reporting link follow-ups are
   now detected by Scorecard. Remaining follow-up candidates include an OpenSSF
-  Best Practices badge, fuzzing, signed releases, npm package publication, and
-  maintainer-approved code review rules.
+  Best Practices badge, fuzzing, signed releases, and maintainer-approved code
+  review rules.
 
-Still external to this repository:
+Published package evidence:
 
-- npm Trusted Publishing must be connected in npm package settings for
-  `@eunjjang/ograph` against the GitHub release workflow and `npm`
-  environment after the first package bootstrap and before CI-managed
-  releases.
-- Local npm registry checks on 2026-06-05 KST with npm CLI `11.12.1` confirm
-  `npm whoami` returns `eunjjang`, `npm access list packages eunjjang --json`
-  returns `{}`, and `npm view @eunjjang/ograph version --json` returns `E404`.
-- `npm publish --dry-run --access public` succeeds for
-  `@eunjjang/ograph@0.1.0`.
-- `npm trust list @eunjjang/ograph --json` reaches `EOTP`, confirming that
-  npm proof-of-presence is now the next external gate for trusted-publisher
-  inspection or configuration.
+- `npm view @eunjjang/ograph version --json` returns `0.1.0`, and the `latest`
+  dist-tag points at `0.1.0`.
+- `npm access get status @eunjjang/ograph --json` returns `public`.
+- `npm access list packages eunjjang --json` returns
+  `{"@eunjjang/ograph":"read-write"}`.
+- `npm audit signatures --json` returns no invalid or missing signatures.
+- `npx -y npm@11.16.0 trust list @eunjjang/ograph --json` returns a GitHub
+  trusted publisher for repository `eunjjang3/ograph`, workflow
+  `release.yml`, environment `npm`, and permission `createPackage`.
 
 ## Completion Evidence
 
