@@ -82,7 +82,8 @@ Preview releases may use the current no-new-dependency verification path:
 - `npm run test`
 - `npm run build`
 - `npm run check:examples`
-- `npm run verify:consumer`
+- `npm run verify:consumer:pinned`
+- `npm run verify:consumer:floating`
 - `node scripts/verify-release-identity.mjs`
 - `npx playwright install chromium`
 - `npm run test:browser`
@@ -167,9 +168,14 @@ The public baseline has been verified locally with:
 - `npm run test`
 - `npm run build`
 - `npm run check:examples`
-- `npm run verify:consumer`
+- `npm run verify:consumer:pinned`
+- `npm run verify:consumer:floating`
 
-`npm run verify:consumer` packs the package, installs the tarball into
-temporary React 18 and React 19 consumer projects, verifies runtime exports,
-and compiles consumer TypeScript with `skipLibCheck: false`,
-`allowSyntheticDefaultImports: false`, and `esModuleInterop: false`.
+`npm run verify:consumer:pinned` packs the package, installs the tarball into
+temporary React 18 and React 19 consumer projects after `npm ci` from checked-in
+consumer fixture locks, verifies runtime exports, and compiles consumer
+TypeScript with `skipLibCheck: false`, `allowSyntheticDefaultImports: false`,
+and `esModuleInterop: false`. `npm run verify:consumer:floating` repeats the
+same export and TypeScript checks against current React 18/19 and TypeScript 5
+major-range installs so floating registry compatibility failures are separate
+from baseline regressions.

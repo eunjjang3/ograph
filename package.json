@@ -67,7 +67,9 @@
     "test:browser:update": "node scripts/prepare-browser-consumer.mjs && playwright test --update-snapshots",
     "check:budgets": "node scripts/check-package-budgets.mjs",
     "check:examples": "npm run build:lib && tsc -p examples/tsconfig.json",
-    "verify:consumer": "node scripts/verify-consumer-package.mjs"
+    "verify:consumer": "npm run verify:consumer:pinned && npm run verify:consumer:floating",
+    "verify:consumer:pinned": "node scripts/verify-consumer-package.mjs --lane pinned",
+    "verify:consumer:floating": "node scripts/verify-consumer-package.mjs --lane floating"
   },
   "dependencies": {
     "d3-force": "^3.0.0"

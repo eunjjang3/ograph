@@ -42,8 +42,11 @@ jobs:
       - name: Verify examples
         run: npm run check:examples
 
-      - name: Verify packed consumer install
-        run: npm run verify:consumer
+      - name: Verify packed consumer install (pinned baseline)
+        run: npm run verify:consumer:pinned
+
+      - name: Verify packed consumer install (floating compatibility)
+        run: npm run verify:consumer:floating
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
