@@ -86,6 +86,26 @@ function normalizeNodeNumber<
   return nextNode;
 }
 
+function normalizeNodeSize<Metadata extends GraphNodeMetadata>(
+  normalizedNode: GraphNode<Metadata> | null,
+  sourceNode: GraphNode<Metadata>,
+  label: string
+): GraphNode<Metadata> | null {
+  const value = sourceNode.size;
+
+  if (value === undefined) {
+    return normalizedNode;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+    return normalizedNode;
+  }
+
+  const nextNode = normalizedNode ?? cloneNodeForNormalization(sourceNode, label);
+  delete nextNode.size;
+  return nextNode;
+}
+
 function normalizeNode<Metadata extends GraphNodeMetadata>(
   node: GraphNode<Metadata>
 ): GraphNode<Metadata> {
@@ -99,6 +119,8 @@ function normalizeNode<Metadata extends GraphNodeMetadata>(
   for (const key of NULLABLE_NODE_NUMBER_KEYS) {
     normalizedNode = normalizeNodeNumber(normalizedNode, node, label, key, true);
   }
+
+  normalizedNode = normalizeNodeSize(normalizedNode, node, label);
 
   return normalizedNode ?? node;
 }

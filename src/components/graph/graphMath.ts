@@ -14,6 +14,10 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
+function nonNegativeFiniteOr(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
 function smoothstep(edge0: number, edge1: number, value: number): number {
   if (value <= edge0) return 0;
   if (value >= edge1) return 1;
@@ -31,8 +35,7 @@ export function toWorldY(screenY: number, viewport: Viewport): number {
 }
 
 /**
- * Calculates a dynamic size base on degrees or configured sizes,
- * ensuring sizes remain bounded.
+ * Calculates a dynamic node radius from degree and configured size values.
  */
 export function getNodeRadius(
   baseRadius: number,
@@ -40,9 +43,9 @@ export function getNodeRadius(
   sizeValue?: number,
   degreeValue?: number
 ): number {
-  // Use metadata size or secondary dynamic sizes
-  const sizeMultiplier = sizeValue !== undefined ? sizeValue : 1.0;
-  const degreeMultiplier = degreeValue !== undefined ? 1.0 + Math.log1p(degreeValue) * 0.4 : 1.0;
+  const sizeMultiplier = nonNegativeFiniteOr(sizeValue, 1.0);
+  const degree = nonNegativeFiniteOr(degreeValue, 0);
+  const degreeMultiplier = 1.0 + Math.log1p(degree) * 0.4;
   
   return baseRadius * sizeMultiplier * degreeMultiplier * (sizeScale || 1.0);
 }
