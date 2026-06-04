@@ -5,6 +5,7 @@ import type { DebugGraphMode } from './useDebugGraphState';
 import type { DebugPresetConfig } from './mockGraphPresets';
 import { RotateCcw, Maximize2, Sliders, Info } from 'lucide-react';
 
+const debugSuiteVersion = import.meta.env.VITE_OGRAPH_VERSION ?? '0.1.0';
 const NODE_COUNT_OPTIONS = [100, 500, 1000, 2500, 5000, 10000];
 const GRAPH_COLOR_NOTE = 'Each node type corresponds to the actual **Ograph Colors**. Large nodes represent hubs or index notes. Small green nodes represent local attachments.';
 
@@ -117,7 +118,7 @@ export function DebugControlPanel({
           <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-wider font-mono">Stress Tester & Debug Panel</p>
         </div>
         <div className="text-[10px] bg-[#22222d] border border-gray-700/80 rounded px-2 py-0.5 font-mono text-gray-300">
-          v1.1
+          v{debugSuiteVersion}
         </div>
       </div>
 

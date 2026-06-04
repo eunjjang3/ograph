@@ -107,6 +107,22 @@ test('package metadata publishes public scoped tarballs with referenced docs', a
   }
 });
 
+test('debug harness displays the package version injected by Vite', async () => {
+  const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  const viteConfig = await readFile(new URL('../vite.config.ts', import.meta.url), 'utf8');
+  const debugPanel = await readFile(
+    new URL('../src/components/graph/debug/DebugControlPanel.tsx', import.meta.url),
+    'utf8'
+  );
+  const fallbackVersion = debugPanel.match(/VITE_OGRAPH_VERSION \?\? '([^']+)'/)?.[1];
+
+  assert.match(viteConfig, /VITE_OGRAPH_VERSION/);
+  assert.match(debugPanel, /VITE_OGRAPH_VERSION/);
+  assert.match(debugPanel, /v\{debugSuiteVersion\}/);
+  assert.equal(fallbackVersion, packageJson.version);
+  assert.doesNotMatch(debugPanel, /\bv1\.1\b/);
+});
+
 test('published package copy stays app-agnostic', async () => {
   const publishedTextFiles = [
     'package.json',
