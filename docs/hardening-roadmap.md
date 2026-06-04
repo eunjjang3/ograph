@@ -50,7 +50,7 @@ compatibility.
 | P1 | Align CI with the Node 22.14.0 release/development toolchain required by current Vite and Tailwind dev dependencies. | Done | `hardening/p1-ci-node-toolchain` | `3afff1481dd504be92fb10be287096b1c2090ea0` |
 | P2 | Confirm GitHub Private Vulnerability Reporting after public visibility and repository settings are available. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Create and protect the `npm` GitHub environment used by `.github/workflows/release.yml`. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
-| P2 | Adopt the `@eunjjang/ograph` package scope after the `afterglow` npm scope became unavailable. | Done | `hardening/p2-package-scope-eunjjang` | Pending |
+| P2 | Adopt the `@eunjjang/ograph` package scope after the `afterglow` npm scope became unavailable. | Done | `hardening/p2-package-scope-eunjjang` | `b6ae87d4ad0c82c741cd6eb6939a6a0084f7111c` |
 | P2 | Configure npm Trusted Publishing for `@eunjjang/ograph` on the npm registry side. | External first publish and npm 2FA action pending | npm package settings | Pending |
 | P2 | Protect `main` with required CI checks before broad external adoption. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld at latest score `6.8` | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
