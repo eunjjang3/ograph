@@ -47,7 +47,7 @@ compatibility.
 | P1 | Keep release/security docs aligned with the public `main` branch. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
 | P1 | Keep repo-only hardening docs out of the package tarball. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
 | P1 | Promote the initial Chromium packed-consumer browser smoke gate into CI. | Done | `hardening/p1-playwright-browser-gate` | `2ce362b623dc306ef4e7d90bf16f451e3a29601b` |
-| P1 | Complete the stable packed-consumer Playwright interaction matrix and visual baselines. | Done | `hardening/p1-stable-playwright-gate` | `4e53ed43b304beff91c042bfd03136b907515f84` |
+| P1 | Complete the stable packed-consumer Playwright interaction matrix and visual baselines. | Done | `hardening/p1-stable-playwright-gate` | `ea1082f267bff9b05df09aae88d3f8d0a346f910` |
 | P1 | Keep reduced-motion local lens viewport effects stable when consumers pass inline callbacks. | Done | `hardening/p1-stable-playwright-gate` | `e9258118bf497e2aa8ca283d3bf12f73483e85d3` |
 | P1 | Normalize malformed public node sizes so invalid input cannot terminate canvas rendering. | Todo | TBD | Pending |
 | P1 | Reject release tags whose commit is not reachable from protected `origin/main`. | Todo | TBD | Pending |
