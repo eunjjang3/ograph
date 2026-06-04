@@ -52,7 +52,7 @@ compatibility.
 | P2 | Create and protect the `npm` GitHub environment used by `.github/workflows/release.yml`. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Configure npm Trusted Publishing for `@afterglow/ograph` on the npm registry side. | External npm action pending | npm package settings | Pending |
 | P2 | Protect `main` with required CI checks before broad external adoption. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
-| P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
+| P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld at latest score `6.8` | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Harden supply-chain automation with SHA-pinned actions, dependency update configuration, SECURITY reporting links, and CodeQL SAST. | Done | `hardening/p2-supply-chain-ci` | `6c3b6b73719d5154c42b341da6dc6da9fb6be048` |
 | P2 | Add no-new-dependency seeded invariant sweeps for graph normalization and diff behavior. | Done | `hardening/p2-core-invariant-sweep` | `0366bc19ce94195fd84301ef84fa6f35d20cc73a` |
 | P3 | Evaluate property-based tests for graph normalization after dependency approval. | Future decision | TBD | Pending |
@@ -109,23 +109,27 @@ Current external setting evidence, checked on 2026-06-04 KST:
 - `main` branch protection requires the GitHub Actions status check `verify`,
   requires branches to be up to date before merge, requires linear history,
   requires conversation resolution, and disallows force pushes and deletions.
-- CI run `26923475931` for commit
-  `c16521ef2ad329c1d3167cf44f4aedbca53d704c` passed, including the packed
+- CI run `26924052567` for commit
+  `0f0403cb68d22596ac538d11beaab8dd83b5aca3` passed, including the packed
   browser consumer Playwright gate.
-- OpenSSF Scorecard run `26923475944` for commit
-  `c16521ef2ad329c1d3167cf44f4aedbca53d704c` passed with score `4.7`.
-  The score is not high enough for a README badge yet. Action SHA pinning,
-  dependency-update tooling, SAST, and SECURITY reporting link follow-ups were
-  addressed in `6c3b6b73719d5154c42b341da6dc6da9fb6be048`. Remaining
-  follow-up candidates include an OpenSSF Best Practices badge, fuzzing, and
-  using pull requests so code-review and PR CI checks become meaningful to
-  Scorecard.
+- CodeQL run `26924052562` for commit
+  `0f0403cb68d22596ac538d11beaab8dd83b5aca3` passed.
+- OpenSSF Scorecard run `26924052564` for commit
+  `0f0403cb68d22596ac538d11beaab8dd83b5aca3` passed with score `6.8`.
+  The score is still not high enough for a README badge. Action SHA pinning,
+  dependency-update tooling, SAST, and SECURITY reporting link follow-ups are
+  now detected by Scorecard. Remaining follow-up candidates include an OpenSSF
+  Best Practices badge, fuzzing, and using pull requests so code-review and PR
+  CI checks become meaningful to Scorecard.
 
 Still external to this repository:
 
 - npm Trusted Publishing must be connected in npm package settings for
   `@afterglow/ograph` against the GitHub release workflow and `npm`
   environment before the first real publish.
+- Local npm registry checks on 2026-06-04 KST could not complete this step:
+  `npm whoami` returned `ENEEDAUTH`, and
+  `npm view @afterglow/ograph version --json` returned `E404`.
 
 ## Completion Evidence
 
