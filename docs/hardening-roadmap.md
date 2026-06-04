@@ -48,11 +48,11 @@ compatibility.
 | P1 | Keep repo-only hardening docs out of the package tarball. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
 | P1 | Add Playwright browser interaction and visual smoke coverage before any stable release. | Done | `hardening/p1-playwright-browser-gate` | `2ce362b623dc306ef4e7d90bf16f451e3a29601b` |
 | P1 | Align CI with the Node 22.14.0 release/development toolchain required by current Vite and Tailwind dev dependencies. | Done | `hardening/p1-ci-node-toolchain` | `3afff1481dd504be92fb10be287096b1c2090ea0` |
-| P2 | Confirm GitHub Private Vulnerability Reporting after public visibility and repository settings are available. | Done; evidence recording in progress | GitHub settings / `hardening/p2-external-release-settings` | Pending |
-| P2 | Create and protect the `npm` GitHub environment used by `.github/workflows/release.yml`. | Done; evidence recording in progress | GitHub settings / `hardening/p2-external-release-settings` | Pending |
+| P2 | Confirm GitHub Private Vulnerability Reporting after public visibility and repository settings are available. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
+| P2 | Create and protect the `npm` GitHub environment used by `.github/workflows/release.yml`. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Configure npm Trusted Publishing for `@afterglow/ograph` on the npm registry side. | External npm action pending | npm package settings | Pending |
-| P2 | Protect `main` with required CI checks before broad external adoption. | Done; evidence recording in progress | GitHub settings / `hardening/p2-external-release-settings` | Pending |
-| P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld | GitHub Actions / `hardening/p2-external-release-settings` | Pending |
+| P2 | Protect `main` with required CI checks before broad external adoption. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
+| P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P3 | Evaluate property-based tests for graph normalization after dependency approval. | Future decision | TBD | Pending |
 | P3 | Evaluate a headless core export only after preview API feedback. | Future decision | TBD | Pending |
 | P3 | Evaluate public debug events only after consumer diagnostics needs are observed. | Future decision | TBD | Pending |
