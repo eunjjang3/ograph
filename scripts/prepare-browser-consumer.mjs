@@ -295,7 +295,7 @@ function makeDenseGraph(): { nodes: GraphNode[]; links: GraphLink[] } {
     const ring = 90 + (index % 12) * 12;
     nodes.push({
       id: \`dense-\${index}\`,
-      label: \`Dense \${index}\`,
+      label: '',
       type: index % 23 === 0 ? 'hub' : index % 7 === 0 ? 'tag' : 'domain',
       x: Math.cos(angle) * ring,
       y: Math.sin(angle) * ring,
