@@ -38,6 +38,8 @@ first npm publication and `v0.1.0` GitHub release.
   and node callbacks.
 - Stabilized reduced-motion local lens viewport effects when consumers pass
   inline `onViewportChange` callbacks.
+- Removed malformed public `node.size` values at the input boundary so invalid
+  radius values cannot terminate canvas rendering.
 
 ### Verified
 
