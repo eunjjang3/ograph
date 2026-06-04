@@ -1,8 +1,32 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const BACKGROUND_RGB = [22, 22, 26] as const;
+const NON_EMPTY_FIXTURES = [
+  'single',
+  'small',
+  'medium',
+  'dense',
+  'disconnected',
+  'invalid'
+] as const;
+// Removing this warning requires a native non-passive wheel listener and an
+// explicit decision about whether graph zoom should suppress page scrolling.
+const ALLOWED_CONSOLE_ERRORS = [
+  'Unable to preventDefault inside passive event listener invocation.'
+] as const;
+const VISUAL_MAX_DIFF_PIXEL_RATIO = 0.005;
+const unexpectedBrowserErrors = new WeakMap<Page, string[]>();
+
+type Viewport = {
+  x: number;
+  y: number;
+  scale: number;
+};
 
 async function graphCanvas(page: Page) {
+  const canvases = page.locator('canvas');
+  await expect(canvases).toHaveCount(1);
+
   const canvas = page.getByLabel('Packed browser graph');
   await expect(canvas).toBeVisible();
   await expect(canvas).toHaveAttribute('role', 'img');
@@ -24,8 +48,8 @@ async function expectNoGraphErrors(page: Page) {
   await expect(page.getByTestId('event-errors')).toHaveText('none');
 }
 
-async function expectCanvasHasGraphPixels(page: Page) {
-  await expect.poll(async () => page.evaluate((backgroundRgb) => {
+async function changedCanvasPixels(page: Page) {
+  return page.evaluate((backgroundRgb) => {
     const canvas = document.querySelector('canvas');
 
     if (!canvas) {
@@ -57,72 +81,163 @@ async function expectCanvasHasGraphPixels(page: Page) {
     }
 
     return changedPixels;
-  }, BACKGROUND_RGB)).toBeGreaterThan(20);
+  }, BACKGROUND_RGB);
+}
+
+async function expectCanvasHasGraphPixels(page: Page) {
+  await expect.poll(() => changedCanvasPixels(page)).toBeGreaterThan(20);
+}
+
+async function expectCanvasIsBackgroundOnly(page: Page) {
+  await expect.poll(() => changedCanvasPixels(page)).toBeLessThanOrEqual(2);
+}
+
+async function setFixture(page: Page, name: string) {
+  await page.getByTestId(`fixture-${name}`).click();
+  await expect(page.getByTestId('fixture-name')).toHaveText(name);
+  await graphCanvas(page);
+  await expectNoGraphErrors(page);
+}
+
+async function readViewport(page: Page): Promise<Viewport> {
+  return {
+    x: Number(await page.getByTestId('event-viewport-x').textContent()),
+    y: Number(await page.getByTestId('event-viewport-y').textContent()),
+    scale: Number(await page.getByTestId('event-viewport-scale').textContent())
+  };
+}
+
+async function singleNodeTarget(page: Page) {
+  await setFixture(page, 'single');
+  await page.getByTestId('fit').click();
+  await expectCanvasHasGraphPixels(page);
+
+  const box = await canvasBox(page);
+  await expect.poll(async () => (await readViewport(page)).x).toBeGreaterThan(20);
+  await expect.poll(async () => (await readViewport(page)).y).toBeGreaterThan(20);
+  const viewport = await readViewport(page);
+
+  return {
+    x: box.x + viewport.x,
+    y: box.y + viewport.y
+  };
+}
+
+async function readDiagnostics(page: Page) {
+  return page.evaluate(() => {
+    const diagnostics = (window as typeof window & {
+      __ographDiagnostics: {
+        activeAnimationFrameCount: () => number;
+        activeGraphListenerCount: () => number;
+      };
+    }).__ographDiagnostics;
+
+    return {
+      frames: diagnostics.activeAnimationFrameCount(),
+      listeners: diagnostics.activeGraphListenerCount()
+    };
+  });
+}
+
+async function prepareVisualState(page: Page) {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.reload();
+  await graphCanvas(page);
+  await page.getByTestId('toggle-pause').click();
+  await expect(page.getByTestId('graph-paused')).toHaveText('yes');
 }
 
 test.beforeEach(async ({ page }) => {
+  const errors: string[] = [];
+  unexpectedBrowserErrors.set(page, errors);
+  page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
+  page.on('console', message => {
+    if (
+      message.type() === 'error' &&
+      !ALLOWED_CONSOLE_ERRORS.some(allowed => message.text().includes(allowed))
+    ) {
+      errors.push(`console: ${message.text()}`);
+    }
+  });
+
   await page.goto('/');
   await graphCanvas(page);
   await expectNoGraphErrors(page);
 });
 
-test('mounts the packed package canvas and renders empty graphs safely', async ({ page }) => {
-  await page.getByTestId('fixture-empty').click();
-  await graphCanvas(page);
-  await expect(page.getByTestId('fixture-name')).toHaveText('empty');
+test.afterEach(async ({ page }) => {
+  expect(unexpectedBrowserErrors.get(page) ?? []).toEqual([]);
   await expectNoGraphErrors(page);
 });
 
-test('renders medium and invalid graph fixtures with non-background pixels', async ({ page }) => {
-  await page.getByTestId('fixture-medium').click();
-  await expect(page.getByTestId('fixture-name')).toHaveText('medium');
-  await expectCanvasHasGraphPixels(page);
-  await expectNoGraphErrors(page);
+test('mounts exactly one packed package canvas and renders the required fixture matrix safely', async ({ page }) => {
+  await setFixture(page, 'empty');
+  await expectCanvasIsBackgroundOnly(page);
 
-  await page.getByTestId('fixture-invalid').click();
-  await expect(page.getByTestId('fixture-name')).toHaveText('invalid');
-  await expectCanvasHasGraphPixels(page);
-  await expectNoGraphErrors(page);
+  for (const fixture of NON_EMPTY_FIXTURES) {
+    await setFixture(page, fixture);
+    await expectCanvasHasGraphPixels(page);
+  }
 });
 
-test('supports node hover, click, drag, and drag release from the packed package', async ({ page }) => {
-  await page.getByTestId('fixture-single').click();
-  await expect(page.getByTestId('fixture-name')).toHaveText('single');
-  await page.getByTestId('fit').click();
-  await expectCanvasHasGraphPixels(page);
-
-  const box = await canvasBox(page);
-  await expect.poll(async () => Number(await page.getByTestId('event-viewport-x').textContent()))
-    .toBeGreaterThan(20);
-  await expect.poll(async () => Number(await page.getByTestId('event-viewport-y').textContent()))
-    .toBeGreaterThan(20);
-
-  const target = {
-    x: box.x + Number(await page.getByTestId('event-viewport-x').textContent()),
-    y: box.y + Number(await page.getByTestId('event-viewport-y').textContent())
-  };
+test('supports node hover, click, double-click, drag, and terminal pointer-loss release', async ({ page }) => {
+  const target = await singleNodeTarget(page);
 
   await page.mouse.move(target.x, target.y);
   await expect(page.getByTestId('event-hover')).toHaveText('center');
 
   await page.mouse.click(target.x, target.y);
   await expect(page.getByTestId('event-click')).toHaveText('center');
+  await expect(page.getByTestId('selected-node')).toHaveText('center');
+
+  await page.waitForTimeout(300);
+  await page.mouse.dblclick(target.x, target.y, { delay: 40 });
+  await expect(page.getByTestId('event-double-click')).toHaveText('center');
 
   await page.mouse.move(target.x, target.y);
   await page.mouse.down();
   await page.mouse.move(target.x + 90, target.y + 36, { steps: 8 });
-
   await expect(page.getByTestId('event-drag-start')).toHaveText('center');
   await expect.poll(async () => Number(await page.getByTestId('event-drag-count').textContent()))
     .toBeGreaterThan(0);
-
   await page.mouse.up();
   await expect(page.getByTestId('event-drag-end')).toHaveText('center');
+
+  const dragStartsBeforeMissedEnd = Number(
+    await page.getByTestId('event-drag-start-count').textContent()
+  );
+  const dragEndsBeforeMissedEnd = Number(
+    await page.getByTestId('event-drag-end-count').textContent()
+  );
+  const movedTarget = { x: target.x + 90, y: target.y + 36 };
+
+  await page.mouse.move(movedTarget.x, movedTarget.y);
+  await page.mouse.down();
+  await page.mouse.move(movedTarget.x + 42, movedTarget.y + 24, { steps: 5 });
+  await expect.poll(async () => Number(await page.getByTestId('event-drag-start-count').textContent()))
+    .toBeGreaterThan(dragStartsBeforeMissedEnd);
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+  await expect.poll(async () => Number(await page.getByTestId('event-drag-end-count').textContent()))
+    .toBeGreaterThan(dragEndsBeforeMissedEnd);
+  await page.mouse.up();
+
+  const dragStartsAfterMissedEnd = Number(
+    await page.getByTestId('event-drag-start-count').textContent()
+  );
+  await page.mouse.move(movedTarget.x + 42, movedTarget.y + 24);
+  await page.mouse.down();
+  await page.mouse.move(movedTarget.x + 70, movedTarget.y + 48, { steps: 5 });
+  await expect.poll(async () => Number(await page.getByTestId('event-drag-start-count').textContent()))
+    .toBeGreaterThan(dragStartsAfterMissedEnd);
+  await page.mouse.up();
   await expectNoGraphErrors(page);
 });
 
-test('updates viewport through pan and anchored wheel zoom', async ({ page }) => {
-  await page.getByTestId('fixture-empty').click();
+test('keeps pan usable and preserves the wheel pointer anchor within tolerance', async ({ page }) => {
+  await setFixture(page, 'empty');
   const box = await canvasBox(page);
   const startViewportEvents = Number(await page.getByTestId('event-viewport-count').textContent());
 
@@ -134,24 +249,163 @@ test('updates viewport through pan and anchored wheel zoom', async ({ page }) =>
   await expect.poll(async () => Number(await page.getByTestId('event-viewport-count').textContent()))
     .toBeGreaterThan(startViewportEvents);
 
-  const beforeWheelScale = Number(await page.getByTestId('event-viewport-scale').textContent());
+  const anchor = { x: 260, y: 220 };
+  const beforeWheel = await readViewport(page);
+  const beforeWorld = {
+    x: (anchor.x - beforeWheel.x) / beforeWheel.scale,
+    y: (anchor.y - beforeWheel.y) / beforeWheel.scale
+  };
+
+  await page.mouse.move(box.x + anchor.x, box.y + anchor.y);
   await page.mouse.wheel(0, -180);
-  await expect.poll(async () => Number(await page.getByTestId('event-viewport-scale').textContent()))
-    .toBeGreaterThan(beforeWheelScale);
+  await expect.poll(async () => (await readViewport(page)).scale).toBeGreaterThan(beforeWheel.scale);
+  await page.waitForTimeout(450);
+
+  const afterWheel = await readViewport(page);
+  const afterWorld = {
+    x: (anchor.x - afterWheel.x) / afterWheel.scale,
+    y: (anchor.y - afterWheel.y) / afterWheel.scale
+  };
+
+  expect(Math.abs(afterWorld.x - beforeWorld.x)).toBeLessThan(1.5);
+  expect(Math.abs(afterWorld.y - beforeWorld.y)).toBeLessThan(1.5);
   await expectNoGraphErrors(page);
 });
 
-test('switches local and global graph modes without stale interaction errors', async ({ page }) => {
-  await page.getByTestId('fixture-local').click();
-  await page.getByTestId('mode-local').click();
-
-  await expect(page.getByTestId('fixture-name')).toHaveText('local');
-  await expect(page.getByTestId('mode-name')).toHaveText('local');
+test('redraws after resize without resetting the user viewport', async ({ page }) => {
+  await setFixture(page, 'small');
+  await page.getByTestId('fit').click();
   await expectCanvasHasGraphPixels(page);
+  await page.waitForTimeout(180);
+
+  const beforeBox = await canvasBox(page);
+  await page.mouse.move(beforeBox.x + 80, beforeBox.y + 80);
+  await page.mouse.down();
+  await page.mouse.move(beforeBox.x + 140, beforeBox.y + 115, { steps: 5 });
+  await page.mouse.up();
+  const beforeResize = await readViewport(page);
+
+  await page.getByTestId('toggle-size').click();
+  await expect.poll(async () => (await canvasBox(page)).width).toBeLessThan(beforeBox.width);
+  await expectCanvasHasGraphPixels(page);
+  await page.waitForTimeout(180);
+
+  const afterResize = await readViewport(page);
+  expect(Math.abs(afterResize.x - beforeResize.x)).toBeLessThan(0.1);
+  expect(Math.abs(afterResize.y - beforeResize.y)).toBeLessThan(0.1);
+  expect(Math.abs(afterResize.scale - beforeResize.scale)).toBeLessThan(0.001);
   await expectNoGraphErrors(page);
+});
+
+test('clears inaccessible hover and consumer-controlled selection across local/global transitions', async ({ page }) => {
+  await page.getByTestId('toggle-pause').click();
+  await expect(page.getByTestId('graph-paused')).toHaveText('yes');
+  await setFixture(page, 'local');
+  await page.getByTestId('fit').click();
+  await page.getByTestId('select-first').click();
+  await expect(page.getByTestId('selected-node')).toHaveText('local-root');
+
+  const box = await canvasBox(page);
+  const viewport = await readViewport(page);
+  const outsideTarget = {
+    x: box.x + viewport.x + 240 * viewport.scale,
+    y: box.y + viewport.y + 160 * viewport.scale
+  };
+
+  await page.mouse.move(outsideTarget.x, outsideTarget.y);
+  await expect(page.getByTestId('event-hover')).toHaveText('local-outside');
+
+  await page.getByTestId('mode-local').click();
+  await expect(page.getByTestId('mode-name')).toHaveText('local');
+  await expect(page.getByTestId('event-hover')).toHaveText('none');
+  await expect(page.getByTestId('selected-node')).toHaveText('none');
+  await expectCanvasHasGraphPixels(page);
 
   await page.getByTestId('mode-global').click();
   await expect(page.getByTestId('mode-name')).toHaveText('global');
+  await expect(page.getByTestId('event-hover')).toHaveText('none');
+  await expect(page.getByTestId('selected-node')).toHaveText('none');
   await expectCanvasHasGraphPixels(page);
   await expectNoGraphErrors(page);
+});
+
+test('StrictMode unmount and remount leave no duplicate listeners or animation frames', async ({ page }) => {
+  await expect.poll(async () => (await readDiagnostics(page)).listeners).toBeGreaterThan(0);
+  const mountedDiagnostics = await readDiagnostics(page);
+
+  await page.getByTestId('toggle-mount').click();
+  await expect(page.getByTestId('graph-mounted')).toHaveText('no');
+  await expect(page.locator('canvas')).toHaveCount(0);
+  await expect.poll(async () => (await readDiagnostics(page)).listeners).toBe(0);
+  await expect.poll(async () => (await readDiagnostics(page)).frames).toBe(0);
+
+  await page.getByTestId('toggle-mount').click();
+  await expect(page.getByTestId('graph-mounted')).toHaveText('yes');
+  await graphCanvas(page);
+  await expect.poll(async () => (await readDiagnostics(page)).listeners)
+    .toBe(mountedDiagnostics.listeners);
+
+  await page.getByTestId('toggle-mount').click();
+  await expect.poll(async () => (await readDiagnostics(page)).listeners).toBe(0);
+  await expect.poll(async () => (await readDiagnostics(page)).frames).toBe(0);
+  await expectNoGraphErrors(page);
+});
+
+test('captures deterministic visual smoke states', async ({ page }) => {
+  await prepareVisualState(page);
+
+  await setFixture(page, 'empty');
+  await expectCanvasIsBackgroundOnly(page);
+  await expect(await graphCanvas(page)).toHaveScreenshot('empty.png', {
+    animations: 'disabled',
+    maxDiffPixelRatio: VISUAL_MAX_DIFF_PIXEL_RATIO
+  });
+
+  await setFixture(page, 'small');
+  await page.getByTestId('fit').click();
+  await expectCanvasHasGraphPixels(page);
+  await expect(await graphCanvas(page)).toHaveScreenshot('basic.png', {
+    animations: 'disabled',
+    maxDiffPixelRatio: VISUAL_MAX_DIFF_PIXEL_RATIO
+  });
+
+  await setFixture(page, 'local');
+  await page.getByTestId('fit').click();
+  await page.getByTestId('select-first').click();
+  await expect(page.getByTestId('selected-node')).toHaveText('local-root');
+  await expectCanvasHasGraphPixels(page);
+  await expect(await graphCanvas(page)).toHaveScreenshot('selected-node.png', {
+    animations: 'disabled',
+    maxDiffPixelRatio: VISUAL_MAX_DIFF_PIXEL_RATIO
+  });
+
+  await setFixture(page, 'disconnected');
+  await setFixture(page, 'local');
+  await page.getByTestId('fit').click();
+  const hoverBox = await canvasBox(page);
+  const hoverViewport = await readViewport(page);
+  await page.mouse.move(hoverBox.x + hoverViewport.x, hoverBox.y + hoverViewport.y);
+  await expect(page.getByTestId('event-hover')).toHaveText('local-root');
+  await expectCanvasHasGraphPixels(page);
+  await expect(await graphCanvas(page)).toHaveScreenshot('hovered-node.png', {
+    animations: 'disabled',
+    maxDiffPixelRatio: VISUAL_MAX_DIFF_PIXEL_RATIO
+  });
+
+  await page.getByTestId('mode-local').click();
+  await expect(page.getByTestId('mode-name')).toHaveText('local');
+  await expectCanvasHasGraphPixels(page);
+  await expect(await graphCanvas(page)).toHaveScreenshot('local-lens.png', {
+    animations: 'disabled',
+    maxDiffPixelRatio: VISUAL_MAX_DIFF_PIXEL_RATIO
+  });
+
+  await page.getByTestId('mode-global').click();
+  await setFixture(page, 'dense');
+  await page.getByTestId('fit').click();
+  await expectCanvasHasGraphPixels(page);
+  await expect(await graphCanvas(page)).toHaveScreenshot('dense.png', {
+    animations: 'disabled',
+    maxDiffPixelRatio: VISUAL_MAX_DIFF_PIXEL_RATIO
+  });
 });

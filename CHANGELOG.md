@@ -36,9 +36,14 @@ first npm publication and `v0.1.0` GitHub release.
   failures, and simulation setup/tick failures.
 - Preserved consumer node metadata types through `GraphViewProps` data props
   and node callbacks.
+- Stabilized reduced-motion local lens viewport effects when consumers pass
+  inline `onViewportChange` callbacks.
 
 ### Verified
 
 - Added package-surface regression tests for the client directive,
   metadata-generics declarations, public scoped publish metadata, and packaged
   documentation files.
+- Added packed-consumer browser coverage for the stable interaction matrix,
+  StrictMode cleanup, resize, invalid/disconnected/dense fixtures, and visual
+  smoke baselines.

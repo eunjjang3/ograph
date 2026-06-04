@@ -108,21 +108,23 @@ export function useViewportControls({
   const viewportAnimationActiveRef = useRef<boolean>(false);
   const lastAutoFitDependencyRef = useRef(autoFitDependency);
   const hasAutoFitRef = useRef(false);
+  const onViewportChangeRef = useRef(onViewportChange);
+  onViewportChangeRef.current = onViewportChange;
 
   const setViewportImmediate = useCallback((viewport: Viewport) => {
     viewportRef.current = viewport;
     targetViewportRef.current = viewport;
     viewportAnimationActiveRef.current = false;
     requestRender();
-    onViewportChange?.(viewportRef.current);
-  }, [onViewportChange, requestRender]);
+    onViewportChangeRef.current?.(viewportRef.current);
+  }, [requestRender]);
 
   const animateViewportTo = useCallback((viewport: Viewport) => {
     targetViewportRef.current = viewport;
     viewportAnimationActiveRef.current = true;
     requestRender();
-    onViewportChange?.(targetViewportRef.current);
-  }, [onViewportChange, requestRender]);
+    onViewportChangeRef.current?.(targetViewportRef.current);
+  }, [requestRender]);
 
   const resolveViewportForNodes = useCallback((nodes: GraphNode[], minimumScale = MIN_ZOOM_SCALE): Viewport | null => (
     resolveViewportForGraphNodes(nodes, dimensions, minimumScale)
