@@ -38,6 +38,9 @@ Current evidence from 2026-06-04 KST:
 - GitHub repository ruleset `Protect release tags` (`17266129`) is active for
   `refs/tags/v*` and blocks deletion and non-fast-forward updates without
   bypass actors.
+- `main` branch protection enforces required checks for administrators, so
+  release-prep changes must land through a checked branch/PR path rather than
+  admin direct-push bypass.
 
 ## Trusted Publishing Requirements
 
@@ -98,6 +101,14 @@ release events and `v*` tags are the publish trigger boundary.
    - CI `verify`
    - CodeQL `analyze`
    - Scorecard `analysis`
+
+   `main` branch protection must also keep administrator enforcement enabled.
+   Confirm before release:
+
+   ```sh
+   gh api repos/eunjjang3/ograph/branches/main/protection \
+     --jq '.enforce_admins.enabled'
+   ```
 
 4. Create the npm package under the `eunjjang` scope only after explicit
    maintainer approval for the first real publish. npm cannot configure a
