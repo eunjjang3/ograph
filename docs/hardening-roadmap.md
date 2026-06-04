@@ -47,8 +47,8 @@ compatibility.
 | P1 | Keep release/security docs aligned with the public `main` branch. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
 | P1 | Keep repo-only hardening docs out of the package tarball. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
 | P1 | Promote the initial Chromium packed-consumer browser smoke gate into CI. | Done | `hardening/p1-playwright-browser-gate` | `2ce362b623dc306ef4e7d90bf16f451e3a29601b` |
-| P1 | Complete the stable packed-consumer Playwright interaction matrix and visual baselines. | Done | `hardening/p1-stable-playwright-gate` | `ea1082f267bff9b05df09aae88d3f8d0a346f910` |
-| P1 | Keep reduced-motion local lens viewport effects stable when consumers pass inline callbacks. | Done | `hardening/p1-stable-playwright-gate` | `e9258118bf497e2aa8ca283d3bf12f73483e85d3` |
+| P1 | Complete the stable packed-consumer Playwright interaction matrix and visual baselines. | Done | `hardening/p1-stable-playwright-gate` | `56a7e973efc7548983e1247acad7f21d493eadf8` |
+| P1 | Keep reduced-motion local lens viewport effects stable when consumers pass inline callbacks. | Done | `hardening/p1-stable-playwright-gate` | `97cdb88db6712fd07763695ef8440f9077e9de40` |
 | P1 | Normalize malformed public node sizes so invalid input cannot terminate canvas rendering. | Todo | TBD | Pending |
 | P1 | Reject release tags whose commit is not reachable from protected `origin/main`. | Todo | TBD | Pending |
 | P1 | Align CI with the Node 22.14.0 release/development toolchain required by current Vite and Tailwind dev dependencies. | Done | `hardening/p1-ci-node-toolchain` | `3afff1481dd504be92fb10be287096b1c2090ea0` |
