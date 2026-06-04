@@ -153,6 +153,12 @@ button:focus-visible {
   );
 
   writeText(
+    join(fixtureRoot, 'src/vite-env.d.ts'),
+    `declare module '*.css';
+`
+  );
+
+  writeText(
     join(fixtureRoot, 'src/main.tsx'),
     `import { StrictMode, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';

@@ -234,6 +234,30 @@ function GraphViewCanvasInner<
   const previousModeRef = useRef(mode);
   const globalViewportRef = useRef<Viewport | null>(null);
 
+  const handleNodeClick = useCallback((node: GraphNode) => {
+    onNodeClick?.(node as GraphNode<NodeMetadata>);
+  }, [onNodeClick]);
+
+  const handleNodeDoubleClick = useCallback((node: GraphNode) => {
+    onNodeDoubleClick?.(node as GraphNode<NodeMetadata>);
+  }, [onNodeDoubleClick]);
+
+  const handleNodeHover = useCallback((node: GraphNode | null) => {
+    onNodeHover?.(node as GraphNode<NodeMetadata> | null);
+  }, [onNodeHover]);
+
+  const handleNodeDragStart = useCallback((node: GraphNode) => {
+    onNodeDragStart?.(node as GraphNode<NodeMetadata>);
+  }, [onNodeDragStart]);
+
+  const handleNodeDrag = useCallback((node: GraphNode) => {
+    onNodeDrag?.(node as GraphNode<NodeMetadata>);
+  }, [onNodeDrag]);
+
+  const handleNodeDragEnd = useCallback((node: GraphNode) => {
+    onNodeDragEnd?.(node as GraphNode<NodeMetadata>);
+  }, [onNodeDragEnd]);
+
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
       setReduceMotion(false);
@@ -315,12 +339,12 @@ function GraphViewCanvasInner<
     dragStart,
     dragMove,
     dragEnd,
-    onNodeClick,
-    onNodeDoubleClick,
-    onNodeHover,
-    onNodeDragStart,
-    onNodeDrag,
-    onNodeDragEnd,
+    onNodeClick: handleNodeClick,
+    onNodeDoubleClick: handleNodeDoubleClick,
+    onNodeHover: handleNodeHover,
+    onNodeDragStart: handleNodeDragStart,
+    onNodeDrag: handleNodeDrag,
+    onNodeDragEnd: handleNodeDragEnd,
     onViewportChange
   });
 

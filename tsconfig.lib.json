@@ -6,6 +6,7 @@
     "declarationDir": "dist",
     "emitDeclarationOnly": true,
     "noEmit": false,
+    "rootDir": "src/components/graph",
     "stripInternal": true
   },
   "include": [
