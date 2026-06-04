@@ -53,7 +53,7 @@ compatibility.
 | P2 | Adopt the `@eunjjang/ograph` package scope after the `afterglow` npm scope became unavailable. | Done | `hardening/p2-package-scope-eunjjang` | `b6ae87d4ad0c82c741cd6eb6939a6a0084f7111c` |
 | P2 | Guard release publishes against mismatched package identity or version tags before npm publish runs. | Done | `hardening/p2-release-identity-guard` | `5880ba35a2c59c4255d6179cb26debadeaebcf6b` |
 | P2 | Guard release publishes against non-canonical GitHub repository context. | Done | `hardening/p2-release-repository-guard` | `103341980d30557ee3e063354f32b64498004bbc` |
-| P2 | Keep unreleased changelog state accurate and require finalized version/date notes before release publish. | Done | `hardening/p2-release-changelog-guard` | Pending |
+| P2 | Keep unreleased changelog state accurate and require finalized version/date notes before release publish. | Done | `hardening/p2-release-changelog-guard` | `1351f1c245b5e9021bee5c3b453a564d2c877b9f` |
 | P2 | Protect `v*` release tags from deletion and non-fast-forward updates. | Done | GitHub ruleset / `hardening/p2-release-tag-ruleset` | `55314114401b0d3c7f638a6545e8c885cea396a2` |
 | P2 | Configure npm Trusted Publishing for `@eunjjang/ograph` on the npm registry side. | External first publish and npm 2FA action pending | npm package settings | Pending |
 | P2 | Protect `main` with required CI checks before broad external adoption. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
