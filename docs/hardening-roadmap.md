@@ -53,7 +53,7 @@ compatibility.
 | P2 | Configure npm Trusted Publishing for `@afterglow/ograph` on the npm registry side. | External npm action pending | npm package settings | Pending |
 | P2 | Protect `main` with required CI checks before broad external adoption. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
-| P2 | Harden supply-chain automation with SHA-pinned actions, dependency update configuration, SECURITY reporting links, and CodeQL SAST. | In progress | `hardening/p2-supply-chain-ci` | Pending |
+| P2 | Harden supply-chain automation with SHA-pinned actions, dependency update configuration, SECURITY reporting links, and CodeQL SAST. | Done | `hardening/p2-supply-chain-ci` | `6c3b6b73719d5154c42b341da6dc6da9fb6be048` |
 | P3 | Evaluate property-based tests for graph normalization after dependency approval. | Future decision | TBD | Pending |
 | P3 | Evaluate a headless core export only after preview API feedback. | Future decision | TBD | Pending |
 | P3 | Evaluate public debug events only after consumer diagnostics needs are observed. | Future decision | TBD | Pending |
@@ -108,15 +108,17 @@ Current external setting evidence, checked on 2026-06-04 KST:
 - `main` branch protection requires the GitHub Actions status check `verify`,
   requires branches to be up to date before merge, requires linear history,
   requires conversation resolution, and disallows force pushes and deletions.
-- CI run `26923241380` for commit
-  `950a9d054009966900733aaadfafa11c472cfbca` passed, including the packed
+- CI run `26923475931` for commit
+  `c16521ef2ad329c1d3167cf44f4aedbca53d704c` passed, including the packed
   browser consumer Playwright gate.
-- OpenSSF Scorecard run `26923241392` for commit
-  `950a9d054009966900733aaadfafa11c472cfbca` passed with score `4.3`.
-  The score is not high enough for a README badge yet. Follow-up candidates
-  include action SHA pinning, dependency-update tooling, SAST, an OpenSSF Best
-  Practices badge, and using pull requests so the code-review/CI checks become
-  meaningful to Scorecard.
+- OpenSSF Scorecard run `26923475944` for commit
+  `c16521ef2ad329c1d3167cf44f4aedbca53d704c` passed with score `4.7`.
+  The score is not high enough for a README badge yet. Action SHA pinning,
+  dependency-update tooling, SAST, and SECURITY reporting link follow-ups were
+  addressed in `6c3b6b73719d5154c42b341da6dc6da9fb6be048`. Remaining
+  follow-up candidates include an OpenSSF Best Practices badge, fuzzing, and
+  using pull requests so code-review and PR CI checks become meaningful to
+  Scorecard.
 
 Still external to this repository:
 
