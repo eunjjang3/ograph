@@ -21,10 +21,15 @@ Publishing is not complete.
 
 Current evidence from 2026-06-04 KST:
 
+- Local npm CLI is `11.12.1`.
 - `npm whoami` returns `ENEEDAUTH`.
 - `npm view @afterglow/ograph version --json` returns `E404`.
+- `npx -y npm@11.10.0 trust list @afterglow/ograph --json` returns `E401`.
 - The package must exist in npm registry/package settings before `npm trust`
   can configure a trusted publisher from the CLI.
+- A maintainer with `afterglow` npm scope/package rights must create or claim
+  the package and configure the trusted publisher; repository edits alone
+  cannot complete this blocker.
 
 ## Trusted Publishing Requirements
 

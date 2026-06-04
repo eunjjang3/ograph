@@ -56,6 +56,7 @@ compatibility.
 | P2 | Harden supply-chain automation with SHA-pinned actions, dependency update configuration, SECURITY reporting links, and CodeQL SAST. | Done | `hardening/p2-supply-chain-ci` | `6c3b6b73719d5154c42b341da6dc6da9fb6be048` |
 | P2 | Add no-new-dependency seeded invariant sweeps for graph normalization and diff behavior. | Done | `hardening/p2-core-invariant-sweep` | `0366bc19ce94195fd84301ef84fa6f35d20cc73a` |
 | P2 | Add a repo-only first-publish runbook for npm Trusted Publishing and release verification. | Done | `hardening/p2-release-runbook` | `b1e6386931ee12b2b8f2938e1a89cf3730185b73` |
+| P2 | Keep the npm registry-side Trusted Publishing blocker auditable until package/auth rights exist. | Done | `hardening/p2-npm-blocker-audit` | Pending |
 | P3 | Evaluate property-based tests for graph normalization after dependency approval. | Future decision | TBD | Pending |
 | P3 | Evaluate a headless core export only after preview API feedback. | Future decision | TBD | Pending |
 | P3 | Evaluate public debug events only after consumer diagnostics needs are observed. | Future decision | TBD | Pending |
@@ -110,13 +111,13 @@ Current external setting evidence, checked on 2026-06-04 KST:
 - `main` branch protection requires the GitHub Actions status check `verify`,
   requires branches to be up to date before merge, requires linear history,
   requires conversation resolution, and disallows force pushes and deletions.
-- CI run `26924052567` for commit
-  `0f0403cb68d22596ac538d11beaab8dd83b5aca3` passed, including the packed
+- CI run `26924540676` for commit
+  `7cbf1284fe18f910423e1cec1d179ea0e4db5482` passed, including the packed
   browser consumer Playwright gate.
-- CodeQL run `26924052562` for commit
-  `0f0403cb68d22596ac538d11beaab8dd83b5aca3` passed.
-- OpenSSF Scorecard run `26924052564` for commit
-  `0f0403cb68d22596ac538d11beaab8dd83b5aca3` passed with score `6.8`.
+- CodeQL run `26924540698` for commit
+  `7cbf1284fe18f910423e1cec1d179ea0e4db5482` passed.
+- OpenSSF Scorecard run `26924540677` for commit
+  `7cbf1284fe18f910423e1cec1d179ea0e4db5482` passed with score `6.8`.
   The score is still not high enough for a README badge. Action SHA pinning,
   dependency-update tooling, SAST, and SECURITY reporting link follow-ups are
   now detected by Scorecard. Remaining follow-up candidates include an OpenSSF
@@ -128,9 +129,14 @@ Still external to this repository:
 - npm Trusted Publishing must be connected in npm package settings for
   `@afterglow/ograph` against the GitHub release workflow and `npm`
   environment before the first real publish.
-- Local npm registry checks on 2026-06-04 KST could not complete this step:
+- Local npm registry checks on 2026-06-04 KST with npm CLI `11.12.1` could
+  not complete this step:
   `npm whoami` returned `ENEEDAUTH`, and
   `npm view @afterglow/ograph version --json` returned `E404`.
+- `npx -y npm@11.10.0 trust list @afterglow/ograph --json` returned `E401`
+  against `/-/package/@afterglow%2fograph/trust`, confirming that current
+  local state lacks the npm package/auth rights needed to inspect or configure
+  the trusted publisher.
 
 ## Completion Evidence
 
