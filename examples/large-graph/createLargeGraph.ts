@@ -1,4 +1,4 @@
-import type { GraphLink, GraphNode } from '@afterglow/ograph';
+import type { GraphLink, GraphNode } from '@eunjjang/ograph';
 
 export function createLargeGraph(
   nodeCount = 500,

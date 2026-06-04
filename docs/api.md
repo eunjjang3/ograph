@@ -19,7 +19,7 @@ import {
   type GraphViewProps,
   type GraphViewport,
   type GraphViewRef
-} from '@afterglow/ograph';
+} from '@eunjjang/ograph';
 ```
 
 Do not import from internal source files in a consumer app. The debug harness and mock generators are intentionally excluded from the package boundary.
@@ -131,7 +131,7 @@ Use `GraphViewRef` when an outer toolbar needs to control the graph.
 
 ```tsx
 import { useRef } from 'react';
-import { GraphView, type GraphViewRef } from '@afterglow/ograph';
+import { GraphView, type GraphViewRef } from '@eunjjang/ograph';
 
 const ref = useRef<GraphViewRef | null>(null);
 

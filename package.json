@@ -1,5 +1,5 @@
 {
-  "name": "@afterglow/ograph",
+  "name": "@eunjjang/ograph",
   "version": "0.1.0",
   "description": "Reusable interactive force-directed canvas graph component for React applications.",
   "type": "module",

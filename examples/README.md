@@ -1,10 +1,10 @@
 # Examples
 
 These examples demonstrate the public package boundary. They import from
-`@afterglow/ograph`, not from internal source files.
+`@eunjjang/ograph`, not from internal source files.
 
 The examples are typechecked in this repository through `npm run check:examples`.
-That script maps `@afterglow/ograph` to the local package entry so the examples
+That script maps `@eunjjang/ograph` to the local package entry so the examples
 can be verified before the first npm publication.
 
 ## Examples

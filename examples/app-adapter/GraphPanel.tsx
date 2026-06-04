@@ -1,4 +1,4 @@
-import { GraphView } from '@afterglow/ograph';
+import { GraphView } from '@eunjjang/ograph';
 import { toOGraphData, type MemoryGraph } from './adapter';
 
 const memoryGraph: MemoryGraph = {

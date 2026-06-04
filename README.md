@@ -15,7 +15,7 @@ The package is designed for applications that need a large interactive node-link
 
 ## Project Status
 
-`@afterglow/ograph` is an early pre-1.0 package being prepared for public preview so the rendering model, package boundary, and API direction can be reviewed before a production-ready release. Expect API and behavior changes before `1.0.0`.
+`@eunjjang/ograph` is an early pre-1.0 package being prepared for public preview so the rendering model, package boundary, and API direction can be reviewed before a production-ready release. Expect API and behavior changes before `1.0.0`.
 
 ## Documentation
 
@@ -28,7 +28,7 @@ These public documents are included in the published package tarball as well as 
 The repository keeps the same public documentation boundary as the package tarball so the project stays app-agnostic for new consumers.
 
 Repository examples live under [examples](examples/README.md). They import from
-`@afterglow/ograph` and are typechecked with `npm run check:examples`.
+`@eunjjang/ograph` and are typechecked with `npm run check:examples`.
 
 ## Install In A Consumer
 
@@ -42,7 +42,7 @@ import {
   type GraphLink,
   type GraphNode,
   type GraphViewProps
-} from '@afterglow/ograph';
+} from '@eunjjang/ograph';
 ```
 
 Until the first npm publication, install from the GitHub repository after it is public, or clone the repository and build locally:
@@ -61,7 +61,7 @@ npm run build
 ## Basic Usage
 
 ```tsx
-import { GraphView, type GraphLink, type GraphNode } from '@afterglow/ograph';
+import { GraphView, type GraphLink, type GraphNode } from '@eunjjang/ograph';
 
 const nodes: GraphNode[] = [
   { id: 'node-a', label: 'Node A', type: 'note' },

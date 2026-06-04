@@ -1,4 +1,4 @@
-import { GraphView, type GraphLink, type GraphNode } from '@afterglow/ograph';
+import { GraphView, type GraphLink, type GraphNode } from '@eunjjang/ograph';
 
 const nodes: GraphNode[] = [
   { id: 'note-a', label: 'Note A', type: 'note' },

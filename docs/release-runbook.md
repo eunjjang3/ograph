@@ -7,29 +7,34 @@ tarball.
 ## Fixed Release Identity
 
 - Product name: Ograph
-- npm package: `@afterglow/ograph`
+- npm package: `@eunjjang/ograph`
 - GitHub repository: `eunjjang3/ograph`
 - Release workflow: `.github/workflows/release.yml`
 - GitHub environment: `npm`
 
 Do not rename the repository, package, or product during release hardening.
 
-## Current Blocker
+## Current Release State
 
-The repository-side release path is prepared, but npm registry-side Trusted
-Publishing is not complete.
+The repository-side release path is prepared for the `@eunjjang/ograph`
+package identity. npm CLI authentication is available, but the first registry
+package creation and Trusted Publishing configuration still require
+maintainer-controlled npm 2FA/proof-of-presence.
 
 Current evidence from 2026-06-04 KST:
 
 - Local npm CLI is `11.12.1`.
-- `npm whoami` returns `ENEEDAUTH`.
-- `npm view @afterglow/ograph version --json` returns `E404`.
-- `npx -y npm@11.10.0 trust list @afterglow/ograph --json` returns `E401`.
+- `npm whoami` returns `eunjjang`.
+- `npm access list packages eunjjang --json` returns `{}`.
+- `npm view @eunjjang/ograph version --json` returns `E404`, as expected
+  before the first publish creates the registry package.
+- `npm publish --dry-run --access public` succeeds for
+  `@eunjjang/ograph@0.1.0`.
+- `npm trust list @eunjjang/ograph --json` reaches `EOTP`, meaning npm
+  requires a one-time password/browser confirmation before trusted-publisher
+  inspection or configuration can continue.
 - The package must exist in npm registry/package settings before `npm trust`
   can configure a trusted publisher from the CLI.
-- A maintainer with `afterglow` npm scope/package rights must create or claim
-  the package and configure the trusted publisher; repository edits alone
-  cannot complete this blocker.
 
 ## Trusted Publishing Requirements
 
@@ -84,13 +89,12 @@ canonical `eunjjang3/ograph` repository.
    - CodeQL `analyze`
    - Scorecard `analysis`
 
-4. Create or claim the npm package under the `afterglow` scope using an npm
-   account that has the necessary scope/package rights and 2FA enabled. If the
-   package does not exist yet, decide the bootstrap path explicitly before
-   proceeding; `npm trust` cannot configure a package that is not already on
-   the registry.
+4. Create the npm package under the `eunjjang` scope only after explicit
+   maintainer approval for the first real publish. npm cannot configure a
+   trusted publisher for a package that is not already on the registry, and
+   the first real publish permanently consumes the `0.1.0` package version.
 
-5. Configure Trusted Publishing for `@afterglow/ograph`.
+5. Configure Trusted Publishing for `@eunjjang/ograph`.
 
    npmjs.com path:
 
@@ -102,16 +106,16 @@ canonical `eunjjang3/ograph` repository.
    - Environment: `npm`
    - Allowed action: `npm publish`
 
-   CLI path after the package exists and npm authentication is available:
+   CLI path after the package exists and npm proof-of-presence is available:
 
    ```sh
    npm install -g npm@^11.10.0
-   npm trust github @afterglow/ograph \
+   npm trust github @eunjjang/ograph \
      --repo eunjjang3/ograph \
      --file release.yml \
      --environment npm \
      --allow-publish
-   npm trust list @afterglow/ograph
+   npm trust list @eunjjang/ograph
    ```
 
 6. Restrict traditional token publishing after Trusted Publishing has been
@@ -147,8 +151,8 @@ canonical `eunjjang3/ograph` repository.
 9. After publish, verify the registry state.
 
    ```sh
-   npm view @afterglow/ograph version
-   npm view @afterglow/ograph repository.url
+   npm view @eunjjang/ograph version
+   npm view @eunjjang/ograph repository.url
    npm audit signatures
    ```
 

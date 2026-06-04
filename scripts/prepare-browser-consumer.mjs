@@ -54,7 +54,7 @@ export function prepareBrowserConsumerFixture() {
       build: 'tsc --noEmit && vite build'
     },
     dependencies: {
-      '@afterglow/ograph': tarballSpecifier,
+      '@eunjjang/ograph': tarballSpecifier,
       '@vitejs/plugin-react': rootPackage.devDependencies['@vitejs/plugin-react'],
       vite: rootPackage.devDependencies.vite,
       typescript: rootPackage.devDependencies.typescript,
@@ -162,7 +162,7 @@ import {
   type GraphNode,
   type GraphViewRef,
   type GraphViewport
-} from '@afterglow/ograph';
+} from '@eunjjang/ograph';
 import './styles.css';
 
 type FixtureName = 'empty' | 'single' | 'small' | 'medium' | 'invalid' | 'local';

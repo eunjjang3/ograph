@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { GraphView } from '@afterglow/ograph';
+import { GraphView } from '@eunjjang/ograph';
 import { createLargeGraph } from './createLargeGraph';
 
 export function LargeGraphPanel() {

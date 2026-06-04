@@ -32,7 +32,7 @@ import {
   type GraphLink,
   type GraphNode,
   type GraphViewRef
-} from '@afterglow/ograph';
+} from '@eunjjang/ograph';
 
 type NoteMetadata = {
   slug: string;
@@ -105,7 +105,7 @@ function verifyReactConsumer(tarballPath, reactMajor) {
     [
       '--input-type=module',
       '-e',
-      "import { GraphView, defaultGraphPreset, defaultGraphTheme } from '@afterglow/ograph'; if (!GraphView) throw new Error('GraphView export missing'); if (!defaultGraphPreset.nodeRadius) throw new Error('preset missing'); if (!defaultGraphTheme.backgroundColor) throw new Error('theme missing');"
+      "import { GraphView, defaultGraphPreset, defaultGraphTheme } from '@eunjjang/ograph'; if (!GraphView) throw new Error('GraphView export missing'); if (!defaultGraphPreset.nodeRadius) throw new Error('preset missing'); if (!defaultGraphTheme.backgroundColor) throw new Error('theme missing');"
     ],
     { cwd: consumerDir }
   );

@@ -3,7 +3,7 @@
 This repository is the canonical public home for Ograph.
 
 - Product name: Ograph
-- Package name: `@afterglow/ograph`
+- Package name: `@eunjjang/ograph`
 - Repository: `eunjjang3/ograph`
 - Default branch: `main`
 
@@ -16,7 +16,7 @@ included in the npm package tarball.
 - Baseline date: 2026-06-04 KST
 - Public baseline commit: `f486ee32086f6e35435977d4bf70a59b8eebb294`
 - Public repository: `https://github.com/eunjjang3/ograph`
-- Package candidate: `@afterglow/ograph@0.1.0`
+- Package candidate: `@eunjjang/ograph@0.1.0`
 - npm publication status: first public npm publication candidate
 
 The baseline already contains the app-agnostic package snapshot, public
@@ -50,7 +50,8 @@ compatibility.
 | P1 | Align CI with the Node 22.14.0 release/development toolchain required by current Vite and Tailwind dev dependencies. | Done | `hardening/p1-ci-node-toolchain` | `3afff1481dd504be92fb10be287096b1c2090ea0` |
 | P2 | Confirm GitHub Private Vulnerability Reporting after public visibility and repository settings are available. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Create and protect the `npm` GitHub environment used by `.github/workflows/release.yml`. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
-| P2 | Configure npm Trusted Publishing for `@afterglow/ograph` on the npm registry side. | External npm action pending | npm package settings | Pending |
+| P2 | Adopt the `@eunjjang/ograph` package scope after the `afterglow` npm scope became unavailable. | Done | `hardening/p2-package-scope-eunjjang` | Pending |
+| P2 | Configure npm Trusted Publishing for `@eunjjang/ograph` on the npm registry side. | External first publish and npm 2FA action pending | npm package settings | Pending |
 | P2 | Protect `main` with required CI checks before broad external adoption. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld at latest score `6.8` | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Harden supply-chain automation with SHA-pinned actions, dependency update configuration, SECURITY reporting links, and CodeQL SAST. | Done | `hardening/p2-supply-chain-ci` | `6c3b6b73719d5154c42b341da6dc6da9fb6be048` |
@@ -127,16 +128,17 @@ Current external setting evidence, checked on 2026-06-04 KST:
 Still external to this repository:
 
 - npm Trusted Publishing must be connected in npm package settings for
-  `@afterglow/ograph` against the GitHub release workflow and `npm`
-  environment before the first real publish.
-- Local npm registry checks on 2026-06-04 KST with npm CLI `11.12.1` could
-  not complete this step:
-  `npm whoami` returned `ENEEDAUTH`, and
-  `npm view @afterglow/ograph version --json` returned `E404`.
-- `npx -y npm@11.10.0 trust list @afterglow/ograph --json` returned `E401`
-  against `/-/package/@afterglow%2fograph/trust`, confirming that current
-  local state lacks the npm package/auth rights needed to inspect or configure
-  the trusted publisher.
+  `@eunjjang/ograph` against the GitHub release workflow and `npm`
+  environment after the first package bootstrap and before CI-managed
+  releases.
+- Local npm registry checks on 2026-06-04 KST with npm CLI `11.12.1` confirm
+  `npm whoami` returns `eunjjang`, `npm access list packages eunjjang --json`
+  returns `{}`, and `npm view @eunjjang/ograph version --json` returns `E404`.
+- `npm publish --dry-run --access public` succeeds for
+  `@eunjjang/ograph@0.1.0`.
+- `npm trust list @eunjjang/ograph --json` reaches `EOTP`, confirming that
+  npm proof-of-presence is now the next external gate for trusted-publisher
+  inspection or configuration.
 
 ## Completion Evidence
 
