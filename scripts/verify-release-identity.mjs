@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const expectedPackageName = '@eunjjang/ograph';
 const expectedRepositoryUrl = 'git+https://github.com/eunjjang3/ograph.git';
+const expectedGitHubRepository = 'eunjjang3/ograph';
 
 export function getReleaseIdentityIssues(packageJson, env = process.env) {
   const issues = [];
@@ -17,6 +18,12 @@ export function getReleaseIdentityIssues(packageJson, env = process.env) {
     issues.push(
       `repository.url must be ${expectedRepositoryUrl}, got ${packageJson.repository?.url ?? '<missing>'}`
     );
+  }
+
+  const githubRepository = env.GITHUB_REPOSITORY;
+
+  if (githubRepository && githubRepository !== expectedGitHubRepository) {
+    issues.push(`GITHUB_REPOSITORY must be ${expectedGitHubRepository}, got ${githubRepository}`);
   }
 
   if (typeof packageJson.version !== 'string' || packageJson.version.length === 0) {
