@@ -64,7 +64,8 @@ canonical `eunjjang3/ograph` repository. It also verifies that the package
 name, package repository URL, GitHub repository context, and release tag match
 the intended `@eunjjang/ograph` identity before npm publish can run. Release
 events additionally require exactly one dated changelog heading for the
-package version and an empty `## Unreleased` section.
+package version, an empty `## Unreleased` section, and a release tag commit
+that is reachable from protected `origin/main`.
 
 GitHub repository ruleset `Protect release tags` protects `v*` release tags
 from deletion and non-fast-forward updates. Keep it active because GitHub
@@ -171,7 +172,7 @@ release events and `v*` tags are the publish trigger boundary.
    npm run build
    npm run check:examples
    npm run verify:consumer
-   GITHUB_EVENT_NAME=release GITHUB_REF="refs/tags/v${VERSION}" node scripts/verify-release-identity.mjs
+   GITHUB_EVENT_NAME=release GITHUB_REF="refs/tags/v${VERSION}" GITHUB_SHA="$(git rev-parse HEAD)" node scripts/verify-release-identity.mjs
    npm run test:browser
    gh api repos/eunjjang3/ograph/rulesets/17266129 \
      --jq '.name, .target, .enforcement'
