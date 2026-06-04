@@ -31,7 +31,7 @@ Initial open-source preparation release.
 - Deterministic Vite debug harness with graph stress-test presets up to 10,000
   nodes.
 - Documentation for API usage, architecture, debug harness behavior, and
-  downstream app consumption.
+  consumer package boundaries.
 - Regression tests for graph traversal, malformed link filtering, hit testing,
   spatial index behavior, viewport fitting, render-loop scheduling, and local
   lens physics.

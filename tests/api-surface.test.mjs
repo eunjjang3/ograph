@@ -95,6 +95,7 @@ test('package metadata publishes public scoped tarballs with referenced docs', a
 
   for (const internalFile of [
     'docs/**/*.md',
+    'docs/hardening-roadmap.md',
     'docs/internal-notes.md',
     'docs/refactor-notes.md',
     'docs/release-checklist.md'
