@@ -54,7 +54,9 @@ repository, the required release shape is:
 The existing release workflow already uses Node `22.14.0`, installs
 `npm@11.5.1`, runs on `ubuntu-latest`, uses `id-token: write`, disables
 package-manager caching for the publish job, and publishes only from the
-canonical `eunjjang3/ograph` repository.
+canonical `eunjjang3/ograph` repository. It also verifies that the package
+name, repository URL, and release tag match the intended `@eunjjang/ograph`
+identity before npm publish can run.
 
 ## First Publish Procedure
 
@@ -74,6 +76,7 @@ canonical `eunjjang3/ograph` repository.
    npm run build
    npm run check:examples
    npm run verify:consumer
+   node scripts/verify-release-identity.mjs
    npx playwright install chromium
    npm run test:browser
    npm audit --omit=dev
@@ -134,6 +137,7 @@ canonical `eunjjang3/ograph` repository.
    npm run build
    npm run check:examples
    npm run verify:consumer
+   GITHUB_EVENT_NAME=release GITHUB_REF="refs/tags/v${VERSION}" node scripts/verify-release-identity.mjs
    npm run test:browser
    git tag "v${VERSION}"
    git push origin main --tags
