@@ -46,7 +46,7 @@ compatibility.
 | P1 | Track the public canonical repository hardening queue and release gates in this repo. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
 | P1 | Keep release/security docs aligned with the public `main` branch. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
 | P1 | Keep repo-only hardening docs out of the package tarball. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
-| P1 | Add Playwright browser interaction and visual smoke coverage before any stable release. | In progress | `hardening/p1-playwright-browser-gate` | Pending |
+| P1 | Add Playwright browser interaction and visual smoke coverage before any stable release. | Done | `hardening/p1-playwright-browser-gate` | `2ce362b623dc306ef4e7d90bf16f451e3a29601b` |
 | P2 | Confirm GitHub Private Vulnerability Reporting after public visibility and repository settings are available. | External setting | GitHub settings | Pending |
 | P2 | Configure npm Trusted Publishing for `@afterglow/ograph` through `.github/workflows/release.yml` and the `npm` environment. | External setting | npm/GitHub settings | Pending |
 | P2 | Protect `main` with required CI checks before broad external adoption. | External setting | GitHub settings | Pending |
