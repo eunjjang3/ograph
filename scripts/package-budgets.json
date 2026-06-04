@@ -10,34 +10,34 @@
     "allowedRegressionRatio": 0.15,
     "minimumHeadroom": 1,
     "unit": "ms",
-    "note": "Median local measurement plus the larger of 15% or a 1ms CI-noise floor."
+    "note": "Best of three median batches plus the larger of 15% or a 1ms CI-noise floor."
   },
   "diffMediumMs": {
     "baseline": 1.08,
     "allowedRegressionRatio": 0.15,
     "minimumHeadroom": 1,
     "unit": "ms",
-    "note": "Median local measurement after adding graphDiff plus the larger of 15% or a 1ms CI-noise floor."
+    "note": "Best of three median batches after adding graphDiff plus the larger of 15% or a 1ms CI-noise floor."
   },
   "topologyMediumMs": {
     "baseline": 0.51,
     "allowedRegressionRatio": 0.15,
     "minimumHeadroom": 1,
     "unit": "ms",
-    "note": "Median local measurement plus the larger of 15% or a 1ms CI-noise floor."
+    "note": "Best of three median batches plus the larger of 15% or a 1ms CI-noise floor."
   },
   "indexesMediumMs": {
     "baseline": 0.41,
     "allowedRegressionRatio": 0.15,
     "minimumHeadroom": 1,
     "unit": "ms",
-    "note": "Median local measurement plus the larger of 15% or a 1ms CI-noise floor."
+    "note": "Best of three median batches plus the larger of 15% or a 1ms CI-noise floor."
   },
   "spatialIndexMediumMs": {
     "baseline": 0.1,
     "allowedRegressionRatio": 0.15,
     "minimumHeadroom": 1,
     "unit": "ms",
-    "note": "Median local measurement plus the larger of 15% or a 1ms CI-noise floor."
+    "note": "Best of three median batches plus the larger of 15% or a 1ms CI-noise floor."
   }
 }

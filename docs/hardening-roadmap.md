@@ -58,6 +58,7 @@ compatibility.
 | P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld at latest score `6.8` | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Harden supply-chain automation with SHA-pinned actions, dependency update configuration, SECURITY reporting links, and CodeQL SAST. | Done | `hardening/p2-supply-chain-ci` | `6c3b6b73719d5154c42b341da6dc6da9fb6be048` |
 | P2 | Add no-new-dependency seeded invariant sweeps for graph normalization and diff behavior. | Done | `hardening/p2-core-invariant-sweep` | `0366bc19ce94195fd84301ef84fa6f35d20cc73a` |
+| P2 | Stabilize performance budget measurement against CI runner jitter without raising budget limits. | Done | `hardening/p2-stabilize-budget-measurement` | Pending |
 | P2 | Add a repo-only first-publish runbook for npm Trusted Publishing and release verification. | Done | `hardening/p2-release-runbook` | `b1e6386931ee12b2b8f2938e1a89cf3730185b73` |
 | P2 | Keep the npm registry-side Trusted Publishing blocker auditable until package/auth rights exist. | Done | `hardening/p2-npm-blocker-audit` | `cba5d1fd99b2a54b7a0c6fcb96d72ff0b5c2b03c` |
 | P3 | Evaluate property-based tests for graph normalization after dependency approval. | Future decision | TBD | Pending |

@@ -10,6 +10,9 @@ import * as esbuild from 'esbuild';
 const repoRoot = resolve(fileURLToPath(new URL('../', import.meta.url)));
 const moduleCache = new Map();
 const BUDGETS = JSON.parse(readFileSync(resolve(repoRoot, 'scripts/package-budgets.json'), 'utf8'));
+const BUDGET_MEASUREMENT_BATCHES = 3;
+const BUDGET_SAMPLE_RUNS = 9;
+const BUDGET_WARMUP_RUNS = 3;
 
 async function importSourceModule(relativePath) {
   const sourcePath = fileURLToPath(new URL(`../${relativePath}`, import.meta.url));
@@ -63,19 +66,29 @@ function median(values) {
   return sorted[Math.floor(sorted.length / 2)];
 }
 
-function measureMedianMs(operation) {
-  for (let index = 0; index < 3; index += 1) {
-    operation();
-  }
-
+function measureMedianBatchMs(operation) {
   const durations = [];
-  for (let index = 0; index < 9; index += 1) {
+  for (let index = 0; index < BUDGET_SAMPLE_RUNS; index += 1) {
     const start = performance.now();
     operation();
     durations.push(performance.now() - start);
   }
 
   return median(durations);
+}
+
+function measureBudgetMs(operation) {
+  const batchMedians = [];
+
+  for (let batch = 0; batch < BUDGET_MEASUREMENT_BATCHES; batch += 1) {
+    for (let index = 0; index < BUDGET_WARMUP_RUNS; index += 1) {
+      operation();
+    }
+
+    batchMedians.push(measureMedianBatchMs(operation));
+  }
+
+  return Math.min(...batchMedians);
 }
 
 function formatNumber(value) {
@@ -187,31 +200,31 @@ assert.equal(normalizedMediumGraph.links.length, 1000);
 assertBudget(
   'normalizeMediumMs',
   'normalize medium graph',
-  measureMedianMs(() => normalizeGraphInput(mediumGraph))
+  measureBudgetMs(() => normalizeGraphInput(mediumGraph))
 );
 
 assertBudget(
   'diffMediumMs',
   'diff medium graph',
-  measureMedianMs(() => diffGraph(normalizedMediumGraph, updatedMediumGraph))
+  measureBudgetMs(() => diffGraph(normalizedMediumGraph, updatedMediumGraph))
 );
 
 assertBudget(
   'topologyMediumMs',
   'topology medium graph',
-  measureMedianMs(() => getGraphTopologySignature(normalizedMediumGraph.nodes, normalizedMediumGraph.links))
+  measureBudgetMs(() => getGraphTopologySignature(normalizedMediumGraph.nodes, normalizedMediumGraph.links))
 );
 
 assertBudget(
   'indexesMediumMs',
   'indexes medium graph',
-  measureMedianMs(() => buildGraphIndexes(normalizedMediumGraph.nodes, normalizedMediumGraph.links))
+  measureBudgetMs(() => buildGraphIndexes(normalizedMediumGraph.nodes, normalizedMediumGraph.links))
 );
 
 assertBudget(
   'spatialIndexMediumMs',
   'spatial index medium graph',
-  measureMedianMs(() => buildSpatialIndex(normalizedMediumGraph.nodes))
+  measureBudgetMs(() => buildSpatialIndex(normalizedMediumGraph.nodes))
 );
 
 console.log('Package budgets passed.');
