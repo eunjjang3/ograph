@@ -158,7 +158,7 @@ Local graph traversal treats links as undirected for display purposes and uses e
 
 ## Run Locally
 
-**Prerequisites:** Node.js
+**Prerequisites:** Node.js 22.14.0 or newer for repository development and verification.
 
 1. Install dependencies:
 

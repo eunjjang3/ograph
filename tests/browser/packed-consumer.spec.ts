@@ -60,61 +60,6 @@ async function expectCanvasHasGraphPixels(page: Page) {
   }, BACKGROUND_RGB)).toBeGreaterThan(20);
 }
 
-async function graphPixelCenter(page: Page) {
-  return page.evaluate((backgroundRgb) => {
-    const canvas = document.querySelector('canvas');
-
-    if (!canvas) {
-      throw new Error('Graph canvas is missing.');
-    }
-
-    const context = canvas.getContext('2d');
-
-    if (!context || canvas.width === 0 || canvas.height === 0) {
-      throw new Error('Graph canvas has no readable pixels.');
-    }
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-    let minX = Number.POSITIVE_INFINITY;
-    let minY = Number.POSITIVE_INFINITY;
-    let maxX = Number.NEGATIVE_INFINITY;
-    let maxY = Number.NEGATIVE_INFINITY;
-
-    for (let pixel = 0; pixel < pixels.length; pixel += 4) {
-      const red = pixels[pixel] ?? 0;
-      const green = pixels[pixel + 1] ?? 0;
-      const blue = pixels[pixel + 2] ?? 0;
-      const alpha = pixels[pixel + 3] ?? 0;
-      const distanceFromBackground =
-        Math.abs(red - backgroundRgb[0]) +
-        Math.abs(green - backgroundRgb[1]) +
-        Math.abs(blue - backgroundRgb[2]);
-
-      if (alpha > 0 && distanceFromBackground > 12) {
-        const index = pixel / 4;
-        const x = index % canvas.width;
-        const y = Math.floor(index / canvas.width);
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x);
-        maxY = Math.max(maxY, y);
-      }
-    }
-
-    if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
-      throw new Error('Graph canvas has no graph pixels.');
-    }
-
-    return {
-      x: rect.left + ((minX + maxX) / 2) / scaleX,
-      y: rect.top + ((minY + maxY) / 2) / scaleY
-    };
-  }, BACKGROUND_RGB);
-}
-
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await graphCanvas(page);
@@ -146,7 +91,16 @@ test('supports node hover, click, drag, and drag release from the packed package
   await page.getByTestId('fit').click();
   await expectCanvasHasGraphPixels(page);
 
-  const target = await graphPixelCenter(page);
+  const box = await canvasBox(page);
+  await expect.poll(async () => Number(await page.getByTestId('event-viewport-x').textContent()))
+    .toBeGreaterThan(20);
+  await expect.poll(async () => Number(await page.getByTestId('event-viewport-y').textContent()))
+    .toBeGreaterThan(20);
+
+  const target = {
+    x: box.x + Number(await page.getByTestId('event-viewport-x').textContent()),
+    y: box.y + Number(await page.getByTestId('event-viewport-y').textContent())
+  };
 
   await page.mouse.move(target.x, target.y);
   await expect(page.getByTestId('event-hover')).toHaveText('center');

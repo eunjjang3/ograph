@@ -4,6 +4,8 @@ Thanks for taking the time to improve Ograph.
 
 ## Local Setup
 
+Use Node.js 22.14.0 or newer for repository development and verification.
+
 ```sh
 npm install
 npm run dev

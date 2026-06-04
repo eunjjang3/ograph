@@ -175,6 +175,8 @@ type EventState = {
   dragEnd: string;
   dragCount: number;
   viewportCount: number;
+  viewportX: number;
+  viewportY: number;
   viewportScale: number;
   errors: string[];
 };
@@ -187,6 +189,8 @@ const emptyEvents: EventState = {
   dragEnd: 'none',
   dragCount: 0,
   viewportCount: 0,
+  viewportX: 0,
+  viewportY: 0,
   viewportScale: 1,
   errors: []
 };
@@ -326,6 +330,8 @@ function App() {
           onViewportChange={(viewport: GraphViewport) => setEvents(current => ({
             ...current,
             viewportCount: current.viewportCount + 1,
+            viewportX: viewport.x,
+            viewportY: viewport.y,
             viewportScale: viewport.scale
           }))}
           onError={(error) => setEvents(current => ({
@@ -345,6 +351,8 @@ function App() {
         <span data-testid="event-drag-end">{events.dragEnd}</span>
         <span data-testid="event-drag-count">{events.dragCount}</span>
         <span data-testid="event-viewport-count">{events.viewportCount}</span>
+        <span data-testid="event-viewport-x">{events.viewportX.toFixed(1)}</span>
+        <span data-testid="event-viewport-y">{events.viewportY.toFixed(1)}</span>
         <span data-testid="event-viewport-scale">{events.viewportScale.toFixed(3)}</span>
         <span data-testid="event-errors">{events.errors.join('|') || 'none'}</span>
       </div>
