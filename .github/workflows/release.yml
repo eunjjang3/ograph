@@ -42,20 +42,24 @@ jobs:
           package-manager-cache: false
           registry-url: https://registry.npmjs.org
 
-      - name: Install npm with trusted publishing support
+      - name: Prepare npm with trusted publishing support
         env:
           NPM_CLI_VERSION: 11.16.0
           NPM_CLI_TARBALL_SHA512: 03be172fc3b199c7a06433163e459be5b110a6983c1dd6305b7ac10f6b0fa12e1440755a8df6b1064ab2ccb789df0474919fb9c684e322dc57685ede21752ccb
         run: |
           npm_cli_tgz="npm-${NPM_CLI_VERSION}.tgz"
+          npm_cli_dir="${RUNNER_TEMP}/npm-${NPM_CLI_VERSION}"
           curl -fsSLo "${npm_cli_tgz}" "https://registry.npmjs.org/npm/-/npm-${NPM_CLI_VERSION}.tgz"
           echo "${NPM_CLI_TARBALL_SHA512}  ${npm_cli_tgz}" | sha512sum --check
-          npm install -g "./${npm_cli_tgz}"
+          mkdir -p "${npm_cli_dir}"
+          tar -xzf "${npm_cli_tgz}" -C "${npm_cli_dir}" --strip-components=1
+          echo "NPM_TRUSTED_CLI=${npm_cli_dir}/bin/npm-cli.js" >> "${GITHUB_ENV}"
 
       - name: Report toolchain
         run: |
           node --version
           npm --version
+          node "${NPM_TRUSTED_CLI}" --version
 
       - name: Verify package release identity
         run: node scripts/verify-release-identity.mjs
@@ -88,8 +92,8 @@ jobs:
         run: npm audit --omit=dev
 
       - name: Publish dry run
-        run: npm publish --dry-run --access public
+        run: node "${NPM_TRUSTED_CLI}" publish --dry-run --access public
 
       - name: Publish to npm
         if: github.event_name == 'release'
-        run: npm publish --access public
+        run: node "${NPM_TRUSTED_CLI}" publish --access public
