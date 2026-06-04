@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   getReleaseIdentityIssues,
   getReleaseMainReachabilityIssues,
+  getReleaseRegistryVersionIssues,
   verifyReleaseIdentity
 } from '../scripts/verify-release-identity.mjs';
 
@@ -127,6 +128,62 @@ test('release identity rejects release publishes without a commit sha for main r
       GITHUB_REF: 'refs/tags/v0.1.0'
     }),
     ['release publish requires GITHUB_SHA so the tag commit can be checked against origin/main']
+  );
+});
+
+test('release identity accepts release tags when the npm version is unpublished', () => {
+  const npm = () => {
+    const error = new Error('E404 Not Found');
+    error.stderr = 'npm error code E404\nnpm error 404 Not Found';
+    throw error;
+  };
+
+  assert.deepEqual(
+    getReleaseRegistryVersionIssues(
+      validPackageJson,
+      {
+        GITHUB_EVENT_NAME: 'release',
+        GITHUB_REF: 'refs/tags/v0.1.0'
+      },
+      npm
+    ),
+    []
+  );
+});
+
+test('release identity rejects release tags when the npm version already exists', () => {
+  assert.deepEqual(
+    getReleaseRegistryVersionIssues(
+      validPackageJson,
+      {
+        GITHUB_EVENT_NAME: 'release',
+        GITHUB_REF: 'refs/tags/v0.1.0'
+      },
+      () => '"0.1.0"'
+    ),
+    [
+      'npm package version @eunjjang/ograph@0.1.0 already exists; bump package.json and CHANGELOG.md before release publish'
+    ]
+  );
+});
+
+test('release identity surfaces unexpected npm registry lookup failures', () => {
+  const npm = () => {
+    const error = new Error('registry timeout');
+    error.stderr = 'npm error code ETIMEDOUT';
+    throw error;
+  };
+
+  assert.deepEqual(
+    getReleaseRegistryVersionIssues(
+      validPackageJson,
+      {
+        GITHUB_EVENT_NAME: 'release',
+        GITHUB_REF: 'refs/tags/v0.1.0'
+      },
+      npm
+    ),
+    ['could not verify npm package version availability for @eunjjang/ograph@0.1.0']
   );
 });
 

@@ -1,8 +1,7 @@
 # Release Runbook
 
-This runbook is for maintainers preparing the first public npm release of
-Ograph. It is intentionally repo-only and is not included in the npm package
-tarball.
+This runbook is for maintainers operating public npm releases of Ograph. It is
+intentionally repo-only and is not included in the npm package tarball.
 
 ## Fixed Release Identity
 
@@ -16,25 +15,24 @@ Do not rename the repository, package, or product during release hardening.
 
 ## Current Release State
 
-The repository-side release path is prepared for the `@eunjjang/ograph`
-package identity. npm CLI authentication is available, but the first registry
-package creation and Trusted Publishing configuration still require
-maintainer-controlled npm 2FA/proof-of-presence.
+The `@eunjjang/ograph` package is published on npm as a public preview package.
+The first registry package creation has consumed version `0.1.0`, and npm
+Trusted Publishing is configured for the GitHub release workflow.
 
-Current evidence from 2026-06-04 KST:
+Current evidence from 2026-06-05 KST:
 
-- Local npm CLI is `11.12.1`.
+- `npm view @eunjjang/ograph version --json` returns `0.1.0`.
+- `npm view @eunjjang/ograph dist-tags --json` points `latest` at `0.1.0`.
+- `npm access get status @eunjjang/ograph --json` returns `public`.
+- `npm access list packages eunjjang --json` returns
+  `{"@eunjjang/ograph":"read-write"}`.
+- `npm audit signatures --json` returns no invalid or missing signatures.
+- `npx -y npm@11.16.0 trust list @eunjjang/ograph --json` returns a GitHub
+  trusted publisher for repository `eunjjang3/ograph`, workflow
+  `release.yml`, environment `npm`, and permission `createPackage`.
+- Local npm CLI is `11.12.1`; use `npx -y npm@11.16.0` or newer for trust
+  commands that need the allowed-action flags.
 - `npm whoami` returns `eunjjang`.
-- `npm access list packages eunjjang --json` returns `{}`.
-- `npm view @eunjjang/ograph version --json` returns `E404`, as expected
-  before the first publish creates the registry package.
-- `npm publish --dry-run --access public` succeeds for
-  `@eunjjang/ograph@0.1.0`.
-- `npm trust list @eunjjang/ograph --json` reaches `EOTP`, meaning npm
-  requires a one-time password/browser confirmation before trusted-publisher
-  inspection or configuration can continue.
-- The package must exist in npm registry/package settings before `npm trust`
-  can configure a trusted publisher from the CLI.
 - GitHub repository ruleset `Protect release tags` (`17266129`) is active for
   `refs/tags/v*` and blocks deletion and non-fast-forward updates without
   bypass actors.
@@ -48,7 +46,8 @@ npm Trusted Publishing uses OIDC between npm and the CI provider. For this
 repository, the required release shape is:
 
 - npm CLI `11.5.1` or newer for OIDC publish.
-- npm CLI `11.10.0` or newer for `npm trust` configuration commands.
+- npm CLI `11.16.0` or newer for `npm trust` configuration commands that set
+  allowed actions.
 - Node.js `22.14.0` or newer.
 - GitHub-hosted runner, not a self-hosted runner.
 - Workflow job permission `id-token: write`.
@@ -71,7 +70,7 @@ GitHub repository ruleset `Protect release tags` protects `v*` release tags
 from deletion and non-fast-forward updates. Keep it active because GitHub
 release events and `v*` tags are the publish trigger boundary.
 
-## First Publish Procedure
+## Release Procedure
 
 1. Confirm the local tree is clean and `main` is up to date.
 
@@ -114,10 +113,9 @@ release events and `v*` tags are the publish trigger boundary.
      --jq '.enforce_admins.enabled'
    ```
 
-4. Create the npm package under the `eunjjang` scope only after explicit
-   maintainer approval for the first real publish. npm cannot configure a
-   trusted publisher for a package that is not already on the registry, and
-   the first real publish permanently consumes the `0.1.0` package version.
+4. Do not republish an already-published version. The manual first publish has
+   already consumed `@eunjjang/ograph@0.1.0`; future npm publishes must bump
+   `package.json` and changelog before tagging.
 
 5. Configure Trusted Publishing for `@eunjjang/ograph`.
 
@@ -134,37 +132,36 @@ release events and `v*` tags are the publish trigger boundary.
    CLI path after the package exists and npm proof-of-presence is available:
 
    ```sh
-   npm install -g npm@^11.10.0
-   npm trust github @eunjjang/ograph \
+   npx -y npm@11.16.0 trust github @eunjjang/ograph \
      --repo eunjjang3/ograph \
      --file release.yml \
      --environment npm \
      --allow-publish
-   npm trust list @eunjjang/ograph
+   npx -y npm@11.16.0 trust list @eunjjang/ograph
    ```
 
 6. Restrict traditional token publishing after Trusted Publishing has been
    verified. In npm package settings, prefer requiring 2FA and disallowing
    tokens for publishing access.
 
-7. Finalize the changelog in a reviewed commit. Move all release notes out of
-   `## Unreleased`, leave that section empty, and add exactly one dated heading
-   matching the package version:
+7. Finalize the changelog in a reviewed commit for every future release. Move
+   release notes out of `## Unreleased`, leave that section empty, and add
+   exactly one dated heading matching the package version:
 
    ```md
    ## Unreleased
 
-   ## 0.1.0 - 2026-06-04
+   ## 0.2.0 - 2026-06-05
    ```
 
-   Until this commit lands, `CHANGELOG.md` must continue to describe the
-   package as unreleased. The release identity guard intentionally rejects a
-   release event while notes remain under `## Unreleased` or the dated version
-   heading is missing.
+   The release identity guard intentionally rejects a release event while notes
+   remain under `## Unreleased`, the dated version heading is missing, or the
+   package version already exists on npm.
 
 8. Confirm the release tag ruleset is active, then create a `v*` tag and
-   GitHub release only after the above gates are green. For the first public
-   preview, the tag must match the existing `package.json` version.
+   GitHub release only after the above gates are green. The tag must match the
+   current `package.json` version, and that version must not already exist on
+   npm.
 
    ```sh
    VERSION="$(node -p 'require("./package.json").version')"
@@ -174,6 +171,10 @@ release events and `v*` tags are the publish trigger boundary.
    npm run check:examples
    npm run verify:consumer:pinned
    npm run verify:consumer:floating
+   if npm view "@eunjjang/ograph@${VERSION}" version >/dev/null 2>&1; then
+     echo "@eunjjang/ograph@${VERSION} already exists on npm; bump the version before tagging."
+     exit 1
+   fi
    GITHUB_EVENT_NAME=release GITHUB_REF="refs/tags/v${VERSION}" GITHUB_SHA="$(git rev-parse HEAD)" node scripts/verify-release-identity.mjs
    npm run test:browser
    gh api repos/eunjjang3/ograph/rulesets/17266129 \

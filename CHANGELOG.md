@@ -4,8 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-Initial public preview candidate. These entries remain unreleased until the
-first npm publication and `v0.1.0` GitHub release.
+## 0.1.0 - 2026-06-05
+
+Initial public preview.
 
 ### Added
 
