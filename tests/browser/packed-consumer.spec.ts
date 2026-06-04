@@ -273,7 +273,7 @@ test('keeps pan usable and preserves the wheel pointer anchor within tolerance',
 });
 
 test('redraws after resize without resetting the user viewport', async ({ page }) => {
-  await setFixture(page, 'small');
+  await setFixture(page, 'local');
   await page.getByTestId('fit').click();
   await expectCanvasHasGraphPixels(page);
   await page.waitForTimeout(180);
@@ -361,7 +361,7 @@ test('captures deterministic visual smoke states', async ({ page }) => {
     maxDiffPixelRatio: VISUAL_MAX_DIFF_PIXEL_RATIO
   });
 
-  await setFixture(page, 'small');
+  await setFixture(page, 'local');
   await page.getByTestId('fit').click();
   await expectCanvasHasGraphPixels(page);
   await expect(await graphCanvas(page)).toHaveScreenshot('basic.png', {
