@@ -30,6 +30,9 @@ The repository keeps the same public documentation boundary as the package tarba
 Repository examples live under [examples](examples/README.md). They import from
 `@eunjjang/ograph` and are typechecked with `npm run check:examples`.
 
+The live debug harness is published at <https://eunjjang3.github.io/ograph/>.
+It uses generated mock graph data and exists to exercise the current graph interaction feel; it is not a public package API surface.
+
 ## Install In A Consumer
 
 The production entry point is shaped for package imports:
