@@ -50,7 +50,7 @@ compatibility.
 | P1 | Complete the stable packed-consumer Playwright interaction matrix and visual baselines. | Done | `hardening/p1-stable-playwright-gate` | `56a7e973efc7548983e1247acad7f21d493eadf8` |
 | P1 | Keep reduced-motion local lens viewport effects stable when consumers pass inline callbacks. | Done | `hardening/p1-stable-playwright-gate` | `97cdb88db6712fd07763695ef8440f9077e9de40` |
 | P1 | Normalize malformed public node sizes so invalid input cannot terminate canvas rendering. | Done | `hardening/p1-normalize-node-size` | `357480e0fb2a140dd542a857ace57c977df2e979` |
-| P1 | Reject release tags whose commit is not reachable from protected `origin/main`. | Done | `hardening/p1-release-tag-main-reachability` | `7d7746630325f7dd2fd7c9429df88a8c47d4856e` |
+| P1 | Reject release tags whose commit is not reachable from protected `origin/main`. | Done | `hardening/p1-release-tag-main-reachability` | `f5e073193f02ccea68ed7d9f8c8dd67960105b4e` |
 | P1 | Align CI with the Node 22.14.0 release/development toolchain required by current Vite and Tailwind dev dependencies. | Done | `hardening/p1-ci-node-toolchain` | `3afff1481dd504be92fb10be287096b1c2090ea0` |
 | P2 | Confirm GitHub Private Vulnerability Reporting after public visibility and repository settings are available. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Create and protect the `npm` GitHub environment used by `.github/workflows/release.yml`. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
