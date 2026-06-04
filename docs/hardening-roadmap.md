@@ -53,6 +53,7 @@ compatibility.
 | P2 | Adopt the `@eunjjang/ograph` package scope after the `afterglow` npm scope became unavailable. | Done | `hardening/p2-package-scope-eunjjang` | `b6ae87d4ad0c82c741cd6eb6939a6a0084f7111c` |
 | P2 | Guard release publishes against mismatched package identity or version tags before npm publish runs. | Done | `hardening/p2-release-identity-guard` | `5880ba35a2c59c4255d6179cb26debadeaebcf6b` |
 | P2 | Guard release publishes against non-canonical GitHub repository context. | Done | `hardening/p2-release-repository-guard` | `103341980d30557ee3e063354f32b64498004bbc` |
+| P2 | Protect `v*` release tags from deletion and non-fast-forward updates. | Done | GitHub ruleset / `hardening/p2-release-tag-ruleset` | Pending |
 | P2 | Configure npm Trusted Publishing for `@eunjjang/ograph` on the npm registry side. | External first publish and npm 2FA action pending | npm package settings | Pending |
 | P2 | Protect `main` with required CI checks before broad external adoption. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld at latest score `6.8` | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
@@ -116,6 +117,9 @@ Current external setting evidence, checked on 2026-06-04 KST:
 - `main` branch protection requires the GitHub Actions status check `verify`,
   requires branches to be up to date before merge, requires linear history,
   requires conversation resolution, and disallows force pushes and deletions.
+- Repository ruleset `Protect release tags` (`17266129`) applies to
+  `refs/tags/v*`, is enforced, has no bypass actors, and blocks release tag
+  deletion and non-fast-forward updates.
 - CI run `26924540676` for commit
   `7cbf1284fe18f910423e1cec1d179ea0e4db5482` passed, including the packed
   browser consumer Playwright gate.

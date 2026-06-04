@@ -35,6 +35,9 @@ Current evidence from 2026-06-04 KST:
   inspection or configuration can continue.
 - The package must exist in npm registry/package settings before `npm trust`
   can configure a trusted publisher from the CLI.
+- GitHub repository ruleset `Protect release tags` (`17266129`) is active for
+  `refs/tags/v*` and blocks deletion and non-fast-forward updates without
+  bypass actors.
 
 ## Trusted Publishing Requirements
 
@@ -57,6 +60,10 @@ package-manager caching for the publish job, and publishes only from the
 canonical `eunjjang3/ograph` repository. It also verifies that the package
 name, package repository URL, GitHub repository context, and release tag match
 the intended `@eunjjang/ograph` identity before npm publish can run.
+
+GitHub repository ruleset `Protect release tags` protects `v*` release tags
+from deletion and non-fast-forward updates. Keep it active because GitHub
+release events and `v*` tags are the publish trigger boundary.
 
 ## First Publish Procedure
 
@@ -125,7 +132,8 @@ the intended `@eunjjang/ograph` identity before npm publish can run.
    verified. In npm package settings, prefer requiring 2FA and disallowing
    tokens for publishing access.
 
-7. Create a `v*` tag and GitHub release only after the above gates are green.
+7. Confirm the release tag ruleset is active, then create a `v*` tag and
+   GitHub release only after the above gates are green.
    For the first public preview, the tag should match the existing
    `package.json` version unless the version and changelog have been updated in
    a reviewed commit.
@@ -139,6 +147,8 @@ the intended `@eunjjang/ograph` identity before npm publish can run.
    npm run verify:consumer
    GITHUB_EVENT_NAME=release GITHUB_REF="refs/tags/v${VERSION}" node scripts/verify-release-identity.mjs
    npm run test:browser
+   gh api repos/eunjjang3/ograph/rulesets/17266129 \
+     --jq '.name, .target, .enforcement'
    git tag "v${VERSION}"
    git push origin main --tags
    ```
