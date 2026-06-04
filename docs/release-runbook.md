@@ -45,8 +45,9 @@ Current evidence from 2026-06-05 KST:
 npm Trusted Publishing uses OIDC between npm and the CI provider. For this
 repository, the required release shape is:
 
-- npm CLI `11.5.1` or newer for OIDC publish; the workflow installs
-  `npm@11.16.0` from a SHA512-verified tarball.
+- npm CLI `11.5.1` or newer for OIDC publish; the workflow extracts
+  `npm@11.16.0` from a SHA512-verified tarball and uses that CLI only for
+  npm publish commands.
 - npm CLI `11.16.0` or newer for `npm trust` configuration commands that set
   allowed actions.
 - Node.js `22.14.0` or newer.
@@ -57,11 +58,11 @@ repository, the required release shape is:
 - A Trusted Publisher configured for GitHub Actions on npmjs.com or with
   `npm trust`.
 
-The existing release workflow already uses Node `22.14.0`, installs a
-SHA512-verified `npm@11.16.0` tarball, runs on `ubuntu-latest`, uses
-`id-token: write`, disables package-manager caching for the publish job, and
-publishes only from the canonical `eunjjang3/ograph` repository. It also
-verifies that the package
+The existing release workflow already uses Node `22.14.0`, extracts a
+SHA512-verified `npm@11.16.0` tarball for publish commands, runs on
+`ubuntu-latest`, uses `id-token: write`, disables package-manager caching for
+the publish job, and publishes only from the canonical `eunjjang3/ograph`
+repository. It also verifies that the package
 name, package repository URL, GitHub repository context, and release tag match
 the intended `@eunjjang/ograph` identity before npm publish can run. Release
 events additionally require exactly one dated changelog heading for the
