@@ -159,13 +159,13 @@ Current external setting evidence, checked on 2026-06-05 KST:
 - Repository ruleset `Protect release tags` (`17266129`) applies to
   `refs/tags/v*`, is enforced, has no bypass actors, and blocks release tag
   deletion and non-fast-forward updates.
-- CI run `26961777426` for commit
-  `a7049b3598f0c177b8e48f359518f9fd708683b6` passed, including the pinned and
+- CI run `26962427681` for commit
+  `dd9485d9d40dfbceffc899d6ed1072a8ea23bbef` passed, including the pinned and
   floating packed consumer lanes and packed browser consumer Playwright gate.
-- CodeQL run `26961777446` for commit
-  `a7049b3598f0c177b8e48f359518f9fd708683b6` passed.
-- OpenSSF Scorecard run `26961777292` for commit
-  `a7049b3598f0c177b8e48f359518f9fd708683b6` passed with score `6.6`.
+- CodeQL run `26962427343` for commit
+  `dd9485d9d40dfbceffc899d6ed1072a8ea23bbef` passed.
+- OpenSSF Scorecard run `26962427354` for commit
+  `dd9485d9d40dfbceffc899d6ed1072a8ea23bbef` passed with score `6.6`.
   The score is still not high enough for a README badge. Action SHA pinning,
   dependency-update tooling, SAST, and SECURITY reporting link follow-ups are
   now detected by Scorecard. Remaining follow-up candidates include an OpenSSF
