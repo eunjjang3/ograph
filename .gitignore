@@ -5,6 +5,9 @@ coverage/
 .omx/
 .vite/
 .cache/
+.tmp/
+playwright-report/
+test-results/
 .DS_Store
 *.log
 .env*

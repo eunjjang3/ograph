@@ -63,6 +63,8 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "npm run build:lib && node --test tests/*.test.mjs && npm run check:budgets",
+    "test:browser": "node scripts/prepare-browser-consumer.mjs && playwright test",
+    "test:browser:update": "node scripts/prepare-browser-consumer.mjs && playwright test --update-snapshots",
     "check:budgets": "node scripts/check-package-budgets.mjs",
     "check:examples": "npm run build:lib && tsc -p examples/tsconfig.json",
     "verify:consumer": "node scripts/verify-consumer-package.mjs"
@@ -75,6 +77,7 @@
     "react-dom": "^18.0.0 || ^19.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/vite": "^4.1.14",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^22.14.0",

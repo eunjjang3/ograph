@@ -180,9 +180,12 @@ npm run lint
 npm run build
 npm run check:examples
 npm run verify:consumer
+npx playwright install chromium
+npm run test:browser
 ```
 
 `npm run test` includes unit/API tests and the no-new-dependency package budget check. `npm run build` creates both the demo build under `dist/demo` and the package build under `dist/index.js` with declarations under `dist`.
+`npm run test:browser` packs the package, installs that tarball into a temporary Vite React consumer app, and runs the Chromium Playwright browser smoke tests.
 
 ## Contributing And Security
 

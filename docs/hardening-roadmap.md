@@ -46,7 +46,7 @@ compatibility.
 | P1 | Track the public canonical repository hardening queue and release gates in this repo. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
 | P1 | Keep release/security docs aligned with the public `main` branch. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
 | P1 | Keep repo-only hardening docs out of the package tarball. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
-| P1 | Add Playwright browser interaction and visual smoke coverage before any stable release. | Dependency-gated | TBD | Pending |
+| P1 | Add Playwright browser interaction and visual smoke coverage before any stable release. | In progress | `hardening/p1-playwright-browser-gate` | Pending |
 | P2 | Confirm GitHub Private Vulnerability Reporting after public visibility and repository settings are available. | External setting | GitHub settings | Pending |
 | P2 | Configure npm Trusted Publishing for `@afterglow/ograph` through `.github/workflows/release.yml` and the `npm` environment. | External setting | npm/GitHub settings | Pending |
 | P2 | Protect `main` with required CI checks before broad external adoption. | External setting | GitHub settings | Pending |
@@ -64,13 +64,15 @@ Preview releases may use the current no-new-dependency verification path:
 - `npm run build`
 - `npm run check:examples`
 - `npm run verify:consumer`
+- `npx playwright install chromium`
+- `npm run test:browser`
 - `npm audit --omit=dev`
 - `npm pack --dry-run`
 - `npm publish --dry-run --access public`
 
 Stable releases additionally require Playwright coverage for the packed package
-consumer boundary. Start with Chromium only, then add Firefox and WebKit after
-the Chromium lane is stable enough that failures are actionable.
+consumer boundary. The initial stable gate uses Chromium only; add Firefox and
+WebKit after the Chromium lane is stable enough that failures are actionable.
 
 The stable Playwright gate should cover:
 

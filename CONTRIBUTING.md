@@ -22,6 +22,8 @@ npm run lint
 npm run build
 npm run check:examples
 npm run verify:consumer
+npx playwright install chromium
+npm run test:browser
 ```
 
 Keep changes focused and describe the user-visible behavior or maintainer
