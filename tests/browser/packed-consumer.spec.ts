@@ -147,6 +147,12 @@ async function prepareVisualState(page: Page) {
   await expect(page.getByTestId('graph-paused')).toHaveText('yes');
 }
 
+async function fitVisualFixture(page: Page) {
+  await page.getByTestId('fit').click();
+  await page.waitForTimeout(220);
+  await expectCanvasHasGraphPixels(page);
+}
+
 test.beforeEach(async ({ page }) => {
   const errors: string[] = [];
   unexpectedBrowserErrors.set(page, errors);
@@ -362,15 +368,14 @@ test('captures deterministic visual smoke states', async ({ page }) => {
   });
 
   await setFixture(page, 'local');
-  await page.getByTestId('fit').click();
-  await expectCanvasHasGraphPixels(page);
+  await fitVisualFixture(page);
   await expect(await graphCanvas(page)).toHaveScreenshot('basic.png', {
     animations: 'disabled',
     maxDiffPixelRatio: VISUAL_MAX_DIFF_PIXEL_RATIO
   });
 
   await setFixture(page, 'local');
-  await page.getByTestId('fit').click();
+  await fitVisualFixture(page);
   await page.getByTestId('select-first').click();
   await expect(page.getByTestId('selected-node')).toHaveText('local-root');
   await expectCanvasHasGraphPixels(page);
@@ -381,7 +386,7 @@ test('captures deterministic visual smoke states', async ({ page }) => {
 
   await setFixture(page, 'disconnected');
   await setFixture(page, 'local');
-  await page.getByTestId('fit').click();
+  await fitVisualFixture(page);
   const hoverBox = await canvasBox(page);
   const hoverViewport = await readViewport(page);
   await page.mouse.move(hoverBox.x + hoverViewport.x, hoverBox.y + hoverViewport.y);
@@ -402,8 +407,7 @@ test('captures deterministic visual smoke states', async ({ page }) => {
 
   await page.getByTestId('mode-global').click();
   await setFixture(page, 'dense');
-  await page.getByTestId('fit').click();
-  await expectCanvasHasGraphPixels(page);
+  await fitVisualFixture(page);
   await expect(await graphCanvas(page)).toHaveScreenshot('dense.png', {
     animations: 'disabled',
     maxDiffPixelRatio: VISUAL_MAX_DIFF_PIXEL_RATIO
