@@ -117,6 +117,33 @@ pixel-level non-blank assertion before every non-empty screenshot comparison;
 the empty graph comparison must first assert that only the configured
 background is rendered.
 
+## Wheel Scroll UX Decision
+
+Decision date: 2026-06-05 KST.
+
+Do not replace the current React `onWheel` path with a native non-passive
+wheel listener for the public preview or first stable release. The current
+product contract is that wheel input over the canvas zooms the graph with
+pointer-anchor preservation; it does not introduce a new library-level promise
+that Ograph will suppress surrounding page scroll. Moving to a native
+non-passive listener would change that scroll contract, so it is a UX decision
+rather than a package hardening fix.
+
+Current evidence:
+
+- `resolveWheelZoomViewport` and the browser consumer gate preserve the world
+  coordinate under the wheel pointer within tolerance.
+- The stable browser gate keeps pan, wheel zoom, node drag, pointer-loss
+  release, resize, local/global transitions, StrictMode cleanup, and visual
+  smoke states covered in the packed consumer fixture.
+- `tests/browser/packed-consumer.spec.ts` explicitly allows the passive
+  `preventDefault` warning so that the warning stays visible as a conscious
+  product tradeoff instead of being mistaken for an unknown regression.
+
+Revisit only after a maintainer explicitly chooses a scroll-suppression UX
+contract for embedded pages, adds tests for that contract, and verifies that
+the change does not alter the debug harness graph interaction feel.
+
 ## External Release Settings
 
 Current external setting evidence, checked on 2026-06-04 KST:
