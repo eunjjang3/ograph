@@ -58,9 +58,9 @@ compatibility.
 | P2 | Guard release publishes against mismatched package identity or version tags before npm publish runs. | Done | `hardening/p2-release-identity-guard` | `5880ba35a2c59c4255d6179cb26debadeaebcf6b` |
 | P2 | Guard release publishes against non-canonical GitHub repository context. | Done | `hardening/p2-release-repository-guard` | `103341980d30557ee3e063354f32b64498004bbc` |
 | P2 | Keep unreleased changelog state accurate and require finalized version/date notes before release publish. | Done | `hardening/p2-release-changelog-guard` | `1351f1c245b5e9021bee5c3b453a564d2c877b9f` |
-| P2 | Reject release publishes when the npm package version already exists. | Done | `hardening/p2-npm-publish-evidence` | Pending |
+| P2 | Reject release publishes when the npm package version already exists. | Done | `hardening/p2-npm-publish-evidence` | `2a2f2894fdc0773fea89273cd5db5e8a9d3f373c` |
 | P2 | Protect `v*` release tags from deletion and non-fast-forward updates. | Done | GitHub ruleset / `hardening/p2-release-tag-ruleset` | `55314114401b0d3c7f638a6545e8c885cea396a2` |
-| P2 | Configure npm Trusted Publishing for `@eunjjang/ograph` on the npm registry side. | Done | npm package settings / `hardening/p2-npm-publish-evidence` | Pending |
+| P2 | Configure npm Trusted Publishing for `@eunjjang/ograph` on the npm registry side. | Done | npm package settings / `hardening/p2-npm-publish-evidence` | `2a2f2894fdc0773fea89273cd5db5e8a9d3f373c` |
 | P2 | Protect `main` with required CI checks before broad external adoption. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Enforce `main` required checks for administrators so direct pushes cannot bypass release gates. | Done | GitHub settings / `hardening/p2-main-admin-enforcement` | `d52e9c53d738b0be8b219b6a95084239075a8adb` |
 | P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld at latest score `6.6` | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
