@@ -49,7 +49,7 @@ compatibility.
 | P1 | Promote the initial Chromium packed-consumer browser smoke gate into CI. | Done | `hardening/p1-playwright-browser-gate` | `2ce362b623dc306ef4e7d90bf16f451e3a29601b` |
 | P1 | Complete the stable packed-consumer Playwright interaction matrix and visual baselines. | Done | `hardening/p1-stable-playwright-gate` | `56a7e973efc7548983e1247acad7f21d493eadf8` |
 | P1 | Keep reduced-motion local lens viewport effects stable when consumers pass inline callbacks. | Done | `hardening/p1-stable-playwright-gate` | `97cdb88db6712fd07763695ef8440f9077e9de40` |
-| P1 | Normalize malformed public node sizes so invalid input cannot terminate canvas rendering. | Todo | TBD | Pending |
+| P1 | Normalize malformed public node sizes so invalid input cannot terminate canvas rendering. | Done | `hardening/p1-normalize-node-size` | `377e68e48be5a82f1b367b7596c219599c2db3af` |
 | P1 | Reject release tags whose commit is not reachable from protected `origin/main`. | Todo | TBD | Pending |
 | P1 | Align CI with the Node 22.14.0 release/development toolchain required by current Vite and Tailwind dev dependencies. | Done | `hardening/p1-ci-node-toolchain` | `3afff1481dd504be92fb10be287096b1c2090ea0` |
 | P2 | Confirm GitHub Private Vulnerability Reporting after public visibility and repository settings are available. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
