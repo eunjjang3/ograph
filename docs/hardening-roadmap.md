@@ -16,8 +16,8 @@ included in the npm package tarball.
 - Baseline date: 2026-06-04 KST
 - Public baseline commit: `f486ee32086f6e35435977d4bf70a59b8eebb294`
 - Public repository: `https://github.com/eunjjang3/ograph`
-- Package candidate: `@eunjjang/ograph@0.1.0`
-- npm publication status: first public npm publication candidate
+- Published package: `@eunjjang/ograph@0.1.0`
+- npm publication status: public preview published on 2026-06-05 KST
 
 The baseline already contains the app-agnostic package snapshot, public
 documentation, CI, release workflow, OpenSSF Scorecard workflow, package
@@ -58,18 +58,19 @@ compatibility.
 | P2 | Guard release publishes against mismatched package identity or version tags before npm publish runs. | Done | `hardening/p2-release-identity-guard` | `5880ba35a2c59c4255d6179cb26debadeaebcf6b` |
 | P2 | Guard release publishes against non-canonical GitHub repository context. | Done | `hardening/p2-release-repository-guard` | `103341980d30557ee3e063354f32b64498004bbc` |
 | P2 | Keep unreleased changelog state accurate and require finalized version/date notes before release publish. | Done | `hardening/p2-release-changelog-guard` | `1351f1c245b5e9021bee5c3b453a564d2c877b9f` |
+| P2 | Reject release publishes when the npm package version already exists. | Done | `hardening/p2-npm-publish-evidence` | `797d8ab9badee50e5623786d3bb7d33dadcb61f6` |
 | P2 | Protect `v*` release tags from deletion and non-fast-forward updates. | Done | GitHub ruleset / `hardening/p2-release-tag-ruleset` | `55314114401b0d3c7f638a6545e8c885cea396a2` |
-| P2 | Configure npm Trusted Publishing for `@eunjjang/ograph` on the npm registry side. | External first publish and npm 2FA action pending | npm package settings | Pending |
+| P2 | Configure npm Trusted Publishing for `@eunjjang/ograph` on the npm registry side. | Done | npm package settings / `hardening/p2-npm-publish-evidence` | `797d8ab9badee50e5623786d3bb7d33dadcb61f6` |
 | P2 | Protect `main` with required CI checks before broad external adoption. | Done | GitHub settings / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Enforce `main` required checks for administrators so direct pushes cannot bypass release gates. | Done | GitHub settings / `hardening/p2-main-admin-enforcement` | `d52e9c53d738b0be8b219b6a95084239075a8adb` |
-| P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld at latest score `6.8` | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
+| P2 | Confirm the first public OpenSSF Scorecard run, then add a README badge only if the result is acceptable. | Done; badge withheld at latest score `6.6` | GitHub Actions / `hardening/p2-external-release-settings` | `eaf2446a398f123f1ab057356548a16ef85cb353` |
 | P2 | Harden supply-chain automation with SHA-pinned actions, dependency update configuration, SECURITY reporting links, and CodeQL SAST. | Done | `hardening/p2-supply-chain-ci` | `6c3b6b73719d5154c42b341da6dc6da9fb6be048` |
 | P2 | Add no-new-dependency seeded invariant sweeps for graph normalization and diff behavior. | Done | `hardening/p2-core-invariant-sweep` | `0366bc19ce94195fd84301ef84fa6f35d20cc73a` |
 | P2 | Stabilize performance budget measurement against CI runner jitter without raising budget limits. | Done | `hardening/p2-stabilize-budget-measurement` | `3fe6cd32f4697f9762d1aba8a77fe61b17373168` |
 | P2 | Add a repo-only first-publish runbook for npm Trusted Publishing and release verification. | Done | `hardening/p2-release-runbook` | `b1e6386931ee12b2b8f2938e1a89cf3730185b73` |
 | P2 | Keep the npm registry-side Trusted Publishing blocker auditable until package/auth rights exist. | Done | `hardening/p2-npm-blocker-audit` | `cba5d1fd99b2a54b7a0c6fcb96d72ff0b5c2b03c` |
 | P2 | Split packed-consumer verification into a lock-pinned baseline lane and an explicit floating compatibility lane. | Done | `hardening/p2-consumer-compat-lanes` | `f11e84ec172846459b3eec0e457eefe142c5bac2` |
-| P2 | Decide whether to replace React wheel handling with a native non-passive listener after explicit scroll-UX review. | Future UX decision | TBD | Pending |
+| P2 | Decide whether to replace React wheel handling with a native non-passive listener after explicit scroll-UX review. | Done; keep React wheel path for preview/stable | `hardening/p2-wheel-scroll-ux-decision` | `3936a08250af7295273cfafd7751c0fd15fcc759` |
 | P3 | Evaluate property-based tests for graph normalization after dependency approval. | Future decision | TBD | Pending |
 | P3 | Evaluate a headless core export only after preview API feedback. | Future decision | TBD | Pending |
 | P3 | Evaluate public debug events only after consumer diagnostics needs are observed. | Future decision | TBD | Pending |
@@ -117,9 +118,36 @@ pixel-level non-blank assertion before every non-empty screenshot comparison;
 the empty graph comparison must first assert that only the configured
 background is rendered.
 
+## Wheel Scroll UX Decision
+
+Decision date: 2026-06-05 KST.
+
+Do not replace the current React `onWheel` path with a native non-passive
+wheel listener for the public preview or first stable release. The current
+product contract is that wheel input over the canvas zooms the graph with
+pointer-anchor preservation; it does not introduce a new library-level promise
+that Ograph will suppress surrounding page scroll. Moving to a native
+non-passive listener would change that scroll contract, so it is a UX decision
+rather than a package hardening fix.
+
+Current evidence:
+
+- `resolveWheelZoomViewport` and the browser consumer gate preserve the world
+  coordinate under the wheel pointer within tolerance.
+- The stable browser gate keeps pan, wheel zoom, node drag, pointer-loss
+  release, resize, local/global transitions, StrictMode cleanup, and visual
+  smoke states covered in the packed consumer fixture.
+- `tests/browser/packed-consumer.spec.ts` explicitly allows the passive
+  `preventDefault` warning so that the warning stays visible as a conscious
+  product tradeoff instead of being mistaken for an unknown regression.
+
+Revisit only after a maintainer explicitly chooses a scroll-suppression UX
+contract for embedded pages, adds tests for that contract, and verifies that
+the change does not alter the debug harness graph interaction feel.
+
 ## External Release Settings
 
-Current external setting evidence, checked on 2026-06-04 KST:
+Current external setting evidence, checked on 2026-06-05 KST:
 
 - GitHub Private Vulnerability Reporting is enabled for
   `eunjjang3/ograph`.
@@ -132,33 +160,30 @@ Current external setting evidence, checked on 2026-06-04 KST:
 - Repository ruleset `Protect release tags` (`17266129`) applies to
   `refs/tags/v*`, is enforced, has no bypass actors, and blocks release tag
   deletion and non-fast-forward updates.
-- CI run `26924540676` for commit
-  `7cbf1284fe18f910423e1cec1d179ea0e4db5482` passed, including the packed
-  browser consumer Playwright gate.
-- CodeQL run `26924540698` for commit
-  `7cbf1284fe18f910423e1cec1d179ea0e4db5482` passed.
-- OpenSSF Scorecard run `26924540677` for commit
-  `7cbf1284fe18f910423e1cec1d179ea0e4db5482` passed with score `6.8`.
+- CI run `26962427681` for commit
+  `dd9485d9d40dfbceffc899d6ed1072a8ea23bbef` passed, including the pinned and
+  floating packed consumer lanes and packed browser consumer Playwright gate.
+- CodeQL run `26962427343` for commit
+  `dd9485d9d40dfbceffc899d6ed1072a8ea23bbef` passed.
+- OpenSSF Scorecard run `26962427354` for commit
+  `dd9485d9d40dfbceffc899d6ed1072a8ea23bbef` passed with score `6.6`.
   The score is still not high enough for a README badge. Action SHA pinning,
   dependency-update tooling, SAST, and SECURITY reporting link follow-ups are
   now detected by Scorecard. Remaining follow-up candidates include an OpenSSF
-  Best Practices badge, fuzzing, and using pull requests so code-review and PR
-  CI checks become meaningful to Scorecard.
+  Best Practices badge, fuzzing, signed releases, and maintainer-approved code
+  review rules.
 
-Still external to this repository:
+Published package evidence:
 
-- npm Trusted Publishing must be connected in npm package settings for
-  `@eunjjang/ograph` against the GitHub release workflow and `npm`
-  environment after the first package bootstrap and before CI-managed
-  releases.
-- Local npm registry checks on 2026-06-04 KST with npm CLI `11.12.1` confirm
-  `npm whoami` returns `eunjjang`, `npm access list packages eunjjang --json`
-  returns `{}`, and `npm view @eunjjang/ograph version --json` returns `E404`.
-- `npm publish --dry-run --access public` succeeds for
-  `@eunjjang/ograph@0.1.0`.
-- `npm trust list @eunjjang/ograph --json` reaches `EOTP`, confirming that
-  npm proof-of-presence is now the next external gate for trusted-publisher
-  inspection or configuration.
+- `npm view @eunjjang/ograph version --json` returns `0.1.0`, and the `latest`
+  dist-tag points at `0.1.0`.
+- `npm access get status @eunjjang/ograph --json` returns `public`.
+- `npm access list packages eunjjang --json` returns
+  `{"@eunjjang/ograph":"read-write"}`.
+- `npm audit signatures --json` returns no invalid or missing signatures.
+- `npx -y npm@11.16.0 trust list @eunjjang/ograph --json` returns a GitHub
+  trusted publisher for repository `eunjjang3/ograph`, workflow
+  `release.yml`, environment `npm`, and permission `createPackage`.
 
 ## Completion Evidence
 
