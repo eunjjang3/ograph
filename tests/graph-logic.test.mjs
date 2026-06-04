@@ -52,6 +52,21 @@ function maybeAddNodeNumber(random, node, key) {
   ]);
 }
 
+function maybeAddNodeSize(random, node) {
+  if (random() > 0.6) return;
+
+  node.size = choose(random, [
+    Math.round(random() * 40) / 10,
+    0,
+    -1,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY,
+    null,
+    'huge'
+  ]);
+}
+
 function createRandomNodeId(random, index) {
   const roll = random();
 
@@ -89,6 +104,7 @@ function createRandomNode(random, index) {
   for (const key of ['x', 'y', 'vx', 'vy', 'fx', 'fy']) {
     maybeAddNodeNumber(random, node, key);
   }
+  maybeAddNodeSize(random, node);
 
   return node;
 }
@@ -320,6 +336,30 @@ test('input sanitization keeps the first duplicate node and coerces invalid labe
   }
 });
 
+test('input sanitization removes malformed node sizes without mutating caller input', async () => {
+  const { sanitizeNodes } = await importSourceModule('src/components/graph/inputValidation.ts');
+  const nodes = [
+    { id: 'valid', label: 'Valid', size: 2 },
+    { id: 'zero', label: 'Zero', size: 0 },
+    { id: 'negative', label: 'Negative', size: -1 },
+    { id: 'nan', label: 'NaN', size: Number.NaN },
+    { id: 'infinite', label: 'Infinite', size: Number.POSITIVE_INFINITY },
+    { id: 'string', label: 'String', size: 'huge' }
+  ];
+  const snapshot = structuredClone(nodes);
+  const sanitized = sanitizeNodes(nodes);
+
+  assert.deepEqual(nodes, snapshot);
+  assert.deepEqual(sanitized.map(node => [node.id, node.size]), [
+    ['valid', 2],
+    ['zero', 0],
+    ['negative', undefined],
+    ['nan', undefined],
+    ['infinite', undefined],
+    ['string', undefined]
+  ]);
+});
+
 test('input sanitization drops dangling links and self-links', async () => {
   const { sanitizeLinks } = await importSourceModule('src/components/graph/inputValidation.ts');
   const nodeIds = new Set(['a', 'b', 'c']);
@@ -446,6 +486,11 @@ test('seeded graph normalization sweep preserves boundary invariants without mut
         assert.notEqual(node.id, '', `seed ${seed} kept an empty node id`);
         assert.equal(nodeIds.has(node.id), false, `seed ${seed} kept duplicate node id ${node.id}`);
         assert.equal(typeof node.label, 'string', `seed ${seed} kept a non-string label for ${node.id}`);
+        assert.equal(
+          node.size === undefined || (typeof node.size === 'number' && Number.isFinite(node.size) && node.size >= 0),
+          true,
+          `seed ${seed} kept invalid size for ${node.id}`
+        );
 
         for (const key of ['x', 'y', 'vx', 'vy']) {
           assert.equal(
@@ -872,6 +917,10 @@ test('graphMath returns stable radius and label visibility values', async () => 
   const expectedRadius = 4 * 2 * (1 + Math.log1p(3) * 0.4) * 1.5;
 
   assert.equal(getNodeRadius(4, 1.5, 2, 3), expectedRadius);
+  assert.equal(getNodeRadius(4, 1, -2, 0), 4);
+  assert.equal(getNodeRadius(4, 1, Number.NaN, 0), 4);
+  assert.equal(getNodeRadius(4, 1, 0, 0), 0);
+  assert.equal(getNodeRadius(4, 1, 1, -2), 4);
   assert.equal(resolveLabelVisibilityTarget(0, 1, 0.5, true), 1);
   assert.equal(resolveLabelVisibilityTarget(0, 0.1, 0, false), 0);
   assert.ok(resolveLabelVisibilityTarget(10, 1, 0.5, false) > 0);

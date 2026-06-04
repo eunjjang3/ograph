@@ -137,7 +137,7 @@ For each topology refresh it:
 6. Resynchronizes render refs against the newly active node objects so transition ghosts stay aligned during lens changes.
 7. Calls `onTick` so the component can schedule canvas redraws.
 
-Between topology refreshes, payload-only updates are applied in place to the active node objects. This keeps labels, node type, group, size, and metadata current while preserving d3-owned layout state (`x`, `y`, `vx`, `vy`, `fx`, `fy`). Size changes refresh the collide force's cached radii and give cooled simulations a minimal alpha kick so collision spacing can settle without a full graph rebuild. The hook keeps the latest graph inputs in refs so topology effects do not read stale arrays after raw graph references are removed from the dependency list.
+Between topology refreshes, payload-only updates are applied in place to the active node objects. This keeps labels, node type, group, sanitized size, and metadata current while preserving d3-owned layout state (`x`, `y`, `vx`, `vy`, `fx`, `fy`). Size changes refresh the collide force's cached radii and give cooled simulations a minimal alpha kick so collision spacing can settle without a full graph rebuild. The hook keeps the latest graph inputs in refs so topology effects do not read stale arrays after raw graph references are removed from the dependency list.
 
 Signature calculation sorts node IDs and normalized links, making it `O(n log n + m log m)` for each new input array pair. That cost is intentionally paid inside `ograph` to avoid more expensive d3-force reconstruction for reference-unstable consumers; if very large graphs make signature calculation the bottleneck, the signature helper is the boundary for a future incremental hash.
 
@@ -149,7 +149,7 @@ The simulation uses:
 
 - `forceManyBody().strength(preset.chargeStrength)`
 - `forceLink(...).distance(preset.linkDistance).strength(0.85)`
-- `forceCollide(...).radius(physics node radius + preset.collisionRadius).strength(0.9)`. Physics node radius includes `nodeRadius`, node `size`, and `degree`, but ignores `nodeSizeScale` so visual size changes do not re-layout the graph.
+- `forceCollide(...).radius(physics node radius + preset.collisionRadius).strength(0.9)`. Physics node radius includes `nodeRadius`, sanitized node `size`, and `degree`, but ignores `nodeSizeScale` so visual size changes do not re-layout the graph.
 - `forceX(0)` and `forceY(0)` scaled by `gravityStrength * 0.4`
 - `velocityDecay(preset.velocityDecay ?? 0.4)` for stable layout settling. Values are clamped to d3-force's `0` through `1` range; lower values preserve velocity longer for a floatier feel, while higher values damp motion faster for a heavier feel.
 - `alphaDecay(preset.alphaDecay ?? modeDefault)` for cooling speed. Values are clamped to `(0, 1]`; invalid or non-positive values fall back to the mode default.

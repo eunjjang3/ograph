@@ -211,7 +211,7 @@ interface GraphNode<Metadata extends GraphNodeMetadata = GraphNodeMetadata> {
 | `label` | yes | Text rendered at the current label visibility opacity; focused labels are forced visible. Non-string labels are coerced to the node ID. |
 | `type` | no | Visual category. See `GraphNodeType`. |
 | `group` | no | Consumer-defined grouping value. The production component does not interpret it directly. |
-| `size` | no | Multiplier applied to the base node radius. |
+| `size` | no | Non-negative finite multiplier applied to the base node radius. Negative, non-finite, or non-number values are removed at the public input boundary and render with the default multiplier. |
 | `degree` | no | Optional precomputed degree. The simulation recalculates active degree from links and writes it onto active simulation nodes. |
 | `x`, `y` | no | Initial finite world coordinates. If absent or non-finite, the simulation assigns a small random starting position. |
 | `vx`, `vy` | no | Initial finite d3-force velocity values. |
@@ -340,10 +340,10 @@ interface GraphPreset {
 
 | Field | Description |
 | --- | --- |
-| `nodeRadius` | Base node radius before `size` and `degree` are applied. `nodeSizeScale` is applied only while rendering and hit-testing. |
+| `nodeRadius` | Base node radius before sanitized `size` and `degree` are applied. `nodeSizeScale` is applied only while rendering and hit-testing. |
 | `linkDistance` | d3-force link distance. |
 | `chargeStrength` | d3-force many-body strength. Negative values repel nodes. |
-| `collisionRadius` | Extra radius added to node collision bounds. Collision uses `nodeRadius`, `size`, and `degree`, but intentionally ignores `nodeSizeScale`. |
+| `collisionRadius` | Extra radius added to node collision bounds. Collision uses `nodeRadius`, sanitized `size`, and `degree`, but intentionally ignores `nodeSizeScale`. |
 | `labelDensity` | `0` to `1` density control. Higher values show more labels earlier. Non-focused labels use this as the center of a soft zoom/degree reveal band, producing target opacity values from `0` to `1` instead of a hard show/hide cutoff. |
 | `hoverDimming` | Opacity multiplier for unrelated nodes/links during hover focus. The transition is eased in the canvas render loop; hover highlights fade as an overlay when hover clears. |
 | `selectionDimming` | Opacity multiplier for unrelated nodes/links during selected focus. The transition is eased in the canvas render loop; selection highlights use the same overlay fade when selection clears. |
