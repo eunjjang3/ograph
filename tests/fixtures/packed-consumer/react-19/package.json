@@ -1,0 +1,13 @@
+{
+  "name": "ograph-packed-consumer-react-19",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@types/react": "19.2.15",
+    "@types/react-dom": "19.2.3",
+    "d3-force": "3.0.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "typescript": "5.8.3"
+  }
+}

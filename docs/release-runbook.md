@@ -88,7 +88,8 @@ release events and `v*` tags are the publish trigger boundary.
    npm run test
    npm run build
    npm run check:examples
-   npm run verify:consumer
+   npm run verify:consumer:pinned
+   npm run verify:consumer:floating
    node scripts/verify-release-identity.mjs
    npx playwright install chromium
    npm run test:browser
@@ -171,7 +172,8 @@ release events and `v*` tags are the publish trigger boundary.
    npm run test
    npm run build
    npm run check:examples
-   npm run verify:consumer
+   npm run verify:consumer:pinned
+   npm run verify:consumer:floating
    GITHUB_EVENT_NAME=release GITHUB_REF="refs/tags/v${VERSION}" GITHUB_SHA="$(git rev-parse HEAD)" node scripts/verify-release-identity.mjs
    npm run test:browser
    gh api repos/eunjjang3/ograph/rulesets/17266129 \
