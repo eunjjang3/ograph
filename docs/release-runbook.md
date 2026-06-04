@@ -62,7 +62,9 @@ The existing release workflow already uses Node `22.14.0`, installs
 package-manager caching for the publish job, and publishes only from the
 canonical `eunjjang3/ograph` repository. It also verifies that the package
 name, package repository URL, GitHub repository context, and release tag match
-the intended `@eunjjang/ograph` identity before npm publish can run.
+the intended `@eunjjang/ograph` identity before npm publish can run. Release
+events additionally require exactly one dated changelog heading for the
+package version and an empty `## Unreleased` section.
 
 GitHub repository ruleset `Protect release tags` protects `v*` release tags
 from deletion and non-fast-forward updates. Keep it active because GitHub
@@ -143,11 +145,24 @@ release events and `v*` tags are the publish trigger boundary.
    verified. In npm package settings, prefer requiring 2FA and disallowing
    tokens for publishing access.
 
-7. Confirm the release tag ruleset is active, then create a `v*` tag and
-   GitHub release only after the above gates are green.
-   For the first public preview, the tag should match the existing
-   `package.json` version unless the version and changelog have been updated in
-   a reviewed commit.
+7. Finalize the changelog in a reviewed commit. Move all release notes out of
+   `## Unreleased`, leave that section empty, and add exactly one dated heading
+   matching the package version:
+
+   ```md
+   ## Unreleased
+
+   ## 0.1.0 - 2026-06-04
+   ```
+
+   Until this commit lands, `CHANGELOG.md` must continue to describe the
+   package as unreleased. The release identity guard intentionally rejects a
+   release event while notes remain under `## Unreleased` or the dated version
+   heading is missing.
+
+8. Confirm the release tag ruleset is active, then create a `v*` tag and
+   GitHub release only after the above gates are green. For the first public
+   preview, the tag must match the existing `package.json` version.
 
    ```sh
    VERSION="$(node -p 'require("./package.json").version')"
@@ -164,7 +179,7 @@ release events and `v*` tags are the publish trigger boundary.
    git push origin main --tags
    ```
 
-8. Publish through a GitHub release for the tag. The `npm` environment requires
+9. Publish through a GitHub release for the tag. The `npm` environment requires
    maintainer approval before the publish job can proceed.
 
    ```sh
@@ -173,7 +188,7 @@ release events and `v*` tags are the publish trigger boundary.
      --notes-file CHANGELOG.md
    ```
 
-9. After publish, verify the registry state.
+10. After publish, verify the registry state.
 
    ```sh
    npm view @eunjjang/ograph version
