@@ -43,9 +43,9 @@ compatibility.
 | P0 | Keep public API narrow: runtime exports only `GraphView`, `defaultGraphPreset`, and `defaultGraphTheme`. | Done in public snapshot | `main` | `f486ee32086f6e35435977d4bf70a59b8eebb294` |
 | P0 | Keep input normalization centralized and defensive: no caller mutation, no dangling/self links, duplicate node handling, invalid coordinate fallback. | Done in public snapshot | `main` | `f486ee32086f6e35435977d4bf70a59b8eebb294` |
 | P0 | Preserve React 18 and React 19 packed-consumer TypeScript compatibility. | Done in public snapshot | `main` | `f486ee32086f6e35435977d4bf70a59b8eebb294` |
-| P1 | Track the public canonical repository hardening queue and release gates in this repo. | In progress | `hardening/p1-public-canonical-ledger` | Pending |
-| P1 | Keep release/security docs aligned with the public `main` branch. | In progress | `hardening/p1-public-canonical-ledger` | Pending |
-| P1 | Keep repo-only hardening docs out of the package tarball. | In progress | `hardening/p1-public-canonical-ledger` | Pending |
+| P1 | Track the public canonical repository hardening queue and release gates in this repo. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
+| P1 | Keep release/security docs aligned with the public `main` branch. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
+| P1 | Keep repo-only hardening docs out of the package tarball. | Done | `hardening/p1-public-canonical-ledger` | `5c26f3f668cc5d7c70e2f0bfdd18c6b199a0841f` |
 | P1 | Add Playwright browser interaction and visual smoke coverage before any stable release. | Dependency-gated | TBD | Pending |
 | P2 | Confirm GitHub Private Vulnerability Reporting after public visibility and repository settings are available. | External setting | GitHub settings | Pending |
 | P2 | Configure npm Trusted Publishing for `@afterglow/ograph` through `.github/workflows/release.yml` and the `npm` environment. | External setting | npm/GitHub settings | Pending |
