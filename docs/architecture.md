@@ -303,6 +303,16 @@ Higher `labelDensity`, higher zoom, and higher degree all make labels appear ear
 
 The computed opacity is treated as the target visibility value, not an immediate draw/remove switch. `GraphView` keeps per-node label visibility in a ref and eases it each animation frame, so labels fade in and out as zoom, density, degree, or focus changes move them through the reveal band.
 
+Consumers can optionally cap label paint work through
+`GraphPreset.labelRenderBudget`. The settled cap applies to ordinary draw
+requests. The interaction cap applies while pointer input, viewport easing,
+simulation, or focus/lens/label transitions are active and falls back to the
+settled cap when omitted. Budgeted frames select labels before either
+`strokeText` or `fillText` runs. Hovered, selected, and root labels are always
+retained; focused neighbors then rank ahead of ordinary labels, followed by
+visibility, degree, and original node order. The default preset leaves both
+caps unset, preserving the existing unbounded label pass.
+
 ## Dimming
 
 Hover and selection focus dim unrelated nodes, links, and labels using the preset's `hoverDimming` or `selectionDimming` multiplier. The active dim amount is eased in the render loop, so entering and leaving focus fades between full opacity and the configured dimmed opacity.

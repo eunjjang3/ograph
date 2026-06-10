@@ -130,6 +130,7 @@ export function useGraphPointerInteractions({
   const isPointerMovedRef = useRef<boolean>(false);
   const lastClickTimeRef = useRef<number>(0);
   const lastTouchDistRef = useRef<number | null>(null);
+  const interactionActiveRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (hoveredNodeId !== undefined) {
@@ -230,6 +231,7 @@ export function useGraphPointerInteractions({
 
     isPointerMovedRef.current = false;
     isPointerDownRef.current = true;
+    interactionActiveRef.current = true;
     activePointerIdRef.current = e.pointerId;
     pointerDownRef.current = { x: e.clientX, y: e.clientY };
 
@@ -343,6 +345,7 @@ export function useGraphPointerInteractions({
     releaseActiveDrag();
     isPanningRef.current = false;
     isPointerDownRef.current = false;
+    interactionActiveRef.current = lastTouchDistRef.current !== null;
     activePointerIdRef.current = null;
 
     if (clickedNode && !isPointerMovedRef.current) {
@@ -365,6 +368,7 @@ export function useGraphPointerInteractions({
     releaseActiveDrag(notifyConsumer);
     isPanningRef.current = false;
     isPointerDownRef.current = false;
+    interactionActiveRef.current = false;
     activePointerIdRef.current = null;
     isPointerMovedRef.current = false;
     lastTouchDistRef.current = null;
@@ -451,6 +455,7 @@ export function useGraphPointerInteractions({
   const handleTouchMove = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
     if (e.touches.length === 2 && canvasRef.current) {
       e.preventDefault();
+      interactionActiveRef.current = true;
       const rect = canvasRef.current.getBoundingClientRect();
       const t1 = e.touches[0]!;
       const t2 = e.touches[1]!;
@@ -478,12 +483,15 @@ export function useGraphPointerInteractions({
 
   const handleTouchEnd = useCallback(() => {
     lastTouchDistRef.current = null;
-  }, []);
+    interactionActiveRef.current = isPointerDownRef.current;
+    requestRender();
+  }, [requestRender]);
 
   const hoveredNode = localHoveredNodeId ? nodeByIdRef.current.get(localHoveredNodeId) : null;
 
   return {
     hoveredNodeIdRef,
+    interactionActiveRef,
     localHoveredNodeId,
     hoveredNode,
     handlers: {

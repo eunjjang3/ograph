@@ -393,6 +393,10 @@ interface GraphPreset {
   chargeStrength: number;
   collisionRadius: number;
   labelDensity: number;
+  labelRenderBudget?: {
+    maxLabels?: number;
+    maxLabelsDuringInteraction?: number;
+  };
   hoverDimming: number;
   selectionDimming: number;
   localGraphDepthBehavior: number;
@@ -410,6 +414,7 @@ interface GraphPreset {
 | `chargeStrength` | d3-force many-body strength. Negative values repel nodes. |
 | `collisionRadius` | Extra radius added to node collision bounds. Collision uses `nodeRadius`, sanitized `size`, and `degree`, but intentionally ignores `nodeSizeScale`. |
 | `labelDensity` | `0` to `1` density control. Higher values show more labels earlier. Non-focused labels use this as the center of a soft zoom/degree reveal band, producing target opacity values from `0` to `1` instead of a hard show/hide cutoff. |
+| `labelRenderBudget` | Optional per-frame label caps. `maxLabels` applies to settled frames; `maxLabelsDuringInteraction` applies during pan, drag, pinch, viewport animation, active simulation, and focus/lens/label transitions. The interaction cap falls back to `maxLabels` when omitted. Invalid or negative values disable that cap. Hovered, selected, and root labels remain visible even when they exceed the cap; focused neighbors rank ahead of ordinary labels while still counting toward it. |
 | `hoverDimming` | Opacity multiplier for unrelated nodes/links during hover focus. The transition is eased in the canvas render loop; hover highlights fade as an overlay when hover clears. |
 | `selectionDimming` | Opacity multiplier for unrelated nodes/links during selected focus. The transition is eased in the canvas render loop; selection highlights use the same overlay fade when selection clears. |
 | `localGraphDepthBehavior` | Reserved preset field mirroring local-depth behavior. The component currently uses the `localDepth` prop for traversal. |
@@ -430,6 +435,10 @@ Example:
     chargeStrength: -80,
     collisionRadius: 10,
     labelDensity: 0.7,
+    labelRenderBudget: {
+      maxLabels: 160,
+      maxLabelsDuringInteraction: 48
+    },
     hoverDimming: 0.25,
     selectionDimming: 0.15,
     localGraphDepthBehavior: 2,
