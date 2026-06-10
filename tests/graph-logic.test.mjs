@@ -990,6 +990,162 @@ test('graphMath returns stable radius and label visibility values', async () => 
   assert.ok(resolveLabelVisibilityTarget(10, 1, 0.5, false) > 0);
 });
 
+test('label render budgets normalize interaction fallbacks and invalid values', async () => {
+  const { resolveLabelRenderBudget } = await importSourceModule('src/components/graph/canvasRenderer.ts');
+
+  assert.equal(resolveLabelRenderBudget(undefined, false), undefined);
+  assert.equal(resolveLabelRenderBudget({ maxLabels: 12.8 }, false), 12);
+  assert.equal(resolveLabelRenderBudget({ maxLabels: 12.8 }, true), 12);
+  assert.equal(
+    resolveLabelRenderBudget({ maxLabels: 12, maxLabelsDuringInteraction: 4.9 }, true),
+    4
+  );
+  assert.equal(resolveLabelRenderBudget({ maxLabels: 12, maxLabelsDuringInteraction: 0 }, true), 0);
+  assert.equal(resolveLabelRenderBudget({ maxLabels: -1 }, false), undefined);
+  assert.equal(resolveLabelRenderBudget({ maxLabels: Number.NaN }, false), undefined);
+  assert.equal(resolveLabelRenderBudget({ maxLabels: Number.POSITIVE_INFINITY }, false), undefined);
+  assert.equal(
+    resolveLabelRenderBudget({ maxLabels: 12, maxLabelsDuringInteraction: Number.NaN }, true),
+    undefined
+  );
+});
+
+test('label render budget preserves forced labels and ranks neighbors deterministically', async () => {
+  const { selectLabelNodeIdsForBudget } = await importSourceModule('src/components/graph/canvasRenderer.ts');
+  const candidates = [
+    { id: 'ordinary-high', index: 0, forceVisible: false, isNeighbor: false, visibility: 1, degree: 20 },
+    { id: 'forced-selected', index: 1, forceVisible: true, isNeighbor: false, visibility: 1, degree: 0 },
+    { id: 'neighbor-low', index: 2, forceVisible: false, isNeighbor: true, visibility: 0.2, degree: 1 },
+    { id: 'ordinary-tie-a', index: 3, forceVisible: false, isNeighbor: false, visibility: 0.5, degree: 3 },
+    { id: 'ordinary-tie-b', index: 4, forceVisible: false, isNeighbor: false, visibility: 0.5, degree: 3 }
+  ];
+
+  assert.deepEqual(
+    [...selectLabelNodeIdsForBudget(candidates, 3)],
+    ['forced-selected', 'neighbor-low', 'ordinary-high']
+  );
+  assert.deepEqual(
+    [...selectLabelNodeIdsForBudget(candidates, 1)],
+    ['forced-selected']
+  );
+
+  const forcedOverflow = selectLabelNodeIdsForBudget([
+    ...candidates,
+    { id: 'forced-root', index: 5, forceVisible: true, isNeighbor: false, visibility: 1, degree: 0 }
+  ], 1);
+  assert.deepEqual([...forcedOverflow], ['forced-selected', 'forced-root']);
+});
+
+test('canvas label paint calls are capped before strokeText and fillText', async () => {
+  const { drawGraph } = await importSourceModule('src/components/graph/canvasRenderer.ts');
+  const { defaultGraphPreset, defaultGraphTheme } = await importSourceModule('src/components/graph/presets.ts');
+  const strokedLabels = [];
+  const filledLabels = [];
+  const ctx = {
+    arc() {},
+    beginPath() {},
+    fill() {},
+    fillRect() {},
+    fillText(label) {
+      filledLabels.push(label);
+    },
+    lineTo() {},
+    moveTo() {},
+    restore() {},
+    save() {},
+    scale() {},
+    stroke() {},
+    strokeText(label) {
+      strokedLabels.push(label);
+    },
+    translate() {}
+  };
+  const nodes = [
+    { id: 'low', label: 'Low', x: 20, y: 20, degree: 1 },
+    { id: 'high', label: 'High', x: 40, y: 20, degree: 10 },
+    { id: 'medium', label: 'Medium', x: 60, y: 20, degree: 5 }
+  ];
+
+  drawGraph(
+    ctx,
+    100,
+    100,
+    nodes,
+    [],
+    { x: 0, y: 0, scale: 1 },
+    defaultGraphTheme,
+    { ...defaultGraphPreset, labelDensity: 1 },
+    null,
+    null,
+    null,
+    new Set(),
+    1,
+    new Map(nodes.map(node => [node.id, 1])),
+    undefined,
+    undefined,
+    2
+  );
+
+  assert.deepEqual(strokedLabels, ['High', 'Medium']);
+  assert.deepEqual(filledLabels, ['High', 'Medium']);
+});
+
+test('canvas label budget keeps source-order tie breaks when spatial index order differs', async () => {
+  const { drawGraph } = await importSourceModule('src/components/graph/canvasRenderer.ts');
+  const { defaultGraphPreset, defaultGraphTheme } = await importSourceModule('src/components/graph/presets.ts');
+  const filledLabels = [];
+  const ctx = {
+    arc() {},
+    beginPath() {},
+    fill() {},
+    fillRect() {},
+    fillText(label) {
+      filledLabels.push(label);
+    },
+    lineTo() {},
+    moveTo() {},
+    restore() {},
+    save() {},
+    scale() {},
+    stroke() {},
+    strokeText() {},
+    translate() {}
+  };
+  const nodes = [
+    { id: 'source-first', label: 'Source First', x: 120, y: 20, degree: 1 },
+    { id: 'query-first', label: 'Query First', x: 20, y: 20, degree: 1 }
+  ];
+  const spatialIndex = {
+    cellSize: 100,
+    cells: new Map([
+      ['0:0', [nodes[1]]],
+      ['1:0', [nodes[0]]]
+    ])
+  };
+
+  drawGraph(
+    ctx,
+    200,
+    100,
+    nodes,
+    [],
+    { x: 0, y: 0, scale: 1 },
+    defaultGraphTheme,
+    { ...defaultGraphPreset, labelDensity: 1 },
+    null,
+    null,
+    null,
+    new Set(),
+    1,
+    new Map(nodes.map(node => [node.id, 1])),
+    undefined,
+    spatialIndex,
+    1
+  );
+
+  assert.deepEqual(filledLabels, ['Source First']);
+});
+
 test('local lens drag physics keeps low simulation heat without connected-node wake', async () => {
   const {
     DEFAULT_GRAPH_DRAG_PHYSICS,

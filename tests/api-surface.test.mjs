@@ -66,6 +66,9 @@ test('built declarations preserve consumer metadata through GraphView callbacks'
   assert.match(typeEntry, /growthAnimation\?: boolean \| GraphGrowthAnimationOptions<NodeMetadata>;/);
   assert.match(typeEntry, /cameraFocusNodeId\?: string \| null;/);
   assert.match(typeEntry, /cameraFocusOptions\?: GraphCameraFocusOptions;/);
+  assert.match(typeEntry, /labelRenderBudget\?: \{/);
+  assert.match(typeEntry, /maxLabels\?: number;/);
+  assert.match(typeEntry, /maxLabelsDuringInteraction\?: number;/);
   assert.match(typeEntry, /ariaLabel\?: string;/);
   assert.match(typeEntry, /canvasRole\?: AriaRole;/);
   assert.match(graphViewEntry, /focusCameraOnNode: \(nodeId: string, options\?: GraphCameraFocusOptions\) => boolean;/);

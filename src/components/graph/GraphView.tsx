@@ -404,6 +404,7 @@ function GraphViewCanvasInner<
 
   const {
     hoveredNodeIdRef,
+    interactionActiveRef,
     localHoveredNodeId,
     hoveredNode,
     handlers
@@ -452,6 +453,7 @@ function GraphViewCanvasInner<
     targetViewportRef,
     viewportAnimationActiveRef,
     hoveredNodeIdRef,
+    interactionActiveRef,
     selectedNodeId: externalSelectedNodeId,
     rootNodeId,
     lensVisibleNodeIds: lensScope.visibleNodeIds,

@@ -157,6 +157,16 @@ export interface GraphPreset {
   collisionRadius: number;
   /** Label reveal density from `0` to `1`; higher values reveal labels earlier. */
   labelDensity: number;
+  /**
+   * Optional caps for labels painted per frame. Invalid values disable the
+   * corresponding cap, and omitted interaction caps fall back to `maxLabels`.
+   */
+  labelRenderBudget?: {
+    /** Maximum labels painted on settled frames. */
+    maxLabels?: number;
+    /** Maximum labels painted while input, simulation, or canvas transitions are active. */
+    maxLabelsDuringInteraction?: number;
+  };
   /** Opacity multiplier for unrelated graph elements during hover focus. */
   hoverDimming: number;
   /** Opacity multiplier for unrelated graph elements during selection focus. */

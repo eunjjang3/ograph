@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- Added optional settled and interaction-time label paint budgets to
+  `GraphPreset`, allowing consumers to bound canvas text calls while preserving
+  hovered, selected, and root labels.
+
 ## 0.1.0 - 2026-06-05
 
 Initial public preview.

@@ -3,7 +3,7 @@ import type { RefObject } from 'react';
 import type { Simulation } from 'd3-force';
 import type { GraphLink, GraphNode, GraphPreset, GraphTheme } from './types';
 import { resolveLabelVisibilityTarget, type Viewport } from './graphMath';
-import { drawGraph } from './canvasRenderer';
+import { drawGraph, resolveLabelRenderBudget } from './canvasRenderer';
 import { getFocusedNeighborSet } from './graphIndexes';
 import { buildSpatialIndex, type GraphSpatialIndex } from './spatialIndex';
 
@@ -32,6 +32,7 @@ interface UseGraphRenderLoopParams {
   targetViewportRef: CurrentRef<Viewport>;
   viewportAnimationActiveRef: CurrentRef<boolean>;
   hoveredNodeIdRef: CurrentRef<string | null>;
+  interactionActiveRef: CurrentRef<boolean>;
   selectedNodeId: string | null | undefined;
   rootNodeId: string | null | undefined;
   lensVisibleNodeIds: ReadonlySet<string>;
@@ -79,6 +80,7 @@ export function useGraphRenderLoop({
   targetViewportRef,
   viewportAnimationActiveRef,
   hoveredNodeIdRef,
+  interactionActiveRef,
   selectedNodeId,
   rootNodeId,
   lensVisibleNodeIds,
@@ -288,6 +290,17 @@ export function useGraphRenderLoop({
 
       if (shouldDraw) {
         renderRequestedRef.current = false;
+        const isInteractionFrame =
+          interactionActiveRef.current ||
+          isSimulationActive ||
+          viewportAnimationActiveRef.current ||
+          isDimmingActive ||
+          isLensAnimationActive ||
+          isLabelAnimationActive;
+        const labelRenderBudget = resolveLabelRenderBudget(
+          preset.labelRenderBudget,
+          isInteractionFrame
+        );
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.save();
@@ -310,7 +323,8 @@ export function useGraphRenderLoop({
             dimProgressRef.current,
             visibleLabelIds,
             lensVisibilityByNodeId,
-            spatialIndexRef.current
+            spatialIndexRef.current,
+            labelRenderBudget
           );
         } finally {
           ctx.restore();
@@ -360,6 +374,7 @@ export function useGraphRenderLoop({
     targetViewportRef,
     viewportAnimationActiveRef,
     hoveredNodeIdRef,
+    interactionActiveRef,
     selectedNodeId,
     rootNodeId,
     lensVisibleNodeIds,

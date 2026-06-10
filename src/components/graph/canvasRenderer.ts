@@ -24,6 +24,70 @@ interface FocusRenderState {
   isNeighbor: (id: string) => boolean;
 }
 
+interface LabelRenderCandidate {
+  id: string;
+  index: number;
+  forceVisible: boolean;
+  isNeighbor: boolean;
+  visibility: number;
+  degree: number;
+}
+
+function normalizeLabelRenderBudget(value: number | undefined): number | undefined {
+  if (value === undefined || !Number.isFinite(value) || value < 0) {
+    return undefined;
+  }
+
+  return Math.floor(value);
+}
+
+export function resolveLabelRenderBudget(
+  config: GraphPreset['labelRenderBudget'],
+  interactionActive: boolean
+): number | undefined {
+  if (!config) return undefined;
+
+  if (interactionActive && config.maxLabelsDuringInteraction !== undefined) {
+    return normalizeLabelRenderBudget(config.maxLabelsDuringInteraction);
+  }
+
+  return normalizeLabelRenderBudget(config.maxLabels);
+}
+
+export function selectLabelNodeIdsForBudget(
+  candidates: readonly LabelRenderCandidate[],
+  budget: number
+): Set<string> {
+  const forced = candidates.filter(candidate => candidate.forceVisible);
+  const selectedIds = new Set(forced.map(candidate => candidate.id));
+  const availableSlots = Math.max(0, Math.floor(budget) - forced.length);
+
+  if (availableSlots === 0) {
+    return selectedIds;
+  }
+
+  const ranked = candidates
+    .filter(candidate => !candidate.forceVisible)
+    .sort((left, right) => {
+      if (left.isNeighbor !== right.isNeighbor) {
+        return left.isNeighbor ? -1 : 1;
+      }
+      if (left.visibility !== right.visibility) {
+        return right.visibility - left.visibility;
+      }
+      if (left.degree !== right.degree) {
+        return right.degree - left.degree;
+      }
+      return left.index - right.index;
+    });
+
+  for (let i = 0; i < Math.min(availableSlots, ranked.length); i++) {
+    selectedIds.add(ranked[i]!.id);
+  }
+
+  return selectedIds;
+}
+
 function createFocusRenderState(
   selectedNodeId: string | null | undefined,
   hoveredNodeId: string | null | undefined,
@@ -368,15 +432,55 @@ function drawLabels(
   preset: GraphPreset,
   focus: FocusRenderState,
   labelVisibilityByNodeId?: Map<string, number>,
-  lensVisibilityByNodeId?: Map<string, number>
+  lensVisibilityByNodeId?: Map<string, number>,
+  labelRenderBudget?: number,
+  labelOrderByNodeId?: Map<string, number>
 ) {
   ctx.globalAlpha = 1.0;
   ctx.font = `${11 / viewport.scale}px ${theme.fontFamily}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
 
+  let selectedLabelIds: Set<string> | null = null;
+  if (labelRenderBudget !== undefined) {
+    const candidates: LabelRenderCandidate[] = [];
+
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      const lensAlpha = resolveLensNodeAlpha(node.id, lensVisibilityByNodeId);
+      if (lensAlpha <= 0.001) continue;
+
+      const isNodeSelected = focus.isSelected(node.id);
+      const isNodeHovered = focus.isHovered(node.id);
+      const isNodeRoot = focus.isRoot(node.id);
+      const isNodeNeighbor = focus.hasActiveFocus && focus.isNeighbor(node.id);
+      const forceVisible = isNodeHovered || isNodeSelected || isNodeRoot;
+      const labelVisibility = labelVisibilityByNodeId?.get(node.id) ?? resolveLabelVisibilityTarget(
+        node.degree,
+        viewport.scale,
+        preset.labelDensity,
+        forceVisible || isNodeNeighbor
+      );
+
+      if (labelVisibility <= 0.001) continue;
+
+      candidates.push({
+        id: node.id,
+        index: labelOrderByNodeId?.get(node.id) ?? i,
+        forceVisible,
+        isNeighbor: isNodeNeighbor,
+        visibility: labelVisibility * lensAlpha,
+        degree: Number.isFinite(node.degree) ? Math.max(0, node.degree ?? 0) : 0
+      });
+    }
+
+    selectedLabelIds = selectLabelNodeIdsForBudget(candidates, labelRenderBudget);
+  }
+
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
+    if (selectedLabelIds && !selectedLabelIds.has(node.id)) continue;
+
     const lensAlpha = resolveLensNodeAlpha(node.id, lensVisibilityByNodeId);
     if (lensAlpha <= 0.001) continue;
 
@@ -433,7 +537,8 @@ export function drawGraph(
   dimProgress = 1,
   labelVisibilityByNodeId?: Map<string, number>,
   lensVisibilityByNodeId?: Map<string, number>,
-  spatialIndex?: GraphSpatialIndex
+  spatialIndex?: GraphSpatialIndex,
+  labelRenderBudget?: number
 ) {
   ctx.fillStyle = theme.backgroundColor;
   ctx.fillRect(0, 0, width, height);
@@ -452,10 +557,24 @@ export function drawGraph(
 
   const bounds = getPaddedViewportWorldBounds(width, height, viewport);
   const visibleNodes = spatialIndex ? querySpatialIndex(spatialIndex, bounds) : nodes;
+  const labelOrderByNodeId = labelRenderBudget === undefined
+    ? undefined
+    : new Map(nodes.map((node, index) => [node.id, index]));
 
   drawLinks(ctx, links, viewport, theme, preset, focus, bounds, lensVisibilityByNodeId);
   drawNodes(ctx, visibleNodes, viewport, theme, preset, focus, bounds, lensVisibilityByNodeId);
-  drawLabels(ctx, visibleNodes, viewport, theme, preset, focus, labelVisibilityByNodeId, lensVisibilityByNodeId);
+  drawLabels(
+    ctx,
+    visibleNodes,
+    viewport,
+    theme,
+    preset,
+    focus,
+    labelVisibilityByNodeId,
+    lensVisibilityByNodeId,
+    labelRenderBudget,
+    labelOrderByNodeId
+  );
 
   ctx.restore();
 }
