@@ -10,6 +10,7 @@ The package is designed for applications that need a large interactive node-link
 - TypeScript data contracts for graph nodes, links, themes, presets, view modes, and viewport events.
 - Default dark graph theme and force preset values.
 - Local/global graph modes, node selection and hover highlighting, drag-to-reposition, pan, wheel zoom, and pinch zoom.
+- Optional chronological graph growth animation driven by consumer timestamps such as `metadata.createdAt`.
 - Declarative simulation pausing for hidden or inactive graph panels.
 - A Vite debug harness for generating deterministic stress-test graphs up to 10,000 nodes.
 
@@ -108,6 +109,33 @@ const nodes: GraphNode<NodeMetadata>[] = [
   links={[]}
   ariaLabel="Knowledge graph"
   onNodeClick={(node) => console.log(node.metadata?.slug)}
+/>;
+```
+
+To replay a graph as a time-ordered growth sequence, pass `growthAnimation`.
+When set to `true`, the component reads `node.metadata.createdAt`; custom apps
+can provide their own timestamp extractor.
+
+```tsx
+type NodeMetadata = {
+  createdAt: string;
+};
+
+const nodes: GraphNode<NodeMetadata>[] = [
+  {
+    id: 'node-a',
+    label: 'Node A',
+    metadata: { createdAt: '2026-06-04T00:00:00.000Z' }
+  }
+];
+
+<GraphView
+  nodes={nodes}
+  links={links}
+  growthAnimation={{
+    stepMs: 180,
+    getNodeTimestamp: node => node.metadata?.createdAt
+  }}
 />;
 ```
 

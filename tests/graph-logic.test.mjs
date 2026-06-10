@@ -727,6 +727,70 @@ test('graph topology signature ignores self-links consistently', async () => {
   );
 });
 
+test('graph growth sequence orders nodes by timestamp with input-order fallback', async () => {
+  const {
+    buildGraphGrowthSequence,
+    filterGraphByGrowthStep,
+    parseGraphGrowthTimestamp,
+    resolveGraphGrowthAnimationOptions
+  } = await importSourceModule('src/components/graph/useGraphGrowthAnimation.ts');
+  const nodes = [
+    { id: 'late', label: 'Late', metadata: { createdAt: '2026-01-03T00:00:00.000Z' } },
+    { id: 'undated', label: 'Undated', metadata: { createdAt: 'not-a-date' } },
+    { id: 'early', label: 'Early', metadata: { createdAt: new Date('2026-01-01T00:00:00.000Z') } },
+    { id: 'tie', label: 'Tie', metadata: { createdAt: '2026-01-01T00:00:00.000Z' } }
+  ];
+  const links = [
+    { source: 'early', target: 'tie' },
+    { source: 'tie', target: 'late' },
+    { source: 'undated', target: 'early' }
+  ];
+  const options = resolveGraphGrowthAnimationOptions(true);
+  const sequence = buildGraphGrowthSequence(nodes, options);
+
+  assert.deepEqual(sequence.items.map(item => item.id), ['early', 'tie', 'late', 'undated']);
+  assert.equal(parseGraphGrowthTimestamp(''), null);
+  assert.equal(parseGraphGrowthTimestamp(Number.NaN), null);
+
+  const firstTwo = filterGraphByGrowthStep(nodes, links, sequence, 2);
+  assert.deepEqual(firstTwo.nodes.map(node => node.id), ['early', 'tie']);
+  assert.deepEqual(firstTwo.links, [{ source: 'early', target: 'tie' }]);
+  assert.equal(firstTwo.isComplete, false);
+
+  const complete = filterGraphByGrowthStep(nodes, links, sequence, 99);
+  assert.deepEqual(complete.nodes, nodes);
+  assert.deepEqual(complete.links, links);
+  assert.equal(complete.isComplete, true);
+});
+
+test('graph growth options support custom timestamp extractors and safe timing defaults', async () => {
+  const {
+    DEFAULT_GRAPH_GROWTH_STEP_MS,
+    buildGraphGrowthSequence,
+    getInitialGraphGrowthRevealedCount,
+    resolveGraphGrowthAnimationOptions
+  } = await importSourceModule('src/components/graph/useGraphGrowthAnimation.ts');
+  const nodes = [
+    { id: 'b', label: 'B', metadata: { order: 2 } },
+    { id: 'a', label: 'A', metadata: { order: 1 } }
+  ];
+  const options = resolveGraphGrowthAnimationOptions({
+    getNodeTimestamp: node => node.metadata.order,
+    stepMs: -10,
+    initialDelayMs: Number.NaN
+  });
+
+  assert.equal(options.enabled, true);
+  assert.equal(options.stepMs, DEFAULT_GRAPH_GROWTH_STEP_MS);
+  assert.equal(options.initialDelayMs, 0);
+  assert.deepEqual(buildGraphGrowthSequence(nodes, options).items.map(item => item.id), ['a', 'b']);
+  assert.equal(getInitialGraphGrowthRevealedCount(3, true, 0), 1);
+  assert.equal(getInitialGraphGrowthRevealedCount(3, true, 100), 0);
+  assert.equal(getInitialGraphGrowthRevealedCount(3, false, 100), 3);
+  assert.equal(resolveGraphGrowthAnimationOptions(false).enabled, false);
+  assert.equal(resolveGraphGrowthAnimationOptions({ enabled: false }).enabled, false);
+});
+
 test('diffGraph reports deterministic node and duplicate-link patches without mutating inputs', async () => {
   const { diffGraph, getGraphLinkDiffKey } = await importSourceModule('src/components/graph/graphDiff.ts');
   const stableNode = { id: 'a', label: 'A' };

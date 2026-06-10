@@ -18,6 +18,8 @@ import {
   type GraphViewMode,
   type GraphViewProps,
   type GraphViewport,
+  type GraphGrowthAnimationOptions,
+  type GraphGrowthTimestamp,
   type GraphViewRef
 } from '@eunjjang/ograph';
 ```
@@ -67,6 +69,7 @@ type GraphViewProps<
 | `rootNodeId` | `string \| null` | `undefined` | Root node used for local lens mode and root highlighting. Must match an `id` in the provided `nodes` array. |
 | `mode` | `'global' \| 'local'` | `'global'` | Whether to display the full graph or a local focus lens over the global layout. |
 | `localDepth` | `number` | `2` | Visible breadth-first traversal depth from `rootNodeId` in local lens mode. Values are clamped to integers from `1` through `10`. |
+| `growthAnimation` | `boolean \| GraphGrowthAnimationOptions<NodeMetadata>` | `undefined` | Optional chronological node reveal. `true` reads `node.metadata.createdAt`; an options object can provide a custom timestamp extractor, metadata key, step duration, and initial delay. |
 | `paused` | `boolean` | `false` | Stops d3-force simulation ticks while keeping the canvas mounted and renderable. Use this when a consumer keeps the graph mounted inside a hidden or inactive panel. |
 
 ### Optional Configuration Props
@@ -167,6 +170,47 @@ When `paused` changes back to `false`, the simulation resumes only if it still h
 Payload-only changes, including node labels, node type, groups, metadata, and link labels, are reflected without recreating simulation nodes. Node `size` is also payload, but it affects collision radius, so size changes refresh the collide force and apply only a minimal alpha kick, restarting immediately only when physics is not paused.
 
 Links whose endpoints do not exist in the current node set are ignored for topology comparison, matching the graph traversal and indexing rules. Self-links where `source === target` are also ignored. Link `weight`, `strength`, `type`, and `metadata` are not part of the topology contract while the library uses preset-level force values. If per-link force parameters become active in a future release, those fields must be reconsidered for topology comparison.
+
+## Chronological Growth Animation
+
+`growthAnimation` replays a graph by revealing nodes in timestamp order. Each
+step passes the revealed node/link subset into the existing d3-force simulation,
+so newly revealed nodes can be pulled toward already visible neighbors as their
+links become active. Links appear only after both endpoint nodes have been
+revealed.
+
+```tsx
+<GraphView
+  nodes={nodes}
+  links={links}
+  growthAnimation={{
+    stepMs: 180,
+    getNodeTimestamp: node => node.metadata?.createdAt
+  }}
+/>;
+```
+
+When `growthAnimation` is `true`, the default timestamp source is
+`node.metadata?.createdAt`. Use `timestampMetadataKey` to read a different
+metadata field, or `getNodeTimestamp` for a fully custom extractor. Timestamp
+values may be ISO date strings, finite epoch-millisecond numbers, or `Date`
+objects. Nodes with missing or invalid timestamps are revealed after timestamped
+nodes in their original input order, and timestamp ties also preserve input
+order.
+
+```ts
+type GraphGrowthTimestamp = string | number | Date | null | undefined;
+
+interface GraphGrowthAnimationOptions<NodeMetadata extends GraphNodeMetadata = GraphNodeMetadata> {
+  enabled?: boolean;
+  getNodeTimestamp?: (node: GraphNode<NodeMetadata>) => GraphGrowthTimestamp;
+  timestampMetadataKey?: string;
+  stepMs?: number;
+  initialDelayMs?: number;
+}
+```
+
+Users who prefer reduced motion see the complete graph immediately.
 
 ## Data Contracts
 

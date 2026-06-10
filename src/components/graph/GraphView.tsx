@@ -26,6 +26,7 @@ import { useGraphPointerInteractions } from './useGraphPointerInteractions';
 import { useGraphRenderLoop } from './useGraphRenderLoop';
 import { useViewportControls } from './useViewportControls';
 import { useGraphLensScope } from './useGraphLensScope';
+import { useGraphGrowthAnimation } from './useGraphGrowthAnimation';
 import { buildSpatialIndex } from './spatialIndex';
 import type { Viewport } from './graphMath';
 import { GraphErrorBoundary } from './GraphErrorBoundary';
@@ -139,6 +140,7 @@ function GraphViewCanvasInner<
     rootNodeId,
     mode = 'global',
     localDepth,
+    growthAnimation,
     paused = false,
     presetConf,
     themeConf,
@@ -158,10 +160,16 @@ function GraphViewCanvasInner<
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const spatialIndexRef = useRef(buildSpatialIndex([]));
   const [reduceMotion, setReduceMotion] = useState(false);
-  const sourceNodeIds = useMemo(() => new Set(nodes.map(node => node.id)), [nodes]);
-  const lensScope = useGraphLensScope({
+  const growthGraph = useGraphGrowthAnimation({
     nodes,
     links,
+    animation: growthAnimation,
+    reduceMotion
+  });
+  const sourceNodeIds = useMemo(() => new Set(growthGraph.nodes.map(node => node.id)), [growthGraph.nodes]);
+  const lensScope = useGraphLensScope({
+    nodes: growthGraph.nodes,
+    links: growthGraph.links,
     mode,
     rootNodeId,
     localDepth,
@@ -226,7 +234,7 @@ function GraphViewCanvasInner<
     dimensions,
     activeNodesRef,
     fitNodeIds: lensScope.visibleNodeIds,
-    autoFitDependency: nodes,
+    autoFitDependency: growthGraph.nodes,
     autoFitEnabled: mode === 'global',
     requestRender,
     onViewportChange
