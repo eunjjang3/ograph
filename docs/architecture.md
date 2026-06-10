@@ -139,6 +139,14 @@ For each topology refresh it:
 
 Between topology refreshes, payload-only updates are applied in place to the active node objects. This keeps labels, node type, group, sanitized size, and metadata current while preserving d3-owned layout state (`x`, `y`, `vx`, `vy`, `fx`, `fy`). Size changes refresh the collide force's cached radii and give cooled simulations a minimal alpha kick so collision spacing can settle without a full graph rebuild. The hook keeps the latest graph inputs in refs so topology effects do not read stale arrays after raw graph references are removed from the dependency list.
 
+`growthAnimation` runs before local-lens scoping. The growth hook sorts nodes by
+a consumer timestamp, defaults to `metadata.createdAt`, and exposes only the
+currently revealed node/link subset to the existing lens and simulation
+pipeline. A link is included only when both endpoint nodes have already been
+revealed. This keeps chronological replay app-agnostic: metadata decides reveal
+order, while d3-force still owns the physical attachment and settling behavior.
+Missing or invalid timestamps fall back to input order after timestamped nodes.
+
 Signature calculation sorts node IDs and normalized links, making it `O(n log n + m log m)` for each new input array pair. That cost is intentionally paid inside `ograph` to avoid more expensive d3-force reconstruction for reference-unstable consumers; if very large graphs make signature calculation the bottleneck, the signature helper is the boundary for a future incremental hash.
 
 `paused` stops the d3-force timer without unmounting the canvas or discarding cached coordinates. Graph refreshes while paused still update refs, forces, and render data, but they do not restart the timer until `paused` returns to `false`. The render loop also treats a paused simulation as inactive, even if its alpha remains above `alphaMin`, so a frozen layout cannot keep requestAnimationFrame alive by itself.

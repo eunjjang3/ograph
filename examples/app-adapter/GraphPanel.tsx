@@ -47,6 +47,7 @@ export function AppAdapterGraphPanel() {
         ariaLabel="Memory graph"
         nodes={graph.nodes}
         links={graph.links}
+        growthAnimation={{ stepMs: 700 }}
       />
     </div>
   );

@@ -64,6 +64,22 @@ export interface GraphLink<
   metadata?: Metadata;
 }
 
+export type GraphGrowthTimestamp = string | number | Date | null | undefined;
+
+/** Optional chronological reveal settings for graph growth animations. */
+export interface GraphGrowthAnimationOptions<Metadata extends GraphNodeMetadata = GraphNodeMetadata> {
+  /** Set to false to keep an options object around while disabling the animation. */
+  enabled?: boolean;
+  /** Extracts a timestamp value from a node. Defaults to `node.metadata?.createdAt`. */
+  getNodeTimestamp?: (node: GraphNode<Metadata>) => GraphGrowthTimestamp;
+  /** Metadata key read when `getNodeTimestamp` is omitted. */
+  timestampMetadataKey?: string;
+  /** Milliseconds between each newly revealed node. */
+  stepMs?: number;
+  /** Delay before the first node is revealed. */
+  initialDelayMs?: number;
+}
+
 /** Canvas color and typography tokens used by the graph renderer. */
 export interface GraphTheme {
   /** Canvas and container background color. */
@@ -180,6 +196,8 @@ export interface GraphViewProps<
   mode?: GraphViewMode;
   /** Local focus traversal depth, clamped to an integer from `1` through `10`. */
   localDepth?: number;
+  /** Optional time-ordered node reveal that grows the graph through the existing force simulation. */
+  growthAnimation?: boolean | GraphGrowthAnimationOptions<NodeMetadata>;
   /** Stops d3-force ticks while keeping the canvas mounted and renderable. */
   paused?: boolean;
   /** Partial theme override merged over `defaultGraphTheme`. */

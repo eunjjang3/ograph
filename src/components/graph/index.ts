@@ -2,6 +2,8 @@ export { GraphView } from './GraphView';
 export type { GraphViewRef } from './GraphView';
 export type {
   GraphLink,
+  GraphGrowthAnimationOptions,
+  GraphGrowthTimestamp,
   GraphNode,
   GraphNodeMetadata,
   GraphNodeType,

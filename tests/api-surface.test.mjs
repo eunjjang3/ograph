@@ -22,6 +22,8 @@ test('built package entry preserves the Next.js client directive', async () => {
 test('built type entry preserves the public type surface without internal helpers', async () => {
   const typeEntry = await readFile(new URL('../dist/index.d.ts', import.meta.url), 'utf8');
   const expectedTypeNames = [
+    'GraphGrowthAnimationOptions',
+    'GraphGrowthTimestamp',
     'GraphLink',
     'GraphNode',
     'GraphNodeMetadata',
@@ -60,6 +62,7 @@ test('built declarations preserve consumer metadata through GraphView callbacks'
   assert.match(typeEntry, /links: GraphLink<LinkMetadata, NodeMetadata>\[\];/);
   assert.match(typeEntry, /onNodeClick\?: \(node: GraphNode<NodeMetadata>\) => void;/);
   assert.match(typeEntry, /onNodeHover\?: \(node: GraphNode<NodeMetadata> \| null\) => void;/);
+  assert.match(typeEntry, /growthAnimation\?: boolean \| GraphGrowthAnimationOptions<NodeMetadata>;/);
   assert.match(typeEntry, /ariaLabel\?: string;/);
   assert.match(typeEntry, /canvasRole\?: AriaRole;/);
   assert.match(
