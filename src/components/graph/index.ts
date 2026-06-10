@@ -1,6 +1,7 @@
 export { GraphView } from './GraphView';
 export type { GraphViewRef } from './GraphView';
 export type {
+  GraphCameraFocusOptions,
   GraphLink,
   GraphGrowthAnimationOptions,
   GraphGrowthTimestamp,

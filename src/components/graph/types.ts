@@ -80,6 +80,16 @@ export interface GraphGrowthAnimationOptions<Metadata extends GraphNodeMetadata 
   initialDelayMs?: number;
 }
 
+/** Options for camera requests that center a specific graph node. */
+export interface GraphCameraFocusOptions {
+  /** Target zoom scale. When omitted, the current camera scale is preserved. */
+  scale?: number;
+  /** Minimum zoom scale to use while preserving or applying the requested scale. */
+  minScale?: number;
+  /** Whether to animate the camera request. Defaults to `true`; reduced motion applies immediately. */
+  animated?: boolean;
+}
+
 /** Canvas color and typography tokens used by the graph renderer. */
 export interface GraphTheme {
   /** Canvas and container background color. */
@@ -198,6 +208,10 @@ export interface GraphViewProps<
   localDepth?: number;
   /** Optional time-ordered node reveal that grows the graph through the existing force simulation. */
   growthAnimation?: boolean | GraphGrowthAnimationOptions<NodeMetadata>;
+  /** Node ID for a camera-only focus request. Does not change selection, hover, or local root state. */
+  cameraFocusNodeId?: string | null;
+  /** Options used with `cameraFocusNodeId` camera requests. */
+  cameraFocusOptions?: GraphCameraFocusOptions;
   /** Stops d3-force ticks while keeping the canvas mounted and renderable. */
   paused?: boolean;
   /** Partial theme override merged over `defaultGraphTheme`. */

@@ -278,6 +278,36 @@ test('keeps pan usable and preserves the wheel pointer anchor within tolerance',
   await expectNoGraphErrors(page);
 });
 
+test('focuses the camera by controlled prop and ref without erroring on unavailable nodes', async ({ page }) => {
+  await page.getByTestId('toggle-pause').click();
+  await expect(page.getByTestId('graph-paused')).toHaveText('yes');
+  await setFixture(page, 'disconnected');
+  await page.waitForTimeout(220);
+
+  await page.getByTestId('reset').click();
+  await page.getByTestId('focus-prop').click();
+  await expect.poll(async () => (await readViewport(page)).scale).toBeCloseTo(1.25, 2);
+  const controlledFocus = await readViewport(page);
+  expect(Math.abs(controlledFocus.x - 217.5)).toBeLessThan(2);
+  expect(Math.abs(controlledFocus.y - 222.5)).toBeLessThan(2);
+
+  await page.getByTestId('focus-missing-ref').click();
+  await expect(page.getByTestId('event-camera-focus')).toHaveText('false');
+  await page.waitForTimeout(80);
+  const afterMissing = await readViewport(page);
+  expect(Math.abs(afterMissing.x - controlledFocus.x)).toBeLessThan(0.2);
+  expect(Math.abs(afterMissing.y - controlledFocus.y)).toBeLessThan(0.2);
+  expect(Math.abs(afterMissing.scale - controlledFocus.scale)).toBeLessThan(0.001);
+
+  await page.getByTestId('focus-ref').click();
+  await expect(page.getByTestId('event-camera-focus')).toHaveText('true');
+  await expect.poll(async () => (await readViewport(page)).scale).toBeCloseTo(1.5, 2);
+  const refFocus = await readViewport(page);
+  expect(Math.abs(refFocus.x - 650)).toBeLessThan(2);
+  expect(Math.abs(refFocus.y - 350)).toBeLessThan(2);
+  await expectNoGraphErrors(page);
+});
+
 test('redraws after resize without resetting the user viewport', async ({ page }) => {
   await setFixture(page, 'local');
   await page.getByTestId('fit').click();
