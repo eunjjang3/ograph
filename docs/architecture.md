@@ -147,6 +147,13 @@ revealed. This keeps chronological replay app-agnostic: metadata decides reveal
 order, while d3-force still owns the physical attachment and settling behavior.
 Missing or invalid timestamps fall back to input order after timestamped nodes.
 
+Node-focus camera requests run after lens scoping and simulation refs are
+available. They only target IDs in the current visible scope, so hidden local
+halo nodes and unrevealed growth-animation nodes are treated as unavailable
+rather than errors. The request computes a viewport from the node's current
+world coordinate and the existing target camera scale unless a scale option is
+provided.
+
 Signature calculation sorts node IDs and normalized links, making it `O(n log n + m log m)` for each new input array pair. That cost is intentionally paid inside `ograph` to avoid more expensive d3-force reconstruction for reference-unstable consumers; if very large graphs make signature calculation the bottleneck, the signature helper is the boundary for a future incremental hash.
 
 `paused` stops the d3-force timer without unmounting the canvas or discarding cached coordinates. Graph refreshes while paused still update refs, forces, and render data, but they do not restart the timer until `paused` returns to `false`. The render loop also treats a paused simulation as inactive, even if its alpha remains above `alphaMin`, so a frozen layout cannot keep requestAnimationFrame alive by itself.

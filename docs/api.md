@@ -18,6 +18,7 @@ import {
   type GraphViewMode,
   type GraphViewProps,
   type GraphViewport,
+  type GraphCameraFocusOptions,
   type GraphGrowthAnimationOptions,
   type GraphGrowthTimestamp,
   type GraphViewRef
@@ -70,6 +71,8 @@ type GraphViewProps<
 | `mode` | `'global' \| 'local'` | `'global'` | Whether to display the full graph or a local focus lens over the global layout. |
 | `localDepth` | `number` | `2` | Visible breadth-first traversal depth from `rootNodeId` in local lens mode. Values are clamped to integers from `1` through `10`. |
 | `growthAnimation` | `boolean \| GraphGrowthAnimationOptions<NodeMetadata>` | `undefined` | Optional chronological node reveal. `true` reads `node.metadata.createdAt`; an options object can provide a custom timestamp extractor, metadata key, step duration, and initial delay. |
+| `cameraFocusNodeId` | `string \| null` | `undefined` | Camera-only focus request for a visible node. Does not change selection, hover, or local root state. |
+| `cameraFocusOptions` | `GraphCameraFocusOptions` | `undefined` | Options for `cameraFocusNodeId`, including optional target scale, minimum scale, and animation control. |
 | `paused` | `boolean` | `false` | Stops d3-force simulation ticks while keeping the canvas mounted and renderable. Use this when a consumer keeps the graph mounted inside a hidden or inactive panel. |
 
 ### Optional Configuration Props
@@ -128,6 +131,9 @@ disables that media-query listener, zero-size containers skip drawing until
 dimensions are available, and missing canvas contexts skip that frame. These
 conditions do not currently call `onError`.
 
+Camera focus requests for missing nodes, nodes outside the current render-visible
+scope, or nodes with invalid coordinates are no-ops. They do not call `onError`.
+
 ## Imperative Ref
 
 Use `GraphViewRef` when an outer toolbar needs to control the graph.
@@ -141,6 +147,7 @@ const ref = useRef<GraphViewRef | null>(null);
 <GraphView ref={ref} nodes={nodes} links={links} />;
 
 ref.current?.fitToView();
+ref.current?.focusCameraOnNode('node-a', { minScale: 1.5 });
 ref.current?.resetViewport();
 ref.current?.restartSimulation();
 ```
@@ -148,8 +155,22 @@ ref.current?.restartSimulation();
 | Method | Description |
 | --- | --- |
 | `fitToView()` | Computes the visible global or local-lens bounds and sets the viewport so nodes fit with padding. |
+| `focusCameraOnNode(nodeId, options?)` | Centers the camera on a visible node and returns `true` when the request can be applied. Returns `false` without moving the camera when the node is missing or not visible in the current graph scope. |
 | `resetViewport()` | Centers the viewport and resets zoom scale to `1.0`. |
 | `restartSimulation()` | Sets simulation alpha to `1` and restarts d3-force unless `paused` is `true`. If paused, the alpha is retained and resumes when `paused` returns to `false`. |
+
+```ts
+interface GraphCameraFocusOptions {
+  scale?: number;
+  minScale?: number;
+  animated?: boolean;
+}
+```
+
+By default, node focus preserves the current zoom scale and animates the camera.
+`minScale` zooms in only when the current or requested scale is smaller, and
+`animated: false` applies the viewport immediately. Reduced-motion users always
+receive immediate camera updates.
 
 ## Simulation Pausing
 

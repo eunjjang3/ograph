@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import type { GraphNode, GraphViewport } from './types';
+import type { GraphCameraFocusOptions, GraphNode, GraphViewport } from './types';
 import type { Viewport } from './graphMath';
 
 const MIN_ZOOM_SCALE = 0.02;
@@ -90,6 +90,63 @@ export function resolveViewportForGraphNodes(
   return {
     x: dimensions.width / 2 - cx * scale,
     y: dimensions.height / 2 - cy * scale,
+    scale
+  };
+}
+
+function resolveRequestedFocusScale(
+  currentViewport: Viewport,
+  options: GraphCameraFocusOptions
+): number | null {
+  const requestedScale = options.scale ?? currentViewport.scale;
+  const requestedMinimumScale = options.minScale;
+
+  if (
+    !Number.isFinite(requestedScale) ||
+    requestedScale <= 0 ||
+    (requestedMinimumScale !== undefined && (!Number.isFinite(requestedMinimumScale) || requestedMinimumScale <= 0))
+  ) {
+    return null;
+  }
+
+  return Math.max(
+    MIN_ZOOM_SCALE,
+    Math.min(
+      Math.max(requestedScale, requestedMinimumScale ?? MIN_ZOOM_SCALE),
+      MAX_ZOOM_SCALE
+    )
+  );
+}
+
+export function resolveViewportForGraphNode(
+  node: Pick<GraphNode, 'x' | 'y'>,
+  dimensions: { width: number; height: number },
+  currentViewport: Viewport,
+  options: GraphCameraFocusOptions = {}
+): Viewport | null {
+  if (
+    !Number.isFinite(dimensions.width) ||
+    !Number.isFinite(dimensions.height) ||
+    dimensions.width <= 0 ||
+    dimensions.height <= 0 ||
+    !Number.isFinite(currentViewport.x) ||
+    !Number.isFinite(currentViewport.y) ||
+    !Number.isFinite(currentViewport.scale)
+  ) {
+    return null;
+  }
+
+  const nodeX = resolveGraphCoordinate(node.x);
+  const nodeY = resolveGraphCoordinate(node.y);
+  const scale = resolveRequestedFocusScale(currentViewport, options);
+
+  if (nodeX === null || nodeY === null || scale === null) {
+    return null;
+  }
+
+  return {
+    x: dimensions.width / 2 - nodeX * scale,
+    y: dimensions.height / 2 - nodeY * scale,
     scale
   };
 }

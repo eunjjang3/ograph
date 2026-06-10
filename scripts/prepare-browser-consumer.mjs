@@ -242,6 +242,7 @@ type EventState = {
   dragEnd: string;
   dragEndCount: number;
   dragCount: number;
+  cameraFocusResult: string;
   viewportCount: number;
   viewportX: number;
   viewportY: number;
@@ -258,6 +259,7 @@ const emptyEvents: EventState = {
   dragEnd: 'none',
   dragEndCount: 0,
   dragCount: 0,
+  cameraFocusResult: 'none',
   viewportCount: 0,
   viewportX: 0,
   viewportY: 0,
@@ -421,6 +423,7 @@ function App() {
   const [mode, setMode] = useState<'global' | 'local'>('global');
   const [events, setEvents] = useState<EventState>(emptyEvents);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [cameraFocusNodeId, setCameraFocusNodeId] = useState<string | null>(null);
   const [graphMounted, setGraphMounted] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -431,6 +434,7 @@ function App() {
   useEffect(() => {
     setEvents(current => ({ ...emptyEvents, errors: current.errors }));
     setSelectedNodeId(null);
+    setCameraFocusNodeId(null);
     const fitTimer = window.setTimeout(() => {
       graphRef.current?.fitToView();
     }, 150);
@@ -463,6 +467,15 @@ function App() {
         <button data-testid="toggle-mount" onClick={() => setGraphMounted(current => !current)}>Toggle Mount</button>
         <button data-testid="fit" onClick={() => graphRef.current?.fitToView()}>Fit</button>
         <button data-testid="reset" onClick={() => graphRef.current?.resetViewport()}>Reset</button>
+        <button data-testid="focus-prop" onClick={() => setCameraFocusNodeId(fixture.nodes[3]?.id ?? fixture.nodes[0]?.id ?? null)}>Focus Prop</button>
+        <button data-testid="focus-ref" onClick={() => {
+          const didFocus = graphRef.current?.focusCameraOnNode(fixture.nodes[0]?.id ?? '', { scale: 1.5, animated: false }) ?? false;
+          patchEvents({ cameraFocusResult: String(didFocus) });
+        }}>Focus Ref</button>
+        <button data-testid="focus-missing-ref" onClick={() => {
+          const didFocus = graphRef.current?.focusCameraOnNode('missing-node', { animated: false }) ?? false;
+          patchEvents({ cameraFocusResult: String(didFocus) });
+        }}>Focus Missing</button>
       </div>
 
       <div
@@ -475,6 +488,8 @@ function App() {
             nodes={fixture.nodes}
             links={fixture.links}
             selectedNodeId={selectedNodeId}
+            cameraFocusNodeId={cameraFocusNodeId}
+            cameraFocusOptions={{ minScale: 1.25, animated: false }}
             mode={mode}
             rootNodeId={rootNodeId}
             localDepth={1}
@@ -527,6 +542,7 @@ function App() {
         <span data-testid="event-drag-end">{events.dragEnd}</span>
         <span data-testid="event-drag-end-count">{events.dragEndCount}</span>
         <span data-testid="event-drag-count">{events.dragCount}</span>
+        <span data-testid="event-camera-focus">{events.cameraFocusResult}</span>
         <span data-testid="event-viewport-count">{events.viewportCount}</span>
         <span data-testid="event-viewport-x">{events.viewportX.toFixed(1)}</span>
         <span data-testid="event-viewport-y">{events.viewportY.toFixed(1)}</span>

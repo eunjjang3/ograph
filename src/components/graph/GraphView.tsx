@@ -11,6 +11,7 @@ import {
 } from 'react';
 import type * as React from 'react';
 import type {
+  GraphCameraFocusOptions,
   GraphLink,
   GraphNode,
   GraphNodeMetadata,
@@ -24,7 +25,7 @@ import { useCanvasSize } from './useCanvasSize';
 import { useGraphFrameScheduler } from './useGraphFrameScheduler';
 import { useGraphPointerInteractions } from './useGraphPointerInteractions';
 import { useGraphRenderLoop } from './useGraphRenderLoop';
-import { useViewportControls } from './useViewportControls';
+import { resolveViewportForGraphNode, useViewportControls } from './useViewportControls';
 import { useGraphLensScope } from './useGraphLensScope';
 import { useGraphGrowthAnimation } from './useGraphGrowthAnimation';
 import { buildSpatialIndex } from './spatialIndex';
@@ -35,6 +36,8 @@ import { normalizeGraphInput } from './inputValidation';
 export interface GraphViewRef {
   /** Fits the current global graph or local lens scope into the container. */
   fitToView: () => void;
+  /** Centers the camera on a visible node without changing selection, hover, or local root state. */
+  focusCameraOnNode: (nodeId: string, options?: GraphCameraFocusOptions) => boolean;
   /** Resets pan and zoom to the centered default viewport. */
   resetViewport: () => void;
   /** Reheats and restarts the simulation unless the graph is paused. */
@@ -42,6 +45,18 @@ export interface GraphViewRef {
 }
 
 const LOCAL_LENS_REFRESH_ALPHA = 0.04;
+
+function getCameraFocusRequestKey(
+  nodeId: string,
+  options: GraphCameraFocusOptions | undefined
+): string {
+  return JSON.stringify([
+    nodeId,
+    options?.animated ?? null,
+    options?.minScale ?? null,
+    options?.scale ?? null
+  ]);
+}
 
 const graphContainerStyle: React.CSSProperties = {
   position: 'relative',
@@ -141,6 +156,8 @@ function GraphViewCanvasInner<
     mode = 'global',
     localDepth,
     growthAnimation,
+    cameraFocusNodeId,
+    cameraFocusOptions,
     paused = false,
     presetConf,
     themeConf,
@@ -241,6 +258,7 @@ function GraphViewCanvasInner<
   });
   const previousModeRef = useRef(mode);
   const globalViewportRef = useRef<Viewport | null>(null);
+  const completedCameraFocusRequestRef = useRef<string | null>(null);
 
   const handleNodeClick = useCallback((node: GraphNode) => {
     onNodeClick?.(node as GraphNode<NodeMetadata>);
@@ -326,6 +344,64 @@ function GraphViewCanvasInner<
     targetViewportRef
   ]);
 
+  const focusCameraOnNode = useCallback((nodeId: string, options?: GraphCameraFocusOptions) => {
+    if (!nodeId || !lensScope.visibleNodeIds.has(nodeId)) {
+      return false;
+    }
+
+    const node = nodeByIdRef.current.get(nodeId);
+    if (!node) {
+      return false;
+    }
+
+    const viewport = resolveViewportForGraphNode(
+      node,
+      dimensions,
+      targetViewportRef.current,
+      options
+    );
+
+    if (!viewport) {
+      return false;
+    }
+
+    if (reduceMotion || options?.animated === false) {
+      setViewportImmediate(viewport);
+    } else {
+      animateViewportTo(viewport);
+    }
+
+    return true;
+  }, [
+    animateViewportTo,
+    dimensions,
+    lensScope.visibleNodeIds,
+    nodeByIdRef,
+    reduceMotion,
+    setViewportImmediate,
+    targetViewportRef
+  ]);
+
+  useEffect(() => {
+    if (!cameraFocusNodeId) {
+      completedCameraFocusRequestRef.current = null;
+      return;
+    }
+
+    const requestKey = getCameraFocusRequestKey(cameraFocusNodeId, cameraFocusOptions);
+    if (completedCameraFocusRequestRef.current === requestKey) {
+      return;
+    }
+
+    if (focusCameraOnNode(cameraFocusNodeId, cameraFocusOptions)) {
+      completedCameraFocusRequestRef.current = requestKey;
+    }
+  }, [
+    cameraFocusNodeId,
+    cameraFocusOptions,
+    focusCameraOnNode
+  ]);
+
   const {
     hoveredNodeIdRef,
     localHoveredNodeId,
@@ -389,9 +465,10 @@ function GraphViewCanvasInner<
 
   useImperativeHandle(ref, () => ({
     fitToView,
+    focusCameraOnNode,
     resetViewport,
     restartSimulation
-  }));
+  }), [fitToView, focusCameraOnNode, resetViewport, restartSimulation]);
 
   return (
     <>

@@ -150,10 +150,12 @@ The production package entry preserves the `"use client"` directive for React se
 - Click a node to emit `onNodeClick`.
 - Double-click a node to emit `onNodeDoubleClick`.
 - Hover a node to emit `onNodeHover` and show the built-in compact tooltip. Moving off a node or leaving the canvas emits `onNodeHover(null)`.
+- Center the camera on a visible node with `cameraFocusNodeId` or `ref.current?.focusCameraOnNode(nodeId)`.
 
 Selection and hover are controlled externally through `selectedNodeId` and `hoveredNodeId`. If `hoveredNodeId` is omitted, the component maintains local hover state while still calling `onNodeHover`.
 Hover state clears immediately when the pointer leaves the active node; the renderer keeps the previous focus only as a fading overlay so highlighted links and nodes fall back smoothly instead of staying fully highlighted. Focus dimming and label visibility are animated in the canvas render loop, so unrelated nodes fade between focus states and non-focused labels reveal gradually from `0` to `1` as zoom, density, and node degree make them eligible.
 Selection and local root focus are separate concepts. Consumer apps that treat a selected node as the local root should clear or remap `selectedNodeId` when leaving that focused flow if selection highlighting should not persist.
+Camera focus is separate from selection, hover, and local root state. A node-focus camera request only pans and optionally adjusts zoom; unavailable nodes are ignored because graph data or lens scope may legitimately be mid-transition.
 
 Use `paused` when the graph remains mounted but is hidden or inactive:
 

@@ -1224,7 +1224,10 @@ test('local simulation gravity can preserve sparse scope centroid', async () => 
 });
 
 test('viewport fitting ignores invalid coordinates and rejects invalid dimensions', async () => {
-  const { resolveViewportForGraphNodes } = await importSourceModule('src/components/graph/useViewportControls.ts');
+  const {
+    resolveViewportForGraphNode,
+    resolveViewportForGraphNodes
+  } = await importSourceModule('src/components/graph/useViewportControls.ts');
   const viewport = resolveViewportForGraphNodes(
     [
       { id: 'origin', label: 'Origin' },
@@ -1239,6 +1242,38 @@ test('viewport fitting ignores invalid coordinates and rejects invalid dimension
   assert.equal(resolveViewportForGraphNodes([], { width: 400, height: 300 }), null);
   assert.equal(resolveViewportForGraphNodes([{ id: 'bad', label: 'Bad', x: Number.NaN, y: 0 }], { width: 400, height: 300 }), null);
   assert.equal(resolveViewportForGraphNodes([{ id: 'a', label: 'A' }], { width: 400, height: 0 }), null);
+
+  const currentViewport = { x: 10, y: 20, scale: 2 };
+  assert.deepEqual(
+    resolveViewportForGraphNode(
+      { id: 'focus', label: 'Focus', x: 20, y: -10 },
+      { width: 400, height: 300 },
+      currentViewport
+    ),
+    { x: 160, y: 170, scale: 2 }
+  );
+  assert.deepEqual(
+    resolveViewportForGraphNode(
+      { id: 'focus', label: 'Focus', x: 20, y: -10 },
+      { width: 400, height: 300 },
+      currentViewport,
+      { minScale: 3 }
+    ),
+    { x: 140, y: 180, scale: 3 }
+  );
+  assert.deepEqual(
+    resolveViewportForGraphNode(
+      { id: 'focus', label: 'Focus' },
+      { width: 400, height: 300 },
+      currentViewport,
+      { scale: 4 }
+    ),
+    { x: 200, y: 150, scale: 4 }
+  );
+  assert.equal(resolveViewportForGraphNode({ id: 'bad', label: 'Bad', x: Number.NaN, y: 0 }, { width: 400, height: 300 }, currentViewport), null);
+  assert.equal(resolveViewportForGraphNode({ id: 'focus', label: 'Focus' }, { width: 0, height: 300 }, currentViewport), null);
+  assert.equal(resolveViewportForGraphNode({ id: 'focus', label: 'Focus' }, { width: 400, height: 300 }, { x: 0, y: 0, scale: Number.NaN }), null);
+  assert.equal(resolveViewportForGraphNode({ id: 'focus', label: 'Focus' }, { width: 400, height: 300 }, currentViewport, { scale: -1 }), null);
 });
 
 test('canvas backing size clamps invalid dimensions and device pixel ratio', async () => {

@@ -22,6 +22,7 @@ test('built package entry preserves the Next.js client directive', async () => {
 test('built type entry preserves the public type surface without internal helpers', async () => {
   const typeEntry = await readFile(new URL('../dist/index.d.ts', import.meta.url), 'utf8');
   const expectedTypeNames = [
+    'GraphCameraFocusOptions',
     'GraphGrowthAnimationOptions',
     'GraphGrowthTimestamp',
     'GraphLink',
@@ -63,8 +64,11 @@ test('built declarations preserve consumer metadata through GraphView callbacks'
   assert.match(typeEntry, /onNodeClick\?: \(node: GraphNode<NodeMetadata>\) => void;/);
   assert.match(typeEntry, /onNodeHover\?: \(node: GraphNode<NodeMetadata> \| null\) => void;/);
   assert.match(typeEntry, /growthAnimation\?: boolean \| GraphGrowthAnimationOptions<NodeMetadata>;/);
+  assert.match(typeEntry, /cameraFocusNodeId\?: string \| null;/);
+  assert.match(typeEntry, /cameraFocusOptions\?: GraphCameraFocusOptions;/);
   assert.match(typeEntry, /ariaLabel\?: string;/);
   assert.match(typeEntry, /canvasRole\?: AriaRole;/);
+  assert.match(graphViewEntry, /focusCameraOnNode: \(nodeId: string, options\?: GraphCameraFocusOptions\) => boolean;/);
   assert.match(
     graphViewEntry,
     /GraphViewProps<NodeMetadata, LinkMetadata> & React\.RefAttributes<GraphViewRef>/
