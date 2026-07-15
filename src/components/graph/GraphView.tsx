@@ -253,9 +253,9 @@ function GraphViewCanvasInner<
       paused,
       engine: runtimeOptions.simulation,
       runtimeTelemetryRef,
-      createSimulationWorker: __OGRAPH_DEBUG_RUNTIME__
-        ? runtimeOptions.createSimulationWorker
-        : undefined,
+      ...(__OGRAPH_DEBUG_RUNTIME__
+        ? { createSimulationWorker: runtimeOptions.createSimulationWorker }
+        : {}),
       onError
     }
   );

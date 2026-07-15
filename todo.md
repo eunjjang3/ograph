@@ -217,10 +217,11 @@ Additional evidence:
   sample, confirming complete dirty-loop shutdown;
 - all 71 unit/API/budget tests and all 8 packed-consumer browser tests passed;
 - the production entry remained Canvas/Main with only the original runtime
-  exports; `dist/index.js` measured about `16.83kB` gzip against the existing
+  exports; `dist/index.js` measured about `16.80kB` gzip against the existing
   `16.94kB` limit and contains no Pixi/Worker runtime string or asset;
 - Pixi stays a development dependency. The demo emits the experimental Pixi
-  and Worker chunks, while the packed consumer tarball contains neither.
+  and Worker chunks; the packed consumer tarball contains no such runtime asset
+  and installing the package does not install Pixi as a consumer dependency.
 
 Human review should decide:
 

@@ -175,5 +175,5 @@ export function createGraphRendererBackend(kind: GraphRendererMode): GraphRender
     return new LazyPixiGraphRendererBackend();
   }
 
-  throw new Error('Pixi graph renderer is not available in the production runtime.');
+  throw new Error('Unsupported graph renderer.');
 }
