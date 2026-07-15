@@ -3,7 +3,6 @@ import {
   Color,
   Container,
   Graphics,
-  GraphicsContext,
   Particle,
   ParticleContainer,
   Text,
@@ -38,6 +37,9 @@ const MAX_INTERACTION_LABELS = 280;
 const ALPHA_EPSILON = 0.001;
 const LINK_TEXTURE_WIDTH = Texture.WHITE.orig.width;
 const LINK_TEXTURE_HEIGHT = Texture.WHITE.orig.height;
+const NODE_TEXTURE_RADIUS = 64;
+const NODE_TEXTURE_RESOLUTION = 2;
+const NODE_BORDER_WIDTH_RATIO = 0.16;
 
 interface ResolvedColor {
   tint: number;
@@ -48,8 +50,8 @@ interface ResolvedColor {
 }
 
 interface PixiNodeView {
-  fill: Graphics;
-  border: Graphics;
+  fill: Particle;
+  border: Particle;
 }
 
 interface PixiLabelView {
@@ -148,13 +150,23 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
       color: true
     }
   });
-  private nodeFillLayer = new Container();
-  private nodeBorderLayer = new Container();
+  private nodeFillLayer = new ParticleContainer<Particle>({
+    dynamicProperties: {
+      vertex: true,
+      position: true,
+      color: true
+    }
+  });
+  private nodeBorderLayer = new ParticleContainer<Particle>({
+    dynamicProperties: {
+      vertex: true,
+      position: true,
+      color: true
+    }
+  });
   private labelLayer = new Container();
-  private nodeFillContext = new GraphicsContext().circle(0, 0, 1).fill(0xffffff);
-  private nodeBorderContext = new GraphicsContext()
-    .circle(0, 0, 1)
-    .stroke({ color: 0xffffff, width: 0.16 });
+  private nodeFillTexture: Texture | null = null;
+  private nodeBorderTexture: Texture | null = null;
   private nodeViews = new Map<string, PixiNodeView>();
   private linkViews = new Map<GraphLink, Particle>();
   private labelViews = new Map<string, PixiLabelView>();
@@ -204,6 +216,7 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     }
 
     app.ticker.stop();
+    this.createNodeTextures(app);
     this.world.eventMode = 'none';
     this.linkLayer.eventMode = 'none';
     this.nodeFillLayer.eventMode = 'none';
@@ -211,6 +224,37 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     this.labelLayer.eventMode = 'none';
     this.world.addChild(this.linkLayer, this.nodeFillLayer, this.nodeBorderLayer);
     app.stage.addChild(this.world, this.labelLayer);
+  }
+
+  private createNodeTextures(app: Application) {
+    const fillSource = new Graphics()
+      .circle(0, 0, NODE_TEXTURE_RADIUS)
+      .fill(0xffffff);
+    const borderSource = new Graphics()
+      .circle(0, 0, NODE_TEXTURE_RADIUS)
+      .stroke({
+        color: 0xffffff,
+        width: NODE_TEXTURE_RADIUS * NODE_BORDER_WIDTH_RATIO
+      });
+
+    this.nodeFillTexture = app.renderer.generateTexture({
+      target: fillSource,
+      resolution: NODE_TEXTURE_RESOLUTION,
+      antialias: true,
+      defaultAnchor: { x: 0.5, y: 0.5 },
+      textureSourceOptions: { scaleMode: 'linear' }
+    });
+    this.nodeBorderTexture = app.renderer.generateTexture({
+      target: borderSource,
+      resolution: NODE_TEXTURE_RESOLUTION,
+      antialias: true,
+      defaultAnchor: { x: 0.5, y: 0.5 },
+      textureSourceOptions: { scaleMode: 'linear' }
+    });
+    this.nodeFillLayer.texture = this.nodeFillTexture;
+    this.nodeBorderLayer.texture = this.nodeBorderTexture;
+    fillSource.destroy();
+    borderSource.destroy();
   }
 
   private resolveColor(value: string): ResolvedColor {
@@ -236,10 +280,6 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
   }
 
   private clearTopology() {
-    for (const view of this.nodeViews.values()) {
-      view.fill.destroy();
-      view.border.destroy();
-    }
     for (const view of this.labelViews.values()) view.text.destroy();
 
     this.nodeViews.clear();
@@ -247,8 +287,8 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     this.labelViews.clear();
     this.nodeById.clear();
     this.linkLayer.removeParticles();
-    this.nodeFillLayer.removeChildren();
-    this.nodeBorderLayer.removeChildren();
+    this.nodeFillLayer.removeParticles();
+    this.nodeBorderLayer.removeParticles();
     this.labelLayer.removeChildren();
   }
 
@@ -303,14 +343,20 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
   private materializeNode(node: GraphNode) {
     if (this.nodeViews.has(node.id)) return;
 
-    const fill = new Graphics(this.nodeFillContext);
-    const border = new Graphics(this.nodeBorderContext);
-    fill.eventMode = 'none';
-    border.eventMode = 'none';
-    fill.visible = false;
-    border.visible = false;
-    this.nodeFillLayer.addChild(fill);
-    this.nodeBorderLayer.addChild(border);
+    const fill = new Particle({
+      texture: this.nodeFillTexture!,
+      anchorX: 0.5,
+      anchorY: 0.5,
+      alpha: 0
+    });
+    const border = new Particle({
+      texture: this.nodeBorderTexture!,
+      anchorX: 0.5,
+      anchorY: 0.5,
+      alpha: 0
+    });
+    this.nodeFillLayer.addParticle(fill);
+    this.nodeBorderLayer.addParticle(border);
     this.nodeViews.set(node.id, { fill, border });
   }
 
@@ -395,15 +441,15 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     for (const [nodeId, view] of this.nodeViews) {
       const node = this.nodeById.get(nodeId);
       if (!node || !visibleNodeIds.has(nodeId)) {
-        view.fill.visible = false;
-        view.border.visible = false;
+        view.fill.alpha = 0;
+        view.border.alpha = 0;
         continue;
       }
 
       const lensAlpha = resolveLensNodeAlpha(nodeId, frame);
       if (lensAlpha <= ALPHA_EPSILON) {
-        view.fill.visible = false;
-        view.border.visible = false;
+        view.fill.alpha = 0;
+        view.border.alpha = 0;
         continue;
       }
 
@@ -436,21 +482,24 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
       const positionX = node.x ?? 0;
       const positionY = node.y ?? 0;
 
-      view.fill.position.set(positionX, positionY);
-      view.fill.scale.set(radius);
+      view.fill.x = positionX;
+      view.fill.y = positionY;
+      view.fill.scaleX = radius / NODE_TEXTURE_RADIUS;
+      view.fill.scaleY = radius / NODE_TEXTURE_RADIUS;
       view.fill.tint = overlayColor
         ? mixTint(baseColor, overlayColor, focusProgress)
         : baseColor.tint;
       view.fill.alpha = (
         overlayColor ? mixAlpha(baseColor, overlayColor, focusProgress) : baseColor.alpha
       ) * nodeAlpha * lensAlpha;
-      view.fill.visible = view.fill.alpha > ALPHA_EPSILON;
 
-      view.border.position.set(positionX, positionY);
-      view.border.scale.set(radius + (isFocusedNode ? 1.5 / frame.viewport.scale : 0));
+      const borderRadius = radius + (isFocusedNode ? 1.5 / frame.viewport.scale : 0);
+      view.border.x = positionX;
+      view.border.y = positionY;
+      view.border.scaleX = borderRadius / NODE_TEXTURE_RADIUS;
+      view.border.scaleY = borderRadius / NODE_TEXTURE_RADIUS;
       view.border.tint = borderColor.tint;
       view.border.alpha = borderColor.alpha * (isFocusedNode ? focusProgress : nodeAlpha) * lensAlpha;
-      view.border.visible = view.border.alpha > ALPHA_EPSILON;
       visibleCount += 1;
     }
 
@@ -725,8 +774,10 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     if (this.disposed) return;
     this.disposed = true;
     this.clearTopology();
-    this.nodeFillContext.destroy();
-    this.nodeBorderContext.destroy();
+    this.nodeFillTexture?.destroy(true);
+    this.nodeBorderTexture?.destroy(true);
+    this.nodeFillTexture = null;
+    this.nodeBorderTexture = null;
     this.app?.destroy(false, { children: true, context: true });
     this.app = null;
   }
