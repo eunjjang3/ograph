@@ -385,6 +385,7 @@ test('worker simulation client covers lifecycle, pause, restart, drag, and buffe
 
 test('Pixi planning prioritizes viewport nodes and keeps forced labels over budget', async () => {
   const {
+    hasEquivalentPixiTopology,
     prioritizePixiNodeMaterialization,
     selectPixiLabelNodeIds
   } = await importSourceModule('src/components/graph/pixiGraphPlanning.ts');
@@ -412,6 +413,32 @@ test('Pixi planning prioritizes viewport nodes and keeps forced labels over budg
   ], 1);
 
   assert.deepEqual([...selected], ['forced-a', 'forced-b']);
+
+  const previousLinks = [
+    { source: nodes[2], target: nodes[1] },
+    { source: nodes[1], target: nodes[0] }
+  ];
+  const equivalentNodes = nodes.map(node => ({ ...node, label: `${node.label}!` }));
+  const equivalentLinks = [
+    { source: 'near-a', target: 'near-b' },
+    { source: 'near-b', target: 'far' }
+  ];
+
+  assert.equal(
+    hasEquivalentPixiTopology(nodes, previousLinks, equivalentNodes, equivalentLinks),
+    true
+  );
+  assert.equal(
+    hasEquivalentPixiTopology(nodes, previousLinks, [...equivalentNodes].reverse(), equivalentLinks),
+    false
+  );
+  assert.equal(
+    hasEquivalentPixiTopology(nodes, previousLinks, equivalentNodes, [
+      equivalentLinks[0],
+      { source: 'near-b', target: 'near-a' }
+    ]),
+    false
+  );
 });
 
 test('lazy Pixi renderer delegates only after async backend initialization completes', async () => {

@@ -1,5 +1,6 @@
-import type { GraphNode } from './types';
+import type { GraphLink, GraphNode } from './types';
 import type { Viewport } from './graphMath';
+import { getLinkId } from './localGraph';
 import { getPaddedViewportWorldBounds, querySpatialIndex, type GraphSpatialIndex } from './spatialIndex';
 
 export interface PixiLabelCandidate {
@@ -9,6 +10,39 @@ export interface PixiLabelCandidate {
   degree: number;
   forceVisible: boolean;
   isNeighbor: boolean;
+}
+
+export function hasEquivalentPixiTopology(
+  previousNodes: readonly GraphNode[] | null,
+  previousLinks: readonly GraphLink[] | null,
+  nextNodes: readonly GraphNode[],
+  nextLinks: readonly GraphLink[]
+): boolean {
+  if (
+    !previousNodes ||
+    !previousLinks ||
+    previousNodes.length !== nextNodes.length ||
+    previousLinks.length !== nextLinks.length
+  ) {
+    return false;
+  }
+
+  for (let index = 0; index < nextNodes.length; index += 1) {
+    if (previousNodes[index]!.id !== nextNodes[index]!.id) return false;
+  }
+
+  for (let index = 0; index < nextLinks.length; index += 1) {
+    const previous = previousLinks[index]!;
+    const next = nextLinks[index]!;
+    if (
+      getLinkId(previous.source) !== getLinkId(next.source) ||
+      getLinkId(previous.target) !== getLinkId(next.target)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function prioritizePixiNodeMaterialization(
