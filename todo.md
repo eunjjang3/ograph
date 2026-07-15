@@ -331,7 +331,7 @@ still require a separate explicit decision.
   - Branch: `feat/obsidian-graph-harness-spike`
   - Verification: full repository and packed-consumer gate
   - Docs: `todo.md`, relevant architecture/debug notes
-  - Commit: `<pending>`
+  - Commit: `1dea656`
 
 The graph surface, controls, pointer behavior, public props/refs/callbacks, and
 production Canvas/Main default are frozen for this follow-up. New measurements
