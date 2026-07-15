@@ -203,6 +203,30 @@ test('filterLocalGraph handles global, missing-root, and depth-limited local gra
   assert.deepEqual(depthTwo.links.map(link => `${link.source}-${link.target}`), ['a-b', 'b-c']);
 });
 
+test('debug frame telemetry summarizes percentiles and long-frame budgets', async () => {
+  const { summarizeFrameIntervals } = await importSourceModule(
+    'src/components/graph/debug/useFpsCounter.ts'
+  );
+  const telemetry = summarizeFrameIntervals([
+    16,
+    16.5,
+    17,
+    20,
+    40,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    -1
+  ]);
+
+  assert.deepEqual(telemetry, {
+    frameIntervalP50Ms: 17,
+    frameIntervalP95Ms: 40,
+    longFramesOver16Ms: 3,
+    longFramesOver33Ms: 1,
+    sampleSize: 5
+  });
+});
+
 test('buildLocalGraphScope keeps one hidden physics halo and merges transition scopes', async () => {
   const {
     buildLocalGraphScope,

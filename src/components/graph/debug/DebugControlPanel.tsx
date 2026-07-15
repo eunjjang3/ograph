@@ -3,6 +3,7 @@ import type { GraphNode } from '../types';
 import type { GraphDragPhysicsOptions } from '../useGraphSimulation';
 import type { DebugGraphMode } from './useDebugGraphState';
 import type { DebugPresetConfig } from './mockGraphPresets';
+import type { FrameTelemetry } from './useFpsCounter';
 import { RotateCcw, Maximize2, Sliders, Info } from 'lucide-react';
 
 const debugSuiteVersion = import.meta.env.VITE_OGRAPH_VERSION ?? '0.1.0';
@@ -56,6 +57,7 @@ interface DebugControlPanelProps {
   hoveredNodeId: string | null;
   selectedNodeId: string | null;
   reactRenderCount: number;
+  frameTelemetry: FrameTelemetry;
   dragTelemetry: DebugDragTelemetry;
   dragPhysics: GraphDragPhysicsOptions;
   onRandomizeSeed: () => void;
@@ -100,6 +102,7 @@ export function DebugControlPanel({
   hoveredNodeId,
   selectedNodeId,
   reactRenderCount,
+  frameTelemetry,
   dragTelemetry,
   dragPhysics,
   onRandomizeSeed,
@@ -432,6 +435,12 @@ export function DebugControlPanel({
             <div>Links (Simulated): <span className="text-white font-bold">{filteredElements.simulatedLinks}</span></div>
             <div>Zoom Multiplier: <span className="text-cyan-400 font-bold">{zoomScale.toFixed(2)}x</span></div>
             <div>Render Count: <span className="text-emerald-400">{reactRenderCount}</span></div>
+            <div>Frame FPS: <span className="text-emerald-300 font-bold">{frameTelemetry.fps}</span></div>
+            <div>Frame Samples: <span className="text-gray-200 font-bold">{frameTelemetry.sampleSize}</span></div>
+            <div>Frame p50: <span className="text-amber-200 font-bold">{frameTelemetry.frameIntervalP50Ms.toFixed(1)}ms</span></div>
+            <div>Frame p95: <span className="text-amber-300 font-bold">{frameTelemetry.frameIntervalP95Ms.toFixed(1)}ms</span></div>
+            <div>&gt;16.7ms: <span className="text-orange-300 font-bold">{frameTelemetry.longFramesOver16Ms}</span></div>
+            <div>&gt;33.3ms: <span className="text-rose-300 font-bold">{frameTelemetry.longFramesOver33Ms}</span></div>
             <div>Drag Phase: <span className="text-amber-300 font-bold">{dragTelemetry.phase}</span></div>
             <div>Drag Events: <span className="text-amber-300 font-bold">{dragTelemetry.eventCount}</span></div>
             <div>Drag Alpha Start: <span className="text-cyan-300 font-bold">{dragPhysics.startAlphaTarget.toFixed(2)}</span></div>

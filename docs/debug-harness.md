@@ -9,7 +9,9 @@ npm install
 npm run dev
 ```
 
-Then open the Vite URL printed by the dev server, usually `http://localhost:3000`.
+Then open the fixed debug URL at `http://localhost:4435`. The development
+server uses strict port selection so a conflicting process fails loudly instead
+of silently moving the comparison run to another port.
 
 ## Purpose
 
@@ -25,7 +27,7 @@ It is not part of the production package API. Consumers should not import anythi
 | `DebugControlPanel.tsx` | Debug side-panel controls, preset selectors, command buttons, and telemetry readouts. |
 | `useDebugGraphState.ts` | Generated graph data, local/global mode state, root selection, selected/hovered node state, and active element counts. |
 | `useDebugGraphPreset.ts` | Debug preset selection, force/style slider state, and derived graph preset/theme values. |
-| `useFpsCounter.ts` | Lightweight requestAnimationFrame FPS sampling for rough stress-test feedback. |
+| `useFpsCounter.ts` | Rolling requestAnimationFrame FPS, p50/p95 interval, and long-frame telemetry for repeatable stress comparisons. |
 | `generateMockGraphData.ts` | Deterministic graph generator for typed nodes, groups, attachments, unresolved references, hubs, communities, and links. |
 | `mockGraphPresets.ts` | Debug-only visual theme and force preset options. |
 
@@ -90,6 +92,8 @@ Runtime sliders override the active preset:
 The harness displays:
 
 - estimated FPS,
+- rolling p50 and p95 requestAnimationFrame interval,
+- sampled frames over the 16.7ms and 33.3ms budgets,
 - current zoom multiplier,
 - visible node and link counts,
 - active simulated node and link counts, including the hidden local-lens halo,
@@ -104,7 +108,11 @@ The harness displays:
 
 The drag telemetry is intentionally mode-sensitive. In global mode it reports the high-heat drag policy with connected-neighbor wake enabled. In local mode it reports the low-heat drag policy with connected-neighbor wake disabled, so local lens drags remain live in the d3 simulation without re-running the full global wake inside the scoped halo.
 
-FPS is measured with a lightweight `requestAnimationFrame` loop in the harness. It is useful for rough comparison while tuning, not for formal benchmark reporting.
+Frame telemetry is measured in one-second `requestAnimationFrame` windows. FPS,
+p50/p95 intervals, and long-frame counts are useful for fixed-seed A/B
+comparisons while tuning. They describe main-thread responsiveness rather than
+the graph draw loop alone and are not a replacement for a browser performance
+trace.
 
 ## Mock Data Shape
 

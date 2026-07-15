@@ -20,6 +20,8 @@ export default defineConfig(() => {
       },
     },
     server: {
+      port: 4435,
+      strictPort: true,
       // HMR can be disabled via DISABLE_HMR in constrained editing environments.
       // Do not modify: file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',

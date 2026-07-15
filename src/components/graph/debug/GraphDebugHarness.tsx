@@ -27,7 +27,7 @@ export function GraphDebugHarness() {
   const graphViewRef = useRef<GraphViewRef | null>(null);
   const graphState = useDebugGraphState();
   const graphPreset = useDebugGraphPreset(graphState.localDepth);
-  const fps = useFpsCounter();
+  const frameTelemetry = useFpsCounter();
   const [zoomScale, setZoomScale] = useState<number>(0.8);
   const [dragTelemetry, setDragTelemetry] = useState<DragTelemetry>({
     phase: 'idle',
@@ -77,10 +77,16 @@ export function GraphDebugHarness() {
     <div className="flex flex-col lg:flex-row h-screen w-screen bg-[#0d0d11] text-gray-200 overflow-hidden font-sans">
       <div className="flex-1 relative flex flex-col min-w-0 order-2 lg:order-1 h-[60vh] lg:h-full border-t border-gray-800 lg:border-t-0 p-3 lg:p-5">
         <div className="absolute top-6 left-6 z-10 flex flex-col gap-1 pointer-events-none">
-          <div className="flex items-center gap-2 bg-[#16161c]/90 backdrop-blur border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/95 shadow-xl">
+          <div
+            data-testid="debug-frame-telemetry"
+            className="flex items-center gap-2 bg-[#16161c]/90 backdrop-blur border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/95 shadow-xl"
+          >
             <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
             <span className="font-semibold uppercase tracking-wider text-[10px] text-gray-400">FPS:</span>
-            <span className="font-mono text-emerald-400 font-bold">{fps}</span>
+            <span className="font-mono text-emerald-400 font-bold">{frameTelemetry.fps}</span>
+            <span className="text-white/20">|</span>
+            <span className="font-semibold uppercase tracking-wider text-[10px] text-gray-400">P95:</span>
+            <span className="font-mono text-amber-300 font-bold">{frameTelemetry.frameIntervalP95Ms.toFixed(1)}ms</span>
             <span className="text-white/20">|</span>
             <span className="font-semibold uppercase tracking-wider text-[10px] text-gray-400">Zoom:</span>
             <span className="font-mono text-cyan-400 font-bold">{zoomScale.toFixed(2)}x</span>
@@ -184,6 +190,7 @@ export function GraphDebugHarness() {
         hoveredNodeId={graphState.hoveredNodeId}
         selectedNodeId={graphState.selectedNodeId}
         reactRenderCount={reactRenderCounterRef.current}
+        frameTelemetry={frameTelemetry}
         dragTelemetry={dragTelemetry}
         dragPhysics={dragPhysics}
         onRandomizeSeed={graphState.randomizeSeed}
