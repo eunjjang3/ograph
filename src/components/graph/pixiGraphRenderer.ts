@@ -537,7 +537,6 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     const hasFocus = !!focusId;
     const dimAlpha = resolveFocusDimAlpha(frame);
     const candidates: PixiLabelCandidate[] = [];
-    const nodeById = new Map<string, GraphNode>();
 
     for (let index = 0; index < visibleNodes.length; index += 1) {
       const node = visibleNodes[index]!;
@@ -552,7 +551,6 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
       const visibility = frame.labelVisibilityByNodeId.get(node.id) ?? 0;
       if (visibility <= ALPHA_EPSILON && !forceVisible) continue;
 
-      nodeById.set(node.id, node);
       candidates.push({
         id: node.id,
         inputIndex: index,
@@ -572,7 +570,7 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
 
     for (const candidate of candidates) {
       if (!selectedIds.has(candidate.id)) continue;
-      const node = nodeById.get(candidate.id)!;
+      const node = this.nodeById.get(candidate.id)!;
       const color = resolveLabelColor(node, frame, candidate.isNeighbor);
       const styleKey = `${frame.theme.fontFamily}|${color}|${frame.theme.backgroundColor}`;
       let view = this.labelViews.get(candidate.id);
