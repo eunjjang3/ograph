@@ -63,8 +63,7 @@ export function GraphDebugHarness() {
     telemetryRef: runtimeTelemetryRef,
     createSimulationWorker: simulationMode === 'worker'
       ? createDebugSimulationWorker
-      : undefined,
-    runKey: `${graphState.nodeCount}:${graphState.avgLinks}:${graphState.seed}`
+      : undefined
   }), [
     graphState.avgLinks,
     graphState.nodeCount,

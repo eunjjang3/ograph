@@ -41,6 +41,8 @@ simulation matrix. Switching a lane or deterministic fixture remounts the graph
 canvas and resets runtime counters while keeping the public package API
 unchanged. The harness warms the debug Pixi module in the background so lane
 switch latency primarily measures WebGL initialization rather than chunk load.
+Fixture and Main/Worker changes retain the active renderer context; changing
+between Canvas 2D and Pixi WebGL replaces the canvas exactly once.
 
 | Renderer | Simulation | Use |
 | --- | --- | --- |

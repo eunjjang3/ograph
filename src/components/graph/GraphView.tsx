@@ -589,9 +589,7 @@ function GraphViewInner<
     >
       <GraphErrorBoundary onError={onError}>
         <GraphViewCanvas
-          key={`${runtimeOptions.renderer}:${runtimeOptions.simulation}:${
-            __OGRAPH_DEBUG_RUNTIME__ ? runtimeOptions.runKey ?? '' : ''
-          }`}
+          key={runtimeOptions.renderer}
           {...props}
           ref={ref}
           nodes={normalizedGraph.nodes}

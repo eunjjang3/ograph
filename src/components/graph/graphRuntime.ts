@@ -32,7 +32,6 @@ export interface GraphRuntimeOptions {
   simulation: GraphSimulationMode;
   telemetryRef?: GraphRuntimeTelemetryRef;
   createSimulationWorker?: () => Worker;
-  runKey?: string;
 }
 
 export const DEFAULT_GRAPH_RUNTIME_OPTIONS: Readonly<GraphRuntimeOptions> = {

@@ -27,7 +27,9 @@ export function useGraphRendererBackend({
 }: UseGraphRendererBackendParams) {
   const rendererBackendRef = useRef<GraphRendererBackend | null>(null);
   const onErrorRef = useRef(onError);
+  const telemetryRefRef = useRef(telemetryRef);
   onErrorRef.current = onError;
+  telemetryRefRef.current = telemetryRef;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -44,8 +46,8 @@ export function useGraphRendererBackend({
     }
 
     rendererBackendRef.current = backend;
-    if (__OGRAPH_DEBUG_RUNTIME__ && telemetryRef) {
-      telemetryRef.current.renderer = renderer;
+    if (__OGRAPH_DEBUG_RUNTIME__ && telemetryRefRef.current) {
+      telemetryRefRef.current.current.renderer = renderer;
     }
 
     Promise.resolve(backend.initialize(canvas))
@@ -69,7 +71,7 @@ export function useGraphRendererBackend({
       }
       backend.destroy();
     };
-  }, [canvasRef, renderer, requestRender, telemetryRef]);
+  }, [canvasRef, renderer, requestRender]);
 
   return rendererBackendRef;
 }

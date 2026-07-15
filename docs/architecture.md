@@ -169,6 +169,11 @@ Ograph's dirty-frame scheduler calls `app.render()` only for simulation output,
 input, easing, visual transitions, or pending materialization work. Resize and
 DPR changes go through `renderer.resize`; disposal preserves the React-owned
 canvas while releasing the WebGL context and retained children.
+Changing graph fixtures or switching Main/Worker simulation keeps the renderer
+and its WebGL context alive; only switching between Canvas 2D and Pixi replaces
+the HTML canvas, because a canvas cannot change context type after acquisition.
+This avoids a blank-frame/context-init penalty during the common retained
+topology and simulation comparisons.
 
 Geometry is retained across frames:
 

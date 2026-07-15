@@ -147,7 +147,7 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
   - Docs: renderer lifecycle and fallback notes in `docs/architecture.md`
   - Commit: `259aa89`
 
-- [ ] Stage 5: Add Obsidian-style work avoidance to the Pixi lane
+- [x] Stage 5: Add Obsidian-style work avoidance to the Pixi lane
   - Branch: `feat/obsidian-graph-harness-spike`
   - Likely files: Pixi backend, frame scheduler, spatial-index/culling helpers,
     debug telemetry
@@ -157,7 +157,7 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
   - Verification: cold-load/first-frame metrics, pan into unmaterialized areas,
     zoom label transitions, memory/object-count telemetry, 10k stress run
   - Docs: `docs/architecture.md`, `docs/debug-harness.md`
-  - Commit: `<pending>`
+  - Commit: `e357f52`
 
 - [ ] Stage 6: Run the four-lane acceptance comparison and make a promotion decision
   - Branch: `feat/obsidian-graph-harness-spike`
@@ -181,6 +181,61 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
   - Docs: API wording remains renderer-neutral; architecture, changelog, and
     release notes document the internal runtime change
   - Commit: `<pending>`
+
+## Human UX checkpoint (2026-07-15)
+
+This is the intentional pause point requested for human feedback. The active
+goal is not complete and Stage 6 remains unchecked until the visual/interaction
+tradeoffs below are reviewed. Production defaults, public types, screenshot
+baselines, and package dependencies have not been promoted.
+
+Representative single-pass measurements from the in-app Chromium browser at
+`http://127.0.0.1:4435`, using 5,000 nodes, average degree `3.5`, seed `42`, and
+the default theme:
+
+| Renderer | Simulation | Active FPS | rAF p95 | Last graph draw CPU | First visible |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Canvas 2D | Main | 28 | 50.2ms | 6.1ms | 91.6ms |
+| Canvas 2D | Worker | 60 | 17.3ms | 4.9ms | 57.7ms |
+| Pixi WebGL | Main, forced reheat | 26 | 50.0ms | 11.3ms | 330.8ms cold lane switch |
+| Pixi WebGL | Worker | 60 | 17.6ms | 8.5ms | 100.2ms retained fixture switch |
+
+The target Pixi/Worker lane at 10,000 nodes measured `56 FPS`, `33.1ms` rAF
+p95, `14.1ms` last graph draw CPU, and `108.3ms` to first visible content after
+a retained fixture switch. It therefore clears the provisional 5k and 10k FPS
+targets in this run. Cold Canvas-to-Pixi context creation remains materially
+slower than retained Pixi fixture/simulation changes and must be evaluated
+separately before promotion.
+
+Additional evidence:
+
+- exactly one HTML canvas remained mounted in every lane;
+- a Pixi/Worker canvas click resolved hover and selection through the existing
+  Ograph spatial index (`node-3093` in the sampled 5k run);
+- after settling, Pixi/Worker reported `Simulation State: idle` and
+  `Frame Reasons: idle`; `Graph Draws` stayed at `450` across a two-second
+  sample, confirming complete dirty-loop shutdown;
+- all 71 unit/API/budget tests and all 8 packed-consumer browser tests passed;
+- the production entry remained Canvas/Main with only the original runtime
+  exports; `dist/index.js` measured about `16.83kB` gzip against the existing
+  `16.94kB` limit and contains no Pixi/Worker runtime string or asset;
+- Pixi stays a development dependency. The demo emits the experimental Pixi
+  and Worker chunks, while the packed consumer tarball contains neither.
+
+Human review should decide:
+
+1. Whether the Pixi node/link weight, color blending, focus borders, and
+   screen-space labels are visually close enough to the Canvas contract.
+2. Whether the 600 idle / 280 focused visible-label caps produce the desired
+   Obsidian-like density, especially for CJK and long labels.
+3. Whether cold WebGL initialization should be hidden by eager initialization,
+   kept as an opt-in warm-up, or covered by a Canvas-first fallback during a
+   future production promotion.
+4. Whether the demo-only Pixi chunk and eventual dependency cost are acceptable
+   before designing the packaged Worker asset and WebGL failure fallback.
+
+The measurements are diagnostic evidence, not a stable benchmark artifact;
+repeat them on the intended reference desktop before checking Stage 6.
 
 ## Stop conditions
 
