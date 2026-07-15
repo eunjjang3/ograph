@@ -115,6 +115,8 @@ export function useGraphRenderLoop({
   const labelVisibilityRef = useRef<Map<string, number>>(new Map());
   const lensVisibilityRef = useRef<Map<string, number>>(new Map());
   const lensVisibilityInitializedRef = useRef<boolean>(false);
+  const lensVisibilityDirtyRef = useRef<boolean>(true);
+  const lastLensNodesRef = useRef<GraphNode[] | null>(null);
   const lastSpatialIndexNodesRef = useRef<GraphNode[] | null>(null);
   const displayedFocusRef = useRef<{ selectedId: string | null | undefined; hoveredId: string | null | undefined }>({
     selectedId: null,
@@ -129,6 +131,7 @@ export function useGraphRenderLoop({
         lensVisibilityRef.current.delete(nodeId);
       }
     }
+    lensVisibilityDirtyRef.current = true;
     requestRender();
   }, [lensVisibleNodeIds, requestRender, sourceNodeIds]);
 
@@ -154,6 +157,10 @@ export function useGraphRenderLoop({
         }
         const renderNodes = renderNodesRef.current;
         const renderLinks = renderLinksRef.current;
+      if (lastLensNodesRef.current !== renderNodes) {
+        lastLensNodesRef.current = renderNodes;
+        lensVisibilityDirtyRef.current = true;
+      }
       if (
         shouldRefreshSpatialIndexForFrame(
           lastSpatialIndexNodesRef.current,
@@ -226,27 +233,31 @@ export function useGraphRenderLoop({
           lensVisibilityByNodeId.set(node.id, lensVisibleNodeIds.has(node.id) ? 1 : 0);
         }
         lensVisibilityInitializedRef.current = true;
-      }
+        lensVisibilityDirtyRef.current = false;
+      } else if (lensVisibilityDirtyRef.current) {
+        lensVisibilityDirtyRef.current = false;
 
-      for (const node of renderNodes) {
-        const target = lensVisibleNodeIds.has(node.id) ? 1 : 0;
-        const current = lensVisibilityByNodeId.get(node.id) ?? 0;
+        for (const node of renderNodes) {
+          const target = lensVisibleNodeIds.has(node.id) ? 1 : 0;
+          const current = lensVisibilityByNodeId.get(node.id) ?? 0;
 
-        if (Math.abs(current - target) <= ANIMATION_EPSILON) {
-          lensVisibilityByNodeId.set(node.id, target);
-          continue;
-        }
+          if (Math.abs(current - target) <= ANIMATION_EPSILON) {
+            lensVisibilityByNodeId.set(node.id, target);
+            continue;
+          }
 
-        lensVisibilityChanged = true;
-        const next = reduceMotion
-          ? target
-          : current + (target - current) * blendLensVisibility;
+          lensVisibilityChanged = true;
+          const next = reduceMotion
+            ? target
+            : current + (target - current) * blendLensVisibility;
 
-        if (Math.abs(next - target) <= ANIMATION_EPSILON) {
-          lensVisibilityByNodeId.set(node.id, target);
-        } else {
-          lensVisibilityByNodeId.set(node.id, next);
-          isLensAnimationActive = true;
+          if (Math.abs(next - target) <= ANIMATION_EPSILON) {
+            lensVisibilityByNodeId.set(node.id, target);
+          } else {
+            lensVisibilityByNodeId.set(node.id, next);
+            lensVisibilityDirtyRef.current = true;
+            isLensAnimationActive = true;
+          }
         }
       }
 
