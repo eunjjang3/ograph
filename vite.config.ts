@@ -13,6 +13,7 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss()],
     define: {
       'import.meta.env.VITE_OGRAPH_VERSION': JSON.stringify(packageJson.version),
+      __OGRAPH_DEBUG_RUNTIME__: 'true',
     },
     resolve: {
       alias: {

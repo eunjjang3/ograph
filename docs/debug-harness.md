@@ -34,6 +34,18 @@ It is not part of the production package API. Consumers should not import anythi
 
 ## Controls
 
+### Runtime Experiment Lane
+
+The internal-only runtime selector currently offers Canvas 2D with either the
+main-thread or Worker d3-force simulation. Switching simulation mode remounts
+the graph canvas, resets runtime counters, and keeps the public package API
+unchanged. The Pixi control remains disabled until the renderer stage lands.
+
+| Renderer | Simulation | Use |
+| --- | --- | --- |
+| `Canvas 2D` | `Main Thread` | Original baseline. |
+| `Canvas 2D` | `Worker` | Isolates the benefit of moving d3-force off the main thread. |
+
 ### Mock Generator Setup
 
 | Control | Effect |
@@ -98,6 +110,8 @@ The harness displays:
 - active private renderer and simulation lane,
 - graph draw count and last graph draw CPU duration,
 - simulation update count,
+- age of the latest Worker position result,
+- topology sync duration and first-visible-frame latency,
 - materialized label count,
 - current zoom multiplier,
 - visible node and link counts,

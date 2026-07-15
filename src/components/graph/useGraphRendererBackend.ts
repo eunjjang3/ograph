@@ -4,6 +4,8 @@ import { createGraphRendererBackend } from './graphRenderer';
 import type { GraphRendererBackend } from './graphRenderer';
 import type { GraphRendererMode, GraphRuntimeTelemetryRef } from './graphRuntime';
 
+declare const __OGRAPH_DEBUG_RUNTIME__: boolean;
+
 interface UseGraphRendererBackendParams {
   canvasRef: RefObject<HTMLCanvasElement | null>;
   renderer: GraphRendererMode;
@@ -42,7 +44,7 @@ export function useGraphRendererBackend({
     }
 
     rendererBackendRef.current = backend;
-    if (telemetryRef) {
+    if (__OGRAPH_DEBUG_RUNTIME__ && telemetryRef) {
       telemetryRef.current.renderer = renderer;
     }
 

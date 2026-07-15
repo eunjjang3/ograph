@@ -106,7 +106,7 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
   - Docs: `docs/debug-harness.md`
   - Commit: `b45c8a2`
 
-- [ ] Stage 2: Introduce private renderer/simulation seams with baseline parity
+- [x] Stage 2: Introduce private renderer/simulation seams with baseline parity
   - Branch: `feat/obsidian-graph-harness-spike`
   - Likely files: `GraphView.tsx`, `useGraphRenderLoop.ts`,
     `useGraphSimulation.ts`, new internal runtime/backend modules, debug harness
@@ -116,7 +116,7 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
   - Verification: API-surface tests, graph-logic tests, packed React 18/19
     consumer compilation, current browser interaction/visual suite
   - Docs: `docs/architecture.md`, `docs/debug-harness.md`
-  - Commit: `<pending>`
+  - Commit: `58aae4d`
 
 - [ ] Stage 3: Add a Worker simulation lane to the debug harness
   - Branch: `feat/obsidian-graph-harness-spike`

@@ -8,7 +8,11 @@ export function useDebugRuntimeTelemetry(telemetryRef: GraphRuntimeTelemetryRef)
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setTelemetry({ ...telemetryRef.current });
+      const next = { ...telemetryRef.current };
+      next.workerResultAgeMs = next.simulation === 'worker' && next.lastSimulationUpdateAt > 0
+        ? Math.max(0, performance.now() - next.lastSimulationUpdateAt)
+        : 0;
+      setTelemetry(next);
     }, 500);
 
     return () => window.clearInterval(timer);

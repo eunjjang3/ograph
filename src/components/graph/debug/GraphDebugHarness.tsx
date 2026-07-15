@@ -9,6 +9,7 @@ import { useFpsCounter } from './useFpsCounter';
 import { getGraphDragPhysicsForMode } from '../useGraphSimulation';
 import { createGraphRuntimeTelemetry } from '../graphRuntime';
 import type { GraphRuntimeOptions, GraphRuntimeTelemetryRef } from '../graphRuntime';
+import type { GraphRendererMode, GraphSimulationMode } from '../graphRuntime';
 import { useDebugRuntimeTelemetry } from './useDebugRuntimeTelemetry';
 
 const CONTROL_HINTS = [
@@ -26,20 +27,32 @@ interface DragTelemetry {
   eventCount: number;
 }
 
+function createDebugSimulationWorker() {
+  return new Worker(new URL('../graphSimulation.worker.ts', import.meta.url), {
+    type: 'module',
+    name: 'ograph-debug-simulation'
+  });
+}
+
 export function GraphDebugHarness() {
   const graphViewRef = useRef<GraphViewRef | null>(null);
   const graphState = useDebugGraphState();
   const graphPreset = useDebugGraphPreset(graphState.localDepth);
   const frameTelemetry = useFpsCounter();
-  const runtimeTelemetryRef = useRef<GraphRuntimeTelemetryRef>({
-    current: createGraphRuntimeTelemetry()
-  });
+  const [rendererMode, setRendererMode] = useState<GraphRendererMode>('canvas2d');
+  const [simulationMode, setSimulationMode] = useState<GraphSimulationMode>('main');
+  const runtimeTelemetryRef = useMemo<GraphRuntimeTelemetryRef>(() => ({
+    current: createGraphRuntimeTelemetry(rendererMode, simulationMode)
+  }), [rendererMode, simulationMode]);
   const runtimeOptions = useMemo<GraphRuntimeOptions>(() => ({
-    renderer: 'canvas2d',
-    simulation: 'main',
-    telemetryRef: runtimeTelemetryRef.current
-  }), []);
-  const runtimeTelemetry = useDebugRuntimeTelemetry(runtimeTelemetryRef.current);
+    renderer: rendererMode,
+    simulation: simulationMode,
+    telemetryRef: runtimeTelemetryRef,
+    createSimulationWorker: simulationMode === 'worker'
+      ? createDebugSimulationWorker
+      : undefined
+  }), [rendererMode, runtimeTelemetryRef, simulationMode]);
+  const runtimeTelemetry = useDebugRuntimeTelemetry(runtimeTelemetryRef);
   const [zoomScale, setZoomScale] = useState<number>(0.8);
   const [dragTelemetry, setDragTelemetry] = useState<DragTelemetry>({
     phase: 'idle',
@@ -168,6 +181,10 @@ export function GraphDebugHarness() {
       </div>
 
       <DebugControlPanel
+        rendererMode={rendererMode}
+        setRendererMode={setRendererMode}
+        simulationMode={simulationMode}
+        setSimulationMode={setSimulationMode}
         nodeCount={graphState.nodeCount}
         setNodeCount={graphState.setNodeCount}
         avgLinks={graphState.avgLinks}

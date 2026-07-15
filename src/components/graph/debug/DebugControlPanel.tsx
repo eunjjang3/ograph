@@ -4,7 +4,11 @@ import type { GraphDragPhysicsOptions } from '../useGraphSimulation';
 import type { DebugGraphMode } from './useDebugGraphState';
 import type { DebugPresetConfig } from './mockGraphPresets';
 import type { FrameTelemetry } from './useFpsCounter';
-import type { GraphRuntimeTelemetry } from '../graphRuntime';
+import type {
+  GraphRendererMode,
+  GraphRuntimeTelemetry,
+  GraphSimulationMode
+} from '../graphRuntime';
 import { RotateCcw, Maximize2, Sliders, Info } from 'lucide-react';
 
 const debugSuiteVersion = import.meta.env.VITE_OGRAPH_VERSION ?? '0.1.0';
@@ -18,6 +22,10 @@ interface DebugDragTelemetry {
 }
 
 interface DebugControlPanelProps {
+  rendererMode: GraphRendererMode;
+  setRendererMode: (mode: GraphRendererMode) => void;
+  simulationMode: GraphSimulationMode;
+  setSimulationMode: (mode: GraphSimulationMode) => void;
   nodeCount: number;
   setNodeCount: Dispatch<SetStateAction<number>>;
   avgLinks: number;
@@ -69,6 +77,10 @@ interface DebugControlPanelProps {
 }
 
 export function DebugControlPanel({
+  rendererMode,
+  setRendererMode,
+  simulationMode,
+  setSimulationMode,
   nodeCount,
   setNodeCount,
   avgLinks,
@@ -129,6 +141,60 @@ export function DebugControlPanel({
       </div>
 
       <div className="p-5 flex-1 space-y-6">
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+            <Sliders className="w-3.5 h-3.5 text-violet-400" />
+            0. Runtime Experiment Lane
+          </h2>
+          <div className="p-4 bg-[#181820] border border-gray-800 rounded-xl space-y-4">
+            <div>
+              <label className="text-[11px] font-semibold text-gray-300 block mb-2 uppercase">
+                Renderer
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setRendererMode('canvas2d')}
+                  className={`py-1.5 rounded-lg text-xs font-bold uppercase transition-all border ${
+                    rendererMode === 'canvas2d'
+                      ? 'bg-violet-600/20 text-violet-300 border-violet-500/80 shadow'
+                      : 'bg-gray-900/40 text-gray-400 border-transparent'
+                  }`}
+                >
+                  Canvas 2D
+                </button>
+                <button
+                  disabled
+                  title="Enabled in the Pixi stage"
+                  className="py-1.5 rounded-lg text-xs font-bold uppercase border border-transparent bg-gray-900/20 text-gray-600 cursor-not-allowed"
+                >
+                  Pixi (next)
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold text-gray-300 block mb-2 uppercase">
+                Simulation
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['main', 'worker'] as const).map(simulation => (
+                  <button
+                    key={simulation}
+                    onClick={() => setSimulationMode(simulation)}
+                    className={`py-1.5 rounded-lg text-xs font-bold uppercase transition-all border ${
+                      simulationMode === simulation
+                        ? 'bg-violet-600/20 text-violet-300 border-violet-500/80 shadow'
+                        : 'bg-gray-900/40 text-gray-400 border-transparent hover:bg-gray-800/40 hover:text-gray-200'
+                    }`}
+                  >
+                    {simulation === 'main' ? 'Main Thread' : 'Worker'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-3">
           <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
             <Sliders className="w-3.5 h-3.5 text-indigo-400" />
@@ -450,6 +516,9 @@ export function DebugControlPanel({
             <div>Last Draw CPU: <span className="text-emerald-300 font-bold">{runtimeTelemetry.lastRenderDurationMs.toFixed(2)}ms</span></div>
             <div>Simulation Updates: <span className="text-cyan-300 font-bold">{runtimeTelemetry.simulationUpdateCount}</span></div>
             <div>Materialized Labels: <span className="text-cyan-300 font-bold">{runtimeTelemetry.materializedLabels}</span></div>
+            <div>Topology Sync: <span className="text-cyan-300 font-bold">{runtimeTelemetry.topologySyncDurationMs.toFixed(2)}ms</span></div>
+            <div>First Visible: <span className="text-cyan-300 font-bold">{runtimeTelemetry.firstVisibleFrameLatencyMs.toFixed(1)}ms</span></div>
+            <div>Worker Result Age: <span className="text-cyan-300 font-bold">{runtimeTelemetry.workerResultAgeMs.toFixed(1)}ms</span></div>
             <div>Drag Phase: <span className="text-amber-300 font-bold">{dragTelemetry.phase}</span></div>
             <div>Drag Events: <span className="text-amber-300 font-bold">{dragTelemetry.eventCount}</span></div>
             <div>Drag Alpha Start: <span className="text-cyan-300 font-bold">{dragPhysics.startAlphaTarget.toFixed(2)}</span></div>

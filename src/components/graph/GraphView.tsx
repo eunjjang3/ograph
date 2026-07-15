@@ -36,6 +36,8 @@ import { useGraphRendererBackend } from './useGraphRendererBackend';
 import { DEFAULT_GRAPH_RUNTIME_OPTIONS } from './graphRuntime';
 import type { GraphRuntimeOptions } from './graphRuntime';
 
+declare const __OGRAPH_DEBUG_RUNTIME__: boolean;
+
 export interface GraphViewRef {
   /** Fits the current global graph or local lens scope into the container. */
   fitToView: () => void;
@@ -180,6 +182,9 @@ function GraphViewCanvasInner<
   } = props;
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const runtimeTelemetryRef = __OGRAPH_DEBUG_RUNTIME__
+    ? runtimeOptions.telemetryRef
+    : undefined;
   const spatialIndexRef = useRef(buildSpatialIndex([]));
   const [reduceMotion, setReduceMotion] = useState(false);
   const growthGraph = useGraphGrowthAnimation({
@@ -212,7 +217,7 @@ function GraphViewCanvasInner<
     canvasRef,
     renderer: runtimeOptions.renderer,
     requestRender,
-    telemetryRef: runtimeOptions.telemetryRef,
+    telemetryRef: runtimeTelemetryRef,
     onError
   });
 
@@ -247,7 +252,10 @@ function GraphViewCanvasInner<
       dragPhysics,
       paused,
       engine: runtimeOptions.simulation,
-      runtimeTelemetryRef: runtimeOptions.telemetryRef,
+      runtimeTelemetryRef,
+      createSimulationWorker: __OGRAPH_DEBUG_RUNTIME__
+        ? runtimeOptions.createSimulationWorker
+        : undefined,
       onError
     }
   );
@@ -460,7 +468,7 @@ function GraphViewCanvasInner<
     requestRender,
     simulationActivityRef,
     rendererBackendRef,
-    runtimeTelemetryRef: runtimeOptions.telemetryRef,
+    runtimeTelemetryRef,
     renderNodesRef,
     renderLinksRef,
     neighborsMapRef,
@@ -530,6 +538,7 @@ type GraphViewComponent = (<
   displayName?: string;
 };
 
+/** @internal */
 export type DebugGraphViewProps<
   NodeMetadata extends GraphNodeMetadata = GraphNodeMetadata,
   LinkMetadata extends GraphNodeMetadata = GraphNodeMetadata
@@ -617,6 +626,7 @@ export const GraphView = forwardRef(GraphViewInner) as GraphViewComponent;
 
 GraphView.displayName = 'GraphView';
 
+/** @internal */
 export const DebugGraphView = forwardRef(GraphViewInner) as DebugGraphViewComponent;
 
 DebugGraphView.displayName = 'DebugGraphView';

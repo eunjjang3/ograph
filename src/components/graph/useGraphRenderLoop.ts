@@ -9,6 +9,8 @@ import type { GraphRendererBackend } from './graphRenderer';
 import type { GraphRuntimeTelemetryRef } from './graphRuntime';
 import type { GraphSimulationActivity } from './useGraphSimulation';
 
+declare const __OGRAPH_DEBUG_RUNTIME__: boolean;
+
 const VIEWPORT_SMOOTHING = 18;
 const DIMMING_SMOOTHING = 14;
 const LABEL_SMOOTHING = 12;
@@ -338,15 +340,23 @@ export function useGraphRenderLoop({
             labelRenderBudget
           });
 
-          if (rendered && runtimeTelemetryRef) {
+          if (__OGRAPH_DEBUG_RUNTIME__ && rendered && runtimeTelemetryRef) {
             const telemetry = runtimeTelemetryRef.current;
+            const renderedAt = performance.now();
             telemetry.renderer = rendererBackend.kind;
             telemetry.renderCount += 1;
-            telemetry.lastRenderDurationMs = performance.now() - renderStartedAt;
-            telemetry.lastRenderAt = performance.now();
+            telemetry.lastRenderDurationMs = renderedAt - renderStartedAt;
+            telemetry.lastRenderAt = renderedAt;
             telemetry.materializedNodes = renderNodes.length;
             telemetry.materializedLinks = renderLinks.length;
             telemetry.materializedLabels = visibleLabelIds.size;
+            if (
+              telemetry.firstVisibleFrameLatencyMs === 0 &&
+              telemetry.runtimeStartedAt > 0 &&
+              renderNodes.length > 0
+            ) {
+              telemetry.firstVisibleFrameLatencyMs = renderedAt - telemetry.runtimeStartedAt;
+            }
           }
         }
       }

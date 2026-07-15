@@ -15,6 +15,10 @@ import { getNodeRadius } from './graphMath';
 import { getLinkId } from './localGraph';
 import { buildGraphIndexes } from './graphIndexes';
 import type { GraphRuntimeTelemetryRef, GraphSimulationMode } from './graphRuntime';
+import type { WorkerSimulationConfig } from './graphSimulationProtocol';
+import type { WorkerGraphSimulationClient } from './workerGraphSimulationClient';
+
+declare const __OGRAPH_DEBUG_RUNTIME__: boolean;
 
 interface ExtendedSimulationNode extends SimulationNodeDatum, GraphNode {}
 interface ExtendedSimulationLink extends SimulationLinkDatum<ExtendedSimulationNode> {
@@ -82,6 +86,7 @@ export interface GraphSimulationOptions {
   paused?: boolean;
   engine?: GraphSimulationMode;
   runtimeTelemetryRef?: GraphRuntimeTelemetryRef;
+  createSimulationWorker?: () => Worker;
   onError?: (error: Error) => void;
 }
 
@@ -272,13 +277,18 @@ export function useGraphSimulation(
     runtimeTelemetryRef,
     onError
   } = options;
+  const createSimulationWorker = __OGRAPH_DEBUG_RUNTIME__
+    ? options.createSimulationWorker
+    : undefined;
   const simulationRef = useRef<Simulation<ExtendedSimulationNode, ExtendedSimulationLink> | null>(null);
   const engineRef = useRef(engine);
   engineRef.current = engine;
   const workerActiveRef = useRef(false);
+  const workerClientRef = useRef<WorkerGraphSimulationClient | null>(null);
+  const workerRevisionRef = useRef(0);
   const simulationActivityRef = useRef<GraphSimulationActivity>({
     isActive: () => {
-      if (engineRef.current === 'worker') {
+      if (__OGRAPH_DEBUG_RUNTIME__ && engineRef.current === 'worker') {
         return workerActiveRef.current;
       }
 
@@ -436,6 +446,7 @@ export function useGraphSimulation(
 
   const reportSimulationError = useCallback((caught: unknown) => {
     simulationRef.current?.stop();
+    workerActiveRef.current = false;
 
     if (onErrorRef.current) {
       onErrorRef.current(toGraphError(caught));
@@ -455,6 +466,12 @@ export function useGraphSimulation(
     payloadSyncedInputsRef.current = null;
   }, []);
 
+  const releaseWorkerResources = useCallback(() => {
+    workerClientRef.current?.dispose();
+    workerClientRef.current = null;
+    workerActiveRef.current = false;
+  }, []);
+
   useEffect(() => {
     if (engine !== 'main') {
       releaseSimulationResources();
@@ -462,6 +479,7 @@ export function useGraphSimulation(
     }
 
     try {
+      const topologyStartedAt = performance.now();
       const currentSimulationNodes = latestSimulationNodesRef.current;
       const currentSimulationLinks = latestSimulationLinksRef.current;
       const currentGravityCenterNodeIds = latestGravityCenterNodeIdsRef.current;
@@ -541,7 +559,7 @@ export function useGraphSimulation(
 
       sim.on('tick', () => {
         try {
-          if (runtimeTelemetryRef) {
+          if (__OGRAPH_DEBUG_RUNTIME__ && runtimeTelemetryRef) {
             runtimeTelemetryRef.current.simulation = 'main';
             runtimeTelemetryRef.current.simulationUpdateCount += 1;
             runtimeTelemetryRef.current.lastSimulationUpdateAt = performance.now();
@@ -557,6 +575,9 @@ export function useGraphSimulation(
       // while the render graph is still holding the previous lens transition set.
       syncLatestRenderGraphRefs();
       markPayloadSyncedForLatestInputs();
+      if (__OGRAPH_DEBUG_RUNTIME__ && runtimeTelemetryRef) {
+        runtimeTelemetryRef.current.topologySyncDurationMs = performance.now() - topologyStartedAt;
+      }
     } catch (caught) {
       reportSimulationError(caught);
     }
@@ -583,7 +604,129 @@ export function useGraphSimulation(
   ]);
 
   useEffect(() => {
-    if (engine !== 'main') return;
+    if (!__OGRAPH_DEBUG_RUNTIME__) return;
+
+    if (engine !== 'worker') {
+      releaseWorkerResources();
+      return;
+    }
+
+    releaseSimulationResources();
+
+    if (!createSimulationWorker) {
+      reportSimulationError(new Error('No graph simulation Worker factory was provided.'));
+      return;
+    }
+
+    let disposed = false;
+    const revision = workerRevisionRef.current + 1;
+    workerRevisionRef.current = revision;
+    const workerConfig: WorkerSimulationConfig = {
+      chargeStrength,
+      linkDistance,
+      nodeRadius,
+      collisionRadius,
+      gravityStrength,
+      velocityDecay,
+      alphaDecay: coolingOptions.alphaDecay,
+      alphaMin: coolingOptions.alphaMin,
+      graphRefreshAlpha,
+      preserveScopeCentroid,
+      gravityCenterNodeIds: gravityCenterNodeIds ? [...gravityCenterNodeIds] : null,
+      paused
+    };
+
+    void import('./workerGraphSimulationClient')
+      .then(({ createWorkerGraphSimulationClient }) => {
+        if (disposed) return;
+
+        const client = createWorkerGraphSimulationClient({
+          createWorker: createSimulationWorker,
+          revision,
+          nodes: latestSimulationNodesRef.current,
+          links: latestSimulationLinksRef.current,
+          cachedPositions: nodeCacheRef.current,
+          config: workerConfig,
+          onGraphReady: (snapshot, topologySyncDurationMs) => {
+            if (disposed) return;
+            const mappedNodes = snapshot.nodes as ExtendedSimulationNode[];
+            activeNodesRef.current = mappedNodes;
+            updateGraphIndexes(mappedNodes, snapshot.adjacencyById, snapshot.degreeById);
+            syncLatestRenderGraphRefs();
+            markPayloadSyncedForLatestInputs();
+
+            if (__OGRAPH_DEBUG_RUNTIME__ && runtimeTelemetryRef) {
+              runtimeTelemetryRef.current.simulation = 'worker';
+              runtimeTelemetryRef.current.topologySyncDurationMs = topologySyncDurationMs;
+            }
+          },
+          onActiveChange: active => {
+            workerActiveRef.current = active;
+          },
+          onTick: receivedAt => {
+            if (disposed) return;
+            if (__OGRAPH_DEBUG_RUNTIME__ && runtimeTelemetryRef) {
+              runtimeTelemetryRef.current.simulation = 'worker';
+              runtimeTelemetryRef.current.simulationUpdateCount += 1;
+              runtimeTelemetryRef.current.lastSimulationUpdateAt = receivedAt;
+              runtimeTelemetryRef.current.workerResultAgeMs = 0;
+            }
+            onTickRef.current?.();
+          },
+          onReady: () => {
+            if (__OGRAPH_DEBUG_RUNTIME__ && runtimeTelemetryRef) {
+              runtimeTelemetryRef.current.simulation = 'worker';
+            }
+          },
+          onError: reportSimulationError
+        });
+
+        workerClientRef.current = client;
+        client.start();
+      })
+      .catch(caught => {
+        if (!disposed) reportSimulationError(caught);
+      });
+
+    return () => {
+      disposed = true;
+      if (workerRevisionRef.current === revision) {
+        releaseWorkerResources();
+      }
+    };
+  }, __OGRAPH_DEBUG_RUNTIME__ ? [
+    engine,
+    topologySignature,
+    simulationNodes,
+    renderNodes,
+    renderLinks,
+    chargeStrength,
+    linkDistance,
+    nodeRadius,
+    collisionRadius,
+    gravityStrength,
+    velocityDecay,
+    coolingOptions.alphaDecay,
+    coolingOptions.alphaMin,
+    graphRefreshAlpha,
+    preserveScopeCentroid,
+    gravityCenterNodeIdsSignature,
+    paused,
+    createSimulationWorker,
+    runtimeTelemetryRef,
+    markPayloadSyncedForLatestInputs,
+    releaseSimulationResources,
+    releaseWorkerResources,
+    reportSimulationError,
+    syncLatestRenderGraphRefs,
+    updateGraphIndexes
+  ] : []);
+
+  useEffect(() => {
+    if (__OGRAPH_DEBUG_RUNTIME__ && engine === 'worker') {
+      workerClientRef.current?.setPaused(paused);
+      return;
+    }
 
     try {
       const syncedInputs = payloadSyncedInputsRef.current;
@@ -643,12 +786,21 @@ export function useGraphSimulation(
   useEffect(() => {
     return () => {
       releaseSimulationResources();
+      if (__OGRAPH_DEBUG_RUNTIME__) releaseWorkerResources();
     };
-  }, [releaseSimulationResources]);
+  }, [releaseSimulationResources, releaseWorkerResources]);
 
   // Node Dragging Physics Control
   const dragStart = useCallback((nodeId: string) => {
-    if (engineRef.current !== 'main') return;
+    if (__OGRAPH_DEBUG_RUNTIME__ && engineRef.current === 'worker') {
+      const targetNode = nodeByIdRef.current.get(nodeId);
+      if (targetNode) {
+        targetNode.fx = targetNode.x;
+        targetNode.fy = targetNode.y;
+      }
+      workerClientRef.current?.dragStart(nodeId, dragPhysics.startAlphaTarget);
+      return;
+    }
     if (!simulationRef.current) return;
 
     if (!pausedRef.current && dragPhysics.startAlphaTarget > 0) {
@@ -663,7 +815,24 @@ export function useGraphSimulation(
   }, [dragPhysics.startAlphaTarget]);
 
   const dragMove = useCallback((nodeId: string, worldX: number, worldY: number) => {
-    if (engineRef.current !== 'main') return;
+    if (__OGRAPH_DEBUG_RUNTIME__ && engineRef.current === 'worker') {
+      const targetNode = nodeByIdRef.current.get(nodeId);
+      if (targetNode) {
+        targetNode.fx = worldX;
+        targetNode.fy = worldY;
+        targetNode.x = worldX;
+        targetNode.y = worldY;
+        onTickRef.current?.();
+      }
+      workerClientRef.current?.dragMove(
+        nodeId,
+        worldX,
+        worldY,
+        dragPhysics.moveAlphaTarget,
+        dragPhysics.wakeConnectedNodes
+      );
+      return;
+    }
     const targetNode = nodeByIdRef.current.get(nodeId);
     if (!targetNode) return;
 
@@ -736,7 +905,15 @@ export function useGraphSimulation(
   }, [dragPhysics.moveAlphaTarget, dragPhysics.wakeConnectedNodes]);
 
   const dragEnd = useCallback((nodeId: string) => {
-    if (engineRef.current !== 'main') return;
+    if (__OGRAPH_DEBUG_RUNTIME__ && engineRef.current === 'worker') {
+      const targetNode = nodeByIdRef.current.get(nodeId);
+      if (targetNode) {
+        targetNode.fx = null;
+        targetNode.fy = null;
+      }
+      workerClientRef.current?.dragEnd(nodeId);
+      return;
+    }
     if (!simulationRef.current) return;
     simulationRef.current.alphaTarget(0); // return to normal decay
     
@@ -748,7 +925,10 @@ export function useGraphSimulation(
   }, []);
 
   const restartSimulation = useCallback(() => {
-    if (engineRef.current !== 'main') return;
+    if (__OGRAPH_DEBUG_RUNTIME__ && engineRef.current === 'worker') {
+      workerClientRef.current?.restart(1);
+      return;
+    }
     if (simulationRef.current) {
       simulationRef.current.alpha(1);
 

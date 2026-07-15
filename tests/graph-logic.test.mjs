@@ -232,7 +232,9 @@ test('private graph runtime telemetry starts in a deterministic empty state', as
     'src/components/graph/graphRuntime.ts'
   );
 
-  assert.deepEqual(createGraphRuntimeTelemetry('pixi', 'worker'), {
+  const telemetry = createGraphRuntimeTelemetry('pixi', 'worker');
+  assert.equal(Number.isFinite(telemetry.runtimeStartedAt), true);
+  assert.deepEqual({ ...telemetry, runtimeStartedAt: 0 }, {
     renderer: 'pixi',
     simulation: 'worker',
     renderCount: 0,
@@ -242,8 +244,138 @@ test('private graph runtime telemetry starts in a deterministic empty state', as
     lastSimulationUpdateAt: 0,
     materializedNodes: 0,
     materializedLinks: 0,
-    materializedLabels: 0
+    materializedLabels: 0,
+    topologySyncDurationMs: 0,
+    firstVisibleFrameLatencyMs: 0,
+    runtimeStartedAt: 0,
+    workerResultAgeMs: 0
   });
+});
+
+test('worker simulation protocol validates and unpacks transferable positions', async () => {
+  const {
+    GRAPH_SIMULATION_PROTOCOL_VERSION,
+    isGraphSimulationWorkerResponse,
+    unpackWorkerPositions
+  } = await importSourceModule('src/components/graph/graphSimulationProtocol.ts');
+  const positions = new Float32Array([1, 2, 3, 4]);
+
+  assert.equal(isGraphSimulationWorkerResponse({
+    type: 'ready',
+    protocolVersion: GRAPH_SIMULATION_PROTOCOL_VERSION,
+    revision: 3,
+    nodeCount: 2
+  }), true);
+  assert.equal(isGraphSimulationWorkerResponse({
+    type: 'tick',
+    revision: 3,
+    alpha: 0.5,
+    positions: positions.buffer
+  }), true);
+  assert.deepEqual([...unpackWorkerPositions(positions.buffer, 2)], [1, 2, 3, 4]);
+  assert.equal(unpackWorkerPositions(new ArrayBuffer(4), 2), null);
+  assert.equal(isGraphSimulationWorkerResponse({ type: 'tick', revision: 3 }), false);
+});
+
+test('worker simulation client covers lifecycle, pause, restart, drag, and buffer recycle', async () => {
+  const { createWorkerGraphSimulationClient } = await importSourceModule(
+    'src/components/graph/workerGraphSimulationClient.ts'
+  );
+  const { GRAPH_SIMULATION_PROTOCOL_VERSION } = await importSourceModule(
+    'src/components/graph/graphSimulationProtocol.ts'
+  );
+
+  class FakeWorker {
+    onmessage = null;
+    onerror = null;
+    onmessageerror = null;
+    messages = [];
+    terminated = false;
+
+    postMessage(message, transfer = []) {
+      this.messages.push({ message, transfer });
+    }
+
+    terminate() {
+      this.terminated = true;
+    }
+
+    emit(data) {
+      this.onmessage?.({ data });
+    }
+  }
+
+  const worker = new FakeWorker();
+  const snapshots = [];
+  const activeStates = [];
+  let tickCount = 0;
+  const client = createWorkerGraphSimulationClient({
+    createWorker: () => worker,
+    revision: 7,
+    nodes: [
+      { id: 'a', label: 'A', x: 0, y: 0 },
+      { id: 'b', label: 'B', x: 10, y: 10 }
+    ],
+    links: [{ source: 'a', target: 'b' }],
+    cachedPositions: new Map(),
+    config: {
+      chargeStrength: -50,
+      linkDistance: 45,
+      nodeRadius: 4.5,
+      collisionRadius: 5,
+      gravityStrength: 0.1,
+      velocityDecay: 0.4,
+      alphaDecay: 0.02,
+      alphaMin: 0.001,
+      graphRefreshAlpha: 0.22,
+      preserveScopeCentroid: false,
+      gravityCenterNodeIds: null,
+      paused: false
+    },
+    onGraphReady: snapshot => snapshots.push(snapshot),
+    onActiveChange: active => activeStates.push(active),
+    onTick: () => { tickCount += 1; },
+    onReady: () => {},
+    onError: error => { throw error; }
+  });
+
+  client.start();
+  assert.equal(worker.messages[0].message.type, 'initialize');
+  assert.equal(worker.messages[0].message.protocolVersion, GRAPH_SIMULATION_PROTOCOL_VERSION);
+  assert.equal(snapshots[0].nodes.length, 2);
+
+  worker.emit({
+    type: 'ready',
+    protocolVersion: GRAPH_SIMULATION_PROTOCOL_VERSION,
+    revision: 7,
+    nodeCount: 2
+  });
+  const positions = new Float32Array([5, 6, 7, 8]);
+  worker.emit({ type: 'tick', revision: 7, alpha: 0.5, positions: positions.buffer });
+  assert.deepEqual(snapshots[0].nodes.map(node => [node.x, node.y]), [[5, 6], [7, 8]]);
+  assert.equal(tickCount, 1);
+  assert.equal(worker.messages.at(-1).message.type, 'recycle');
+  assert.equal(worker.messages.at(-1).transfer.length, 1);
+
+  client.setPaused(true);
+  client.setPaused(false);
+  client.restart(0.75);
+  client.dragStart('a', 0.4);
+  client.dragMove('a', 11, 12, 0.3, true);
+  client.dragEnd('a');
+  assert.deepEqual(worker.messages.slice(-6).map(entry => entry.message.type), [
+    'set-paused',
+    'set-paused',
+    'restart',
+    'drag-start',
+    'drag-move',
+    'drag-end'
+  ]);
+
+  client.dispose();
+  assert.equal(worker.messages.at(-1).message.type, 'dispose');
+  assert.equal(worker.terminated, true);
+  assert.equal(activeStates.at(-1), false);
 });
 
 test('buildLocalGraphScope keeps one hidden physics halo and merges transition scopes', async () => {

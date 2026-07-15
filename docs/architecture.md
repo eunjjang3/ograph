@@ -79,6 +79,9 @@ published runtime/type entry points.
 | `useGraphRendererBackend.ts` | Renderer initialization, disposal, async error routing, and dirty-frame wake-up. |
 | `useGraphPointerInteractions.ts` | Pointer capture, pan, node drag, hover hit testing, click/double-click handling, wheel zoom, and touch pinch zoom. |
 | `useGraphSimulation.ts` | Persistent d3-force setup, graph indexes, degree calculation, cached layout positions, scoped force refresh, drag physics, and simulation restart. |
+| `graphSimulationProtocol.ts` | Debug-only versioned Worker messages plus transferable packed-position validation. |
+| `graphSimulation.worker.ts` | Debug Worker d3-force runtime, drag controls, 60 Hz position publication, and transfer-buffer recycling. |
+| `workerGraphSimulationClient.ts` | Main-thread Worker lifecycle, graph revision checks, packed-position application, and command adapter. |
 | `useGraphLensScope.ts` | Global/local lens scope derivation, render-only transition union, and hidden physics halo scope. |
 | `graphIndexes.ts` | Shared node lookup, degree, and focused-neighbor index helpers over the common undirected adjacency helper. |
 | `graphDiff.ts` | Pure internal graph patch helper for deterministic node and duplicate-link add/remove/update detection. |
@@ -130,6 +133,27 @@ The draw loop schedules frames when:
 - the d3 simulation is not paused and is still above `alphaMin`.
 
 When the simulation cools and no explicit render is requested, frame scheduling stops.
+
+### Debug Worker simulation lane
+
+The harness can replace the main-thread timer with a module Worker without
+changing the package API. The main thread builds the same graph indexes and
+render-node objects, while the Worker owns d3-force node velocity, force state,
+and timer work. Position frames are packed as `x,y` pairs in a transferable
+`Float32Array`; after applying them to the retained node objects, the client
+transfers the buffer back for reuse. Every message carries a graph revision so
+late frames from a disposed topology are ignored.
+
+Pause, restart, drag pin/move/release, local drag heat, and connected-neighbor
+wake are represented in the Worker protocol. Cleanup sends `dispose` and then
+terminates the Worker, including React StrictMode remounts and runtime-lane
+switches.
+
+The Worker URL is created only by the debug harness. Vite defines
+`__OGRAPH_DEBUG_RUNTIME__` as `true` for the demo and `false` for the library
+build, allowing Rollup to remove the client import and debug telemetry from the
+consumer entry. The production package therefore has no Worker asset to locate
+or publish during this spike.
 
 Graph-owned errors report through `onError` in three places: the React error boundary, the requestAnimationFrame draw loop, and simulation setup/tick scheduling. Canvas draw-loop and simulation errors stop the active graph loop before reporting. Consumer callback errors remain consumer-owned and are not converted into graph `onError` events.
 
