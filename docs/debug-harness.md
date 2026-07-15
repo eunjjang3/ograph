@@ -139,6 +139,23 @@ comparisons while tuning. They describe main-thread responsiveness rather than
 the graph draw loop alone and are not a replacement for a browser performance
 trace.
 
+The page-level FPS value and its percentiles are derived from the same interval
+set. A visibility transition resets the partial window, and a single interval
+that spans a complete window is reported on its own instead of being mixed with
+earlier 60 Hz samples. This prevents a resumed background tab from showing a
+near-zero FPS beside an apparently healthy p95 from a different effective
+window.
+
+The existing telemetry card also carries visually inert debug data attributes
+under `data-testid="runtime-performance-telemetry"`. They expose one-second
+active graph-draw cadence, draw-interval p95, full graph-frame CPU p50/p95/max,
+and the last Pixi phase breakdown. Active graph samples are collected only
+while simulation, interaction animation, or renderer materialization actually
+keeps drawing; idle page rAF callbacks are excluded. Full graph-frame CPU
+includes pre-render spatial-index and label work, while the Pixi `submit`
+phase still measures JavaScript command submission rather than GPU completion.
+These attributes do not add controls, text, layout, or consumer API surface.
+
 `Frame Reasons` is `idle` once force updates, viewport/focus/lens/label easing,
 and Pixi materialization have all completed. At that point `Graph Draws` must
 remain unchanged across subsequent telemetry samples even though the page-level

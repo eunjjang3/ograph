@@ -227,6 +227,38 @@ test('debug frame telemetry summarizes percentiles and long-frame budgets', asyn
   });
 });
 
+test('debug frame telemetry keeps FPS and percentiles on the same timestamp window', async () => {
+  const {
+    createFrameTelemetryWindow,
+    recordFrameTimestamp
+  } = await importSourceModule('src/components/graph/debug/useFpsCounter.ts');
+  const steadyWindow = createFrameTelemetryWindow();
+  let steadyTelemetry = recordFrameTimestamp(steadyWindow, 0);
+
+  for (let index = 1; index <= 60; index += 1) {
+    steadyTelemetry = recordFrameTimestamp(steadyWindow, index * 16.7) ?? steadyTelemetry;
+  }
+
+  assert.equal(steadyTelemetry.fps, 60);
+  assert.equal(steadyTelemetry.frameIntervalP95Ms, 16.7);
+  assert.equal(steadyTelemetry.sampleSize, 60);
+
+  const resumedWindow = createFrameTelemetryWindow();
+  recordFrameTimestamp(resumedWindow, 0);
+  recordFrameTimestamp(resumedWindow, 16.7);
+  recordFrameTimestamp(resumedWindow, 33.4);
+  const resumedTelemetry = recordFrameTimestamp(resumedWindow, 2033.4);
+
+  assert.deepEqual(resumedTelemetry, {
+    fps: 1,
+    frameIntervalP50Ms: 2000,
+    frameIntervalP95Ms: 2000,
+    longFramesOver16Ms: 1,
+    longFramesOver33Ms: 1,
+    sampleSize: 1
+  });
+});
+
 test('private graph runtime telemetry starts in a deterministic empty state', async () => {
   const { createGraphRuntimeTelemetry } = await importSourceModule(
     'src/components/graph/graphRuntime.ts'
@@ -240,6 +272,19 @@ test('private graph runtime telemetry starts in a deterministic empty state', as
     renderCount: 0,
     lastRenderDurationMs: 0,
     lastRenderAt: 0,
+    lastFrameCpuDurationMs: 0,
+    lastPreRendererDurationMs: 0,
+    lastSpatialIndexDurationMs: 0,
+    lastLabelVisibilityDurationMs: 0,
+    activeRenderFps: 0,
+    activeRenderIntervalP95Ms: 0,
+    activeRenderDurationP50Ms: 0,
+    activeRenderDurationP95Ms: 0,
+    activeRenderDurationMaxMs: 0,
+    activeRenderSampleSize: 0,
+    activeRenderWindowMs: 0,
+    activeRenderSequence: 0,
+    lastRendererProfile: null,
     simulationUpdateCount: 0,
     lastSimulationUpdateAt: 0,
     materializedNodes: 0,
@@ -255,6 +300,41 @@ test('private graph runtime telemetry starts in a deterministic empty state', as
     simulationActive: false,
     activeFrameReasons: 'initializing'
   });
+});
+
+test('active graph render telemetry excludes idle gaps and summarizes draw CPU', async () => {
+  const {
+    createActiveGraphRenderWindow,
+    createGraphRuntimeTelemetry,
+    recordActiveGraphRenderSample
+  } = await importSourceModule('src/components/graph/graphRuntime.ts');
+  const telemetry = createGraphRuntimeTelemetry('pixi', 'worker');
+  const window = createActiveGraphRenderWindow();
+  let published = false;
+
+  for (let index = 0; index <= 60; index += 1) {
+    published = recordActiveGraphRenderSample(
+      window,
+      telemetry,
+      index * 16.7,
+      index === 60 ? 20 : 5,
+      true
+    ) || published;
+  }
+
+  assert.equal(published, true);
+  assert.equal(telemetry.activeRenderFps, 59.9);
+  assert.equal(telemetry.activeRenderIntervalP95Ms, 16.7);
+  assert.equal(telemetry.activeRenderDurationP50Ms, 5);
+  assert.equal(telemetry.activeRenderDurationP95Ms, 5);
+  assert.equal(telemetry.activeRenderDurationMaxMs, 20);
+  assert.equal(telemetry.activeRenderSampleSize, 60);
+  assert.equal(telemetry.activeRenderSequence, 1);
+
+  recordActiveGraphRenderSample(window, telemetry, 5000, 5, false);
+  assert.equal(recordActiveGraphRenderSample(window, telemetry, 6000, 5, true), false);
+  assert.equal(recordActiveGraphRenderSample(window, telemetry, 6016.7, 5, true), false);
+  assert.equal(telemetry.activeRenderSequence, 1);
 });
 
 test('worker simulation protocol validates and unpacks transferable positions', async () => {

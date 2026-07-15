@@ -713,6 +713,7 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     const app = this.app;
     if (!app || this.disposed) return false;
 
+    const frameStartedAt = performance.now();
     this.frameNumber += 1;
     if (this.width !== frame.width || this.height !== frame.height || this.dpr !== frame.dpr) {
       this.width = frame.width;
@@ -726,28 +727,45 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     if (this.topologyNodes !== frame.nodes || this.topologyLinks !== frame.links) {
       if (!this.reuseEquivalentTopology(frame)) this.resetTopology(frame);
     }
+    const topologyCompletedAt = performance.now();
 
     const bounds = getPaddedViewportWorldBounds(frame.width, frame.height, frame.viewport);
     const visibleNodes = querySpatialIndex(frame.spatialIndex, bounds);
     const visibleNodeIds = new Set<string>();
     for (const node of visibleNodes) visibleNodeIds.add(node.id);
+    const cullingCompletedAt = performance.now();
     this.materializeNodes(frame, visibleNodes);
     this.materializeLinks(frame);
+    const materializationCompletedAt = performance.now();
 
     this.world.position.set(frame.viewport.x, frame.viewport.y);
     this.world.scale.set(frame.viewport.scale);
     const visibleLinks = this.updateLinkViews(frame);
+    const linksCompletedAt = performance.now();
     const visibleNodeCount = this.updateNodeViews(frame, visibleNodeIds);
+    const nodesCompletedAt = performance.now();
     const visibleLabels = this.updateLabelViews(frame, visibleNodes);
+    const labelsCompletedAt = performance.now();
 
     app.render();
+    const submittedAt = performance.now();
     this.stats = {
       materializedNodes: this.nodeViews.size,
       materializedLinks: this.linkViews.size,
       materializedLabels: this.labelViews.size,
       visibleNodes: visibleNodeCount,
       visibleLinks,
-      visibleLabels
+      visibleLabels,
+      lastFrameProfile: {
+        topologyMs: topologyCompletedAt - frameStartedAt,
+        cullingMs: cullingCompletedAt - topologyCompletedAt,
+        materializationMs: materializationCompletedAt - cullingCompletedAt,
+        linksMs: linksCompletedAt - materializationCompletedAt,
+        nodesMs: nodesCompletedAt - linksCompletedAt,
+        labelsMs: labelsCompletedAt - nodesCompletedAt,
+        submitMs: submittedAt - labelsCompletedAt,
+        totalMs: submittedAt - frameStartedAt
+      }
     };
     return true;
   }

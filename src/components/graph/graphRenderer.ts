@@ -1,6 +1,6 @@
 import type { GraphLink, GraphNode, GraphPreset, GraphTheme } from './types';
 import type { Viewport } from './graphMath';
-import type { GraphRendererMode } from './graphRuntime';
+import type { GraphRendererFrameProfile, GraphRendererMode } from './graphRuntime';
 import type { GraphSpatialIndex } from './spatialIndex';
 import { drawGraph } from './canvasRenderer';
 
@@ -13,6 +13,7 @@ export interface GraphRendererStats {
   visibleNodes: number;
   visibleLinks: number;
   visibleLabels: number;
+  lastFrameProfile?: GraphRendererFrameProfile;
 }
 
 export interface GraphRenderFrame {

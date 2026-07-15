@@ -489,7 +489,30 @@ export function DebugControlPanel({
           </div>
         </div>
 
-        <div className="p-4 bg-gray-950 border border-gray-850 rounded-xl space-y-3 font-mono text-[11px]">
+        <div
+          className="p-4 bg-gray-950 border border-gray-850 rounded-xl space-y-3 font-mono text-[11px]"
+          data-testid="runtime-performance-telemetry"
+          data-active-render-fps={runtimeTelemetry.activeRenderFps}
+          data-active-render-interval-p95-ms={runtimeTelemetry.activeRenderIntervalP95Ms}
+          data-active-render-duration-p50-ms={runtimeTelemetry.activeRenderDurationP50Ms}
+          data-active-render-duration-p95-ms={runtimeTelemetry.activeRenderDurationP95Ms}
+          data-active-render-duration-max-ms={runtimeTelemetry.activeRenderDurationMaxMs}
+          data-active-render-sample-size={runtimeTelemetry.activeRenderSampleSize}
+          data-active-render-window-ms={runtimeTelemetry.activeRenderWindowMs}
+          data-active-render-sequence={runtimeTelemetry.activeRenderSequence}
+          data-last-frame-cpu-ms={runtimeTelemetry.lastFrameCpuDurationMs}
+          data-last-pre-renderer-ms={runtimeTelemetry.lastPreRendererDurationMs}
+          data-last-spatial-index-ms={runtimeTelemetry.lastSpatialIndexDurationMs}
+          data-last-label-visibility-ms={runtimeTelemetry.lastLabelVisibilityDurationMs}
+          data-profile-topology-ms={runtimeTelemetry.lastRendererProfile?.topologyMs ?? 0}
+          data-profile-culling-ms={runtimeTelemetry.lastRendererProfile?.cullingMs ?? 0}
+          data-profile-materialization-ms={runtimeTelemetry.lastRendererProfile?.materializationMs ?? 0}
+          data-profile-links-ms={runtimeTelemetry.lastRendererProfile?.linksMs ?? 0}
+          data-profile-nodes-ms={runtimeTelemetry.lastRendererProfile?.nodesMs ?? 0}
+          data-profile-labels-ms={runtimeTelemetry.lastRendererProfile?.labelsMs ?? 0}
+          data-profile-submit-ms={runtimeTelemetry.lastRendererProfile?.submitMs ?? 0}
+          data-profile-total-ms={runtimeTelemetry.lastRendererProfile?.totalMs ?? 0}
+        >
           <h3 className="text-[10px] font-bold text-gray-500 tracking-wider uppercase border-b border-gray-850 pb-1.5">
             Network Telemetry Logs
           </h3>

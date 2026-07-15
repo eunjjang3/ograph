@@ -315,6 +315,39 @@ spike. Stage 7 remains intentionally unchecked because Canvas fallback,
 packaged Worker assets, cold-start UX policy, and production-default promotion
 still require a separate explicit decision.
 
+## Goal: Active-work telemetry and no-UX optimization follow-up
+
+- [x] Stage 8: Make frame and graph-draw telemetry internally consistent
+  - Branch: `feat/obsidian-graph-harness-spike`
+  - Verification: `npm run lint && npm run test`
+  - Docs: `docs/debug-harness.md`
+  - Commit: `<pending>`
+- [ ] Stage 9: Profile the fixed 10k Pixi/Worker active window and remove one low-risk hot-path waste
+  - Branch: `feat/obsidian-graph-harness-spike`
+  - Verification: fixed-seed 10k browser A/B plus targeted unit tests
+  - Docs: `docs/debug-harness.md`, `docs/architecture.md`
+  - Commit: `<pending>`
+- [ ] Stage 10: Prove public API, visual, interaction, package, and consumer compatibility
+  - Branch: `feat/obsidian-graph-harness-spike`
+  - Verification: full repository and packed-consumer gate
+  - Docs: `todo.md`, relevant architecture/debug notes
+  - Commit: `<pending>`
+
+The graph surface, controls, pointer behavior, public props/refs/callbacks, and
+production Canvas/Main default are frozen for this follow-up. New measurements
+must remain debug-only and visually inert. Optimization candidates are retained
+only when the same active-work window improves without changing graph output or
+interaction semantics.
+
+Stage 8 fixed the resumed-tab window mismatch and added invisible active-draw
+and renderer-phase attributes. In the fixed 10,000-node / 17,500-link full-view
+Pixi/Worker baseline, six active windows measured `60.0-60.1` graph draws/s,
+`17.1-17.5ms` draw-interval p95, `9.3-9.7ms` full-frame CPU p50,
+`10.6-11.1ms` full-frame CPU p95, and `11.2-12.4ms` max. Last-frame phase
+samples attributed roughly `1.0-1.3ms` to spatial-index rebuild, `1.8-2.3ms`
+to Pixi culling/visible-ID preparation, `2.1-2.3ms` to links, `2.3-2.9ms` to
+nodes, and `1.1-1.4ms` to Pixi command submission.
+
 ## Stop conditions
 
 Stop the spike and report rather than silently widening scope when:
