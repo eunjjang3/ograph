@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { GraphView } from '../GraphView';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DebugGraphView } from '../GraphView';
 import type { GraphViewRef } from '../GraphView';
 import { Activity, ShieldAlert } from 'lucide-react';
 import { DebugControlPanel } from './DebugControlPanel';
@@ -7,6 +7,9 @@ import { useDebugGraphPreset } from './useDebugGraphPreset';
 import { useDebugGraphState } from './useDebugGraphState';
 import { useFpsCounter } from './useFpsCounter';
 import { getGraphDragPhysicsForMode } from '../useGraphSimulation';
+import { createGraphRuntimeTelemetry } from '../graphRuntime';
+import type { GraphRuntimeOptions, GraphRuntimeTelemetryRef } from '../graphRuntime';
+import { useDebugRuntimeTelemetry } from './useDebugRuntimeTelemetry';
 
 const CONTROL_HINTS = [
   'Drag Node to slide physics anchors',
@@ -28,6 +31,15 @@ export function GraphDebugHarness() {
   const graphState = useDebugGraphState();
   const graphPreset = useDebugGraphPreset(graphState.localDepth);
   const frameTelemetry = useFpsCounter();
+  const runtimeTelemetryRef = useRef<GraphRuntimeTelemetryRef>({
+    current: createGraphRuntimeTelemetry()
+  });
+  const runtimeOptions = useMemo<GraphRuntimeOptions>(() => ({
+    renderer: 'canvas2d',
+    simulation: 'main',
+    telemetryRef: runtimeTelemetryRef.current
+  }), []);
+  const runtimeTelemetry = useDebugRuntimeTelemetry(runtimeTelemetryRef.current);
   const [zoomScale, setZoomScale] = useState<number>(0.8);
   const [dragTelemetry, setDragTelemetry] = useState<DragTelemetry>({
     phase: 'idle',
@@ -109,7 +121,7 @@ export function GraphDebugHarness() {
         </div>
 
         <div className="flex-1 rounded-2xl bg-[#121217] border border-gray-850 overflow-hidden relative shadow-2xl shadow-black/80">
-          <GraphView
+          <DebugGraphView
             ref={graphViewRef}
             nodes={graphState.originalNodes}
             links={graphState.originalLinks}
@@ -120,6 +132,7 @@ export function GraphDebugHarness() {
             localDepth={graphState.localDepth}
             preset={graphPreset.finalPreset}
             theme={graphPreset.finalTheme}
+            runtimeOptions={runtimeOptions}
             onNodeClick={(n) => {
               graphState.setSelectedNodeId(n.id);
             }}
@@ -191,6 +204,7 @@ export function GraphDebugHarness() {
         selectedNodeId={graphState.selectedNodeId}
         reactRenderCount={reactRenderCounterRef.current}
         frameTelemetry={frameTelemetry}
+        runtimeTelemetry={runtimeTelemetry}
         dragTelemetry={dragTelemetry}
         dragPhysics={dragPhysics}
         onRandomizeSeed={graphState.randomizeSeed}

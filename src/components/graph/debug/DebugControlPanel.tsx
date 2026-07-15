@@ -4,6 +4,7 @@ import type { GraphDragPhysicsOptions } from '../useGraphSimulation';
 import type { DebugGraphMode } from './useDebugGraphState';
 import type { DebugPresetConfig } from './mockGraphPresets';
 import type { FrameTelemetry } from './useFpsCounter';
+import type { GraphRuntimeTelemetry } from '../graphRuntime';
 import { RotateCcw, Maximize2, Sliders, Info } from 'lucide-react';
 
 const debugSuiteVersion = import.meta.env.VITE_OGRAPH_VERSION ?? '0.1.0';
@@ -58,6 +59,7 @@ interface DebugControlPanelProps {
   selectedNodeId: string | null;
   reactRenderCount: number;
   frameTelemetry: FrameTelemetry;
+  runtimeTelemetry: GraphRuntimeTelemetry;
   dragTelemetry: DebugDragTelemetry;
   dragPhysics: GraphDragPhysicsOptions;
   onRandomizeSeed: () => void;
@@ -103,6 +105,7 @@ export function DebugControlPanel({
   selectedNodeId,
   reactRenderCount,
   frameTelemetry,
+  runtimeTelemetry,
   dragTelemetry,
   dragPhysics,
   onRandomizeSeed,
@@ -441,6 +444,12 @@ export function DebugControlPanel({
             <div>Frame p95: <span className="text-amber-300 font-bold">{frameTelemetry.frameIntervalP95Ms.toFixed(1)}ms</span></div>
             <div>&gt;16.7ms: <span className="text-orange-300 font-bold">{frameTelemetry.longFramesOver16Ms}</span></div>
             <div>&gt;33.3ms: <span className="text-rose-300 font-bold">{frameTelemetry.longFramesOver33Ms}</span></div>
+            <div>Renderer: <span className="text-violet-300 font-bold">{runtimeTelemetry.renderer}</span></div>
+            <div>Simulation: <span className="text-violet-300 font-bold">{runtimeTelemetry.simulation}</span></div>
+            <div>Graph Draws: <span className="text-emerald-300 font-bold">{runtimeTelemetry.renderCount}</span></div>
+            <div>Last Draw CPU: <span className="text-emerald-300 font-bold">{runtimeTelemetry.lastRenderDurationMs.toFixed(2)}ms</span></div>
+            <div>Simulation Updates: <span className="text-cyan-300 font-bold">{runtimeTelemetry.simulationUpdateCount}</span></div>
+            <div>Materialized Labels: <span className="text-cyan-300 font-bold">{runtimeTelemetry.materializedLabels}</span></div>
             <div>Drag Phase: <span className="text-amber-300 font-bold">{dragTelemetry.phase}</span></div>
             <div>Drag Events: <span className="text-amber-300 font-bold">{dragTelemetry.eventCount}</span></div>
             <div>Drag Alpha Start: <span className="text-cyan-300 font-bold">{dragPhysics.startAlphaTarget.toFixed(2)}</span></div>

@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
-import type { Simulation } from 'd3-force';
 import type { GraphLink, GraphNode, GraphPreset, GraphTheme } from './types';
 import { resolveLabelVisibilityTarget, type Viewport } from './graphMath';
-import { drawGraph, resolveLabelRenderBudget } from './canvasRenderer';
+import { resolveLabelRenderBudget } from './canvasRenderer';
 import { getFocusedNeighborSet } from './graphIndexes';
 import { buildSpatialIndex, type GraphSpatialIndex } from './spatialIndex';
+import type { GraphRendererBackend } from './graphRenderer';
+import type { GraphRuntimeTelemetryRef } from './graphRuntime';
+import type { GraphSimulationActivity } from './useGraphSimulation';
 
 const VIEWPORT_SMOOTHING = 18;
 const DIMMING_SMOOTHING = 14;
@@ -14,7 +16,11 @@ const LENS_VISIBILITY_SMOOTHING = 14;
 const ANIMATION_EPSILON = 0.001;
 
 type CurrentRef<T> = { current: T };
-type SimulationActivitySnapshot = Pick<Simulation<GraphNode, GraphLink>, 'alpha' | 'alphaMin'>;
+type D3SimulationActivitySnapshot = {
+  alpha: () => number;
+  alphaMin: () => number;
+};
+type SimulationActivitySnapshot = D3SimulationActivitySnapshot | GraphSimulationActivity;
 
 interface UseGraphRenderLoopParams {
   canvasRef: RefObject<HTMLCanvasElement | null>;
@@ -23,7 +29,9 @@ interface UseGraphRenderLoopParams {
   drawFrameRef: CurrentRef<(timestamp: number) => void>;
   scheduleFrame: () => void;
   requestRender: () => void;
-  simulationRef: CurrentRef<Simulation<GraphNode, GraphLink> | null>;
+  simulationActivityRef: CurrentRef<GraphSimulationActivity | null>;
+  rendererBackendRef: CurrentRef<GraphRendererBackend | null>;
+  runtimeTelemetryRef?: GraphRuntimeTelemetryRef;
   renderNodesRef: CurrentRef<GraphNode[]>;
   renderLinksRef: CurrentRef<GraphLink[]>;
   neighborsMapRef: CurrentRef<Map<string, Set<string>>>;
@@ -61,7 +69,13 @@ export function isGraphSimulationActiveForFrame(
   simulation: SimulationActivitySnapshot | null,
   simulationPaused: boolean
 ): boolean {
-  return !simulationPaused && !!simulation && simulation.alpha() > simulation.alphaMin();
+  if (simulationPaused || !simulation) return false;
+
+  if ('isActive' in simulation) {
+    return simulation.isActive();
+  }
+
+  return simulation.alpha() > simulation.alphaMin();
 }
 
 export function useGraphRenderLoop({
@@ -71,7 +85,9 @@ export function useGraphRenderLoop({
   drawFrameRef,
   scheduleFrame,
   requestRender,
-  simulationRef,
+  simulationActivityRef,
+  rendererBackendRef,
+  runtimeTelemetryRef,
   renderNodesRef,
   renderLinksRef,
   neighborsMapRef,
@@ -129,10 +145,7 @@ export function useGraphRenderLoop({
         const { dpr, width: dw, height: dh } = canvasSizeRef.current;
         if (dw === 0 || dh === 0 || dpr === 0) return;
 
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        const simulation = simulationRef.current;
+        const simulation = simulationActivityRef.current;
         const isSimulationActive = isGraphSimulationActiveForFrame(simulation, simulationPaused);
         const renderNodes = renderNodesRef.current;
         const renderLinks = renderLinksRef.current;
@@ -302,32 +315,39 @@ export function useGraphRenderLoop({
           isInteractionFrame
         );
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.save();
-        try {
-          ctx.scale(dpr, dpr);
-
-          drawGraph(
-            ctx,
-            dw,
-            dh,
-            renderNodes,
-            renderLinks,
-            viewportRef.current,
+        const rendererBackend = rendererBackendRef.current;
+        if (rendererBackend) {
+          const renderStartedAt = performance.now();
+          const rendered = rendererBackend.render({
+            width: dw,
+            height: dh,
+            dpr,
+            nodes: renderNodes,
+            links: renderLinks,
+            viewport: viewportRef.current,
             theme,
             preset,
-            renderSelectedId,
-            renderHoveredId,
+            selectedNodeId: renderSelectedId,
+            hoveredNodeId: renderHoveredId,
             rootNodeId,
-            activeNeighbors,
-            dimProgressRef.current,
-            visibleLabelIds,
+            neighbors: activeNeighbors,
+            dimProgress: dimProgressRef.current,
+            labelVisibilityByNodeId: visibleLabelIds,
             lensVisibilityByNodeId,
-            spatialIndexRef.current,
+            spatialIndex: spatialIndexRef.current,
             labelRenderBudget
-          );
-        } finally {
-          ctx.restore();
+          });
+
+          if (rendered && runtimeTelemetryRef) {
+            const telemetry = runtimeTelemetryRef.current;
+            telemetry.renderer = rendererBackend.kind;
+            telemetry.renderCount += 1;
+            telemetry.lastRenderDurationMs = performance.now() - renderStartedAt;
+            telemetry.lastRenderAt = performance.now();
+            telemetry.materializedNodes = renderNodes.length;
+            telemetry.materializedLinks = renderLinks.length;
+            telemetry.materializedLabels = visibleLabelIds.size;
+          }
         }
       }
 
@@ -346,7 +366,7 @@ export function useGraphRenderLoop({
         lastFrameTimeRef.current = null;
         renderRequestedRef.current = false;
         viewportAnimationActiveRef.current = false;
-        simulationRef.current?.stop();
+        simulationActivityRef.current?.stop();
 
         if (onErrorRef.current) {
           onErrorRef.current(toGraphError(caught));
@@ -365,7 +385,9 @@ export function useGraphRenderLoop({
     drawFrameRef,
     scheduleFrame,
     requestRender,
-    simulationRef,
+    simulationActivityRef,
+    rendererBackendRef,
+    runtimeTelemetryRef,
     renderNodesRef,
     renderLinksRef,
     neighborsMapRef,

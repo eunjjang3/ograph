@@ -28,6 +28,7 @@ It is not part of the production package API. Consumers should not import anythi
 | `useDebugGraphState.ts` | Generated graph data, local/global mode state, root selection, selected/hovered node state, and active element counts. |
 | `useDebugGraphPreset.ts` | Debug preset selection, force/style slider state, and derived graph preset/theme values. |
 | `useFpsCounter.ts` | Rolling requestAnimationFrame FPS, p50/p95 interval, and long-frame telemetry for repeatable stress comparisons. |
+| `useDebugRuntimeTelemetry.ts` | Samples renderer, simulation, draw-duration, update-count, and materialization counters without putting hot-path state in React. |
 | `generateMockGraphData.ts` | Deterministic graph generator for typed nodes, groups, attachments, unresolved references, hubs, communities, and links. |
 | `mockGraphPresets.ts` | Debug-only visual theme and force preset options. |
 
@@ -94,6 +95,10 @@ The harness displays:
 - estimated FPS,
 - rolling p50 and p95 requestAnimationFrame interval,
 - sampled frames over the 16.7ms and 33.3ms budgets,
+- active private renderer and simulation lane,
+- graph draw count and last graph draw CPU duration,
+- simulation update count,
+- materialized label count,
 - current zoom multiplier,
 - visible node and link counts,
 - active simulated node and link counts, including the hidden local-lens halo,

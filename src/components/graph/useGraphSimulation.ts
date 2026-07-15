@@ -14,6 +14,7 @@ import type { GraphNode, GraphLink, GraphPreset, GraphViewMode } from './types';
 import { getNodeRadius } from './graphMath';
 import { getLinkId } from './localGraph';
 import { buildGraphIndexes } from './graphIndexes';
+import type { GraphRuntimeTelemetryRef, GraphSimulationMode } from './graphRuntime';
 
 interface ExtendedSimulationNode extends SimulationNodeDatum, GraphNode {}
 interface ExtendedSimulationLink extends SimulationLinkDatum<ExtendedSimulationNode> {
@@ -79,7 +80,14 @@ export interface GraphSimulationOptions {
   gravityCenterNodeIds?: ReadonlySet<string>;
   dragPhysics?: Partial<GraphDragPhysicsOptions>;
   paused?: boolean;
+  engine?: GraphSimulationMode;
+  runtimeTelemetryRef?: GraphRuntimeTelemetryRef;
   onError?: (error: Error) => void;
+}
+
+export interface GraphSimulationActivity {
+  isActive: () => boolean;
+  stop: () => void;
 }
 
 function toGraphError(caught: unknown): Error {
@@ -260,9 +268,28 @@ export function useGraphSimulation(
     gravityCenterNodeIds,
     dragPhysics: dragPhysicsOptions,
     paused = false,
+    engine = 'main',
+    runtimeTelemetryRef,
     onError
   } = options;
   const simulationRef = useRef<Simulation<ExtendedSimulationNode, ExtendedSimulationLink> | null>(null);
+  const engineRef = useRef(engine);
+  engineRef.current = engine;
+  const workerActiveRef = useRef(false);
+  const simulationActivityRef = useRef<GraphSimulationActivity>({
+    isActive: () => {
+      if (engineRef.current === 'worker') {
+        return workerActiveRef.current;
+      }
+
+      const simulation = simulationRef.current;
+      return !!simulation && simulation.alpha() > simulation.alphaMin();
+    },
+    stop: () => {
+      workerActiveRef.current = false;
+      simulationRef.current?.stop();
+    }
+  });
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
   const onErrorRef = useRef(onError);
@@ -429,6 +456,11 @@ export function useGraphSimulation(
   }, []);
 
   useEffect(() => {
+    if (engine !== 'main') {
+      releaseSimulationResources();
+      return;
+    }
+
     try {
       const currentSimulationNodes = latestSimulationNodesRef.current;
       const currentSimulationLinks = latestSimulationLinksRef.current;
@@ -509,6 +541,11 @@ export function useGraphSimulation(
 
       sim.on('tick', () => {
         try {
+          if (runtimeTelemetryRef) {
+            runtimeTelemetryRef.current.simulation = 'main';
+            runtimeTelemetryRef.current.simulationUpdateCount += 1;
+            runtimeTelemetryRef.current.lastSimulationUpdateAt = performance.now();
+          }
           onTickRef.current?.();
         } catch (caught) {
           reportSimulationError(caught);
@@ -525,6 +562,7 @@ export function useGraphSimulation(
     }
   }, [
     topologySignature,
+    engine,
     chargeStrength,
     linkDistance,
     nodeRadius,
@@ -536,6 +574,8 @@ export function useGraphSimulation(
     gravityCenterNodeIdsSignature,
     graphRefreshAlpha,
     preserveScopeCentroid,
+    runtimeTelemetryRef,
+    releaseSimulationResources,
     markPayloadSyncedForLatestInputs,
     reportSimulationError,
     syncLatestRenderGraphRefs,
@@ -543,6 +583,8 @@ export function useGraphSimulation(
   ]);
 
   useEffect(() => {
+    if (engine !== 'main') return;
+
     try {
       const syncedInputs = payloadSyncedInputsRef.current;
       if (
@@ -574,6 +616,7 @@ export function useGraphSimulation(
     }
   }, [
     simulationNodes,
+    engine,
     renderNodes,
     renderLinks,
     nodeRadius,
@@ -585,6 +628,8 @@ export function useGraphSimulation(
   ]);
 
   useEffect(() => {
+    if (engine !== 'main') return;
+
     const simulation = simulationRef.current;
     if (!simulation) return;
 
@@ -593,7 +638,7 @@ export function useGraphSimulation(
     } else if (simulation.alpha() > simulation.alphaMin()) {
       simulation.restart();
     }
-  }, [paused]);
+  }, [engine, paused]);
 
   useEffect(() => {
     return () => {
@@ -603,6 +648,7 @@ export function useGraphSimulation(
 
   // Node Dragging Physics Control
   const dragStart = useCallback((nodeId: string) => {
+    if (engineRef.current !== 'main') return;
     if (!simulationRef.current) return;
 
     if (!pausedRef.current && dragPhysics.startAlphaTarget > 0) {
@@ -617,6 +663,7 @@ export function useGraphSimulation(
   }, [dragPhysics.startAlphaTarget]);
 
   const dragMove = useCallback((nodeId: string, worldX: number, worldY: number) => {
+    if (engineRef.current !== 'main') return;
     const targetNode = nodeByIdRef.current.get(nodeId);
     if (!targetNode) return;
 
@@ -689,6 +736,7 @@ export function useGraphSimulation(
   }, [dragPhysics.moveAlphaTarget, dragPhysics.wakeConnectedNodes]);
 
   const dragEnd = useCallback((nodeId: string) => {
+    if (engineRef.current !== 'main') return;
     if (!simulationRef.current) return;
     simulationRef.current.alphaTarget(0); // return to normal decay
     
@@ -700,6 +748,7 @@ export function useGraphSimulation(
   }, []);
 
   const restartSimulation = useCallback(() => {
+    if (engineRef.current !== 'main') return;
     if (simulationRef.current) {
       simulationRef.current.alpha(1);
 
@@ -713,6 +762,7 @@ export function useGraphSimulation(
 
   return {
     simulationRef,
+    simulationActivityRef,
     activeNodesRef,
     renderNodesRef,
     renderLinksRef,

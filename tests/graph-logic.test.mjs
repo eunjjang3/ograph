@@ -227,6 +227,25 @@ test('debug frame telemetry summarizes percentiles and long-frame budgets', asyn
   });
 });
 
+test('private graph runtime telemetry starts in a deterministic empty state', async () => {
+  const { createGraphRuntimeTelemetry } = await importSourceModule(
+    'src/components/graph/graphRuntime.ts'
+  );
+
+  assert.deepEqual(createGraphRuntimeTelemetry('pixi', 'worker'), {
+    renderer: 'pixi',
+    simulation: 'worker',
+    renderCount: 0,
+    lastRenderDurationMs: 0,
+    lastRenderAt: 0,
+    simulationUpdateCount: 0,
+    lastSimulationUpdateAt: 0,
+    materializedNodes: 0,
+    materializedLinks: 0,
+    materializedLabels: 0
+  });
+});
+
 test('buildLocalGraphScope keeps one hidden physics halo and merges transition scopes', async () => {
   const {
     buildLocalGraphScope,

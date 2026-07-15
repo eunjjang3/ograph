@@ -40,18 +40,27 @@ flowchart TD
   View --> Scheduler["useGraphFrameScheduler"]
   View --> DrawLoop["useGraphRenderLoop"]
   View --> Simulation["useGraphSimulation"]
+  View --> RendererBackend["private renderer backend"]
   Lens --> Simulation
   Lens --> DrawLoop
   Simulation --> D3["d3-force simulation"]
   D3 --> Scheduler
   Scheduler --> DrawLoop
-  DrawLoop --> Renderer["canvasRenderer.drawGraph"]
+  DrawLoop --> RendererBackend
+  RendererBackend --> Renderer["canvasRenderer.drawGraph"]
   Input --> HitTest["hitTest.findNodeAtPosition"]
   Input --> Viewport
   Input --> Drag["simulation drag controls"]
 ```
 
 `GraphView` composes focused hooks for canvas sizing, viewport control, pointer interaction, frame scheduling, render-loop animation, and simulation. Those hooks keep hot-path state in refs so high-frequency pointer and animation paths do not force React renders on every frame.
+
+The render loop and simulation are connected through private backend/activity
+interfaces. The package-facing `GraphView` always chooses Canvas 2D plus the
+main-thread simulation; the debug harness can inject experimental lanes through
+`DebugGraphView`, which is deliberately absent from `index.ts`. This keeps
+renderer and worker choices out of `GraphViewProps`, `GraphViewRef`, and the
+published runtime/type entry points.
 
 ## Core Files
 
@@ -65,6 +74,9 @@ flowchart TD
 | `useViewportControls.ts` | Viewport refs, fit-to-view, reset, immediate viewport updates, and animated viewport targets. |
 | `useGraphFrameScheduler.ts` | Shared requestAnimationFrame scheduling and render request state. |
 | `useGraphRenderLoop.ts` | Canvas draw-loop callback, focus and lens visibility animation, viewport easing, label animation, and spatial-index refresh. |
+| `graphRenderer.ts` | Private renderer frame contract and Canvas 2D backend adapter. |
+| `graphRuntime.ts` | Internal renderer/simulation lane names and debug telemetry contract. |
+| `useGraphRendererBackend.ts` | Renderer initialization, disposal, async error routing, and dirty-frame wake-up. |
 | `useGraphPointerInteractions.ts` | Pointer capture, pan, node drag, hover hit testing, click/double-click handling, wheel zoom, and touch pinch zoom. |
 | `useGraphSimulation.ts` | Persistent d3-force setup, graph indexes, degree calculation, cached layout positions, scoped force refresh, drag physics, and simulation restart. |
 | `useGraphLensScope.ts` | Global/local lens scope derivation, render-only transition union, and hidden physics halo scope. |
@@ -102,7 +114,7 @@ Rendering is canvas-based and happens outside the React tree:
 2. Required outer-container, canvas, touch-action, and tooltip styles are applied inline so package consumers do not need Tailwind CSS or a package stylesheet for core graph behavior.
 3. The canvas backing store is sized in physical pixels using a sanitized `devicePixelRatio`; invalid DPR falls back to `1`, and invalid CSS dimensions are clamped before writing canvas sizes.
 4. The visible canvas size remains in CSS pixels.
-5. A draw frame clears the canvas, scales the drawing context by DPR, and passes CSS-pixel dimensions into `drawGraph`.
+5. A draw frame passes a renderer-neutral frame snapshot to the selected private backend. The production Canvas backend clears the canvas, scales the drawing context by DPR, and passes CSS-pixel dimensions into `drawGraph`.
 6. The draw loop refreshes the uniform-grid spatial index only when simulation ticks can move nodes, render-node arrays change, or a render is explicitly requested after graph data changes.
 7. `drawGraph` computes an 80 CSS-pixel padded viewport, queries the current spatial index, and applies graph viewport translation and zoom.
 8. Visible links and nodes are grouped into canvas path batches; labels draw last.

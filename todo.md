@@ -96,7 +96,7 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
 
 ## Stages
 
-- [ ] Stage 1: Lock the baseline and add debug-only performance telemetry
+- [x] Stage 1: Lock the baseline and add debug-only performance telemetry
   - Branch: `feat/obsidian-graph-harness-spike`
   - Likely files: `src/components/graph/debug/*`, `docs/debug-harness.md`,
     targeted graph-logic tests
@@ -104,14 +104,15 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
     telemetry without changing production rendering
   - Verification: `npm run lint`, `npm run test`, targeted harness browser run
   - Docs: `docs/debug-harness.md`
-  - Commit: `<pending>`
+  - Commit: `b45c8a2`
 
 - [ ] Stage 2: Introduce private renderer/simulation seams with baseline parity
   - Branch: `feat/obsidian-graph-harness-spike`
   - Likely files: `GraphView.tsx`, `useGraphRenderLoop.ts`,
     `useGraphSimulation.ts`, new internal runtime/backend modules, debug harness
-  - Deliverable: debug-only runtime selector; the public `GraphView` remains
-    wired to Canvas 2D plus main-thread simulation
+  - Deliverable: private runtime seam and telemetry; the public `GraphView`
+    remains wired to Canvas 2D plus main-thread simulation. The selector is
+    enabled as the experimental lanes land in Stages 3 and 4.
   - Verification: API-surface tests, graph-logic tests, packed React 18/19
     consumer compilation, current browser interaction/visual suite
   - Docs: `docs/architecture.md`, `docs/debug-harness.md`
