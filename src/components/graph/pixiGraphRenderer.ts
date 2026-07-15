@@ -304,6 +304,10 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
   }
 
   private materializeLinks(frame: GraphRenderFrame) {
+    // pendingLinks empties only after every topology link owns a retained view.
+    // Avoid rescanning the complete settled topology on every active frame.
+    if (this.pendingLinks.length === 0) return;
+
     let remaining = LINK_MATERIALIZATION_BUDGET;
     const bounds = getPaddedViewportWorldBounds(frame.width, frame.height, frame.viewport);
 
