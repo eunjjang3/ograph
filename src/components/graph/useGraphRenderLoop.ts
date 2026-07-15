@@ -350,6 +350,15 @@ export function useGraphRenderLoop({
             telemetry.materializedNodes = renderNodes.length;
             telemetry.materializedLinks = renderLinks.length;
             telemetry.materializedLabels = visibleLabelIds.size;
+            const rendererStats = rendererBackend.getStats?.();
+            if (rendererStats) {
+              telemetry.materializedNodes = rendererStats.materializedNodes;
+              telemetry.materializedLinks = rendererStats.materializedLinks;
+              telemetry.materializedLabels = rendererStats.materializedLabels;
+              telemetry.visibleNodes = rendererStats.visibleNodes;
+              telemetry.visibleLinks = rendererStats.visibleLinks;
+              telemetry.visibleLabels = rendererStats.visibleLabels;
+            }
             if (
               telemetry.firstVisibleFrameLatencyMs === 0 &&
               telemetry.runtimeStartedAt > 0 &&
@@ -366,7 +375,8 @@ export function useGraphRenderLoop({
         isDimmingActive ||
         isLensAnimationActive ||
         isLabelAnimationActive ||
-        viewportAnimationActiveRef.current
+        viewportAnimationActiveRef.current ||
+        (__OGRAPH_DEBUG_RUNTIME__ && rendererBackendRef.current?.hasPendingWork?.())
       ) {
         scheduleFrame();
       } else {

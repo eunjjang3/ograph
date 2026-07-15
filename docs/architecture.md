@@ -74,7 +74,9 @@ published runtime/type entry points.
 | `useViewportControls.ts` | Viewport refs, fit-to-view, reset, immediate viewport updates, and animated viewport targets. |
 | `useGraphFrameScheduler.ts` | Shared requestAnimationFrame scheduling and render request state. |
 | `useGraphRenderLoop.ts` | Canvas draw-loop callback, focus and lens visibility animation, viewport easing, label animation, and spatial-index refresh. |
-| `graphRenderer.ts` | Private renderer frame contract and Canvas 2D backend adapter. |
+| `graphRenderer.ts` | Private renderer frame contract, Canvas 2D adapter, and lazy debug Pixi loader. |
+| `pixiGraphRenderer.ts` | Debug-only imperative Pixi WebGL backend with retained geometry, culling, and bounded text objects. |
+| `pixiGraphPlanning.ts` | Pure viewport-priority and label-budget planning helpers used by the Pixi backend. |
 | `graphRuntime.ts` | Internal renderer/simulation lane names and debug telemetry contract. |
 | `useGraphRendererBackend.ts` | Renderer initialization, disposal, async error routing, and dirty-frame wake-up. |
 | `useGraphPointerInteractions.ts` | Pointer capture, pan, node drag, hover hit testing, click/double-click handling, wheel zoom, and touch pinch zoom. |
@@ -154,6 +156,35 @@ The Worker URL is created only by the debug harness. Vite defines
 build, allowing Rollup to remove the client import and debug telemetry from the
 consumer entry. The production package therefore has no Worker asset to locate
 or publish during this spike.
+
+### Debug Pixi WebGL renderer lane
+
+The Pixi lane initializes an `Application` asynchronously against the same
+HTML canvas element that `GraphView` already owns. Renderer preference is the
+single-item `['webgl']` list, so the experiment cannot silently turn into a
+Canvas or WebGPU comparison. Pixi's ticker is stopped (`autoStart: false`), and
+Ograph's dirty-frame scheduler calls `app.render()` only for simulation output,
+input, easing, visual transitions, or pending materialization work. Resize and
+DPR changes go through `renderer.resize`; disposal preserves the React-owned
+canvas while releasing the WebGL context and retained children.
+
+Geometry is retained across frames:
+
+- node fill and border objects share unit-circle `GraphicsContext` geometry;
+- every link is a `Texture.WHITE` sprite stretched and rotated between its
+  endpoints;
+- node/link transforms, tint, alpha, and visibility update in place;
+- viewport-prioritized nodes and endpoint-ready links materialize under
+  per-frame budgets;
+- padded viewport culling hides objects before render submission;
+- screen-space text is created lazily, capped at 800 retained objects, and
+  limited to 600 visible labels while idle or 280 during focus/interaction;
+- pointer hit testing remains on Ograph's existing main-thread spatial index,
+  with Pixi event traversal disabled.
+
+`pixi.js` is a development dependency in this harness-first branch. The library
+build compiles the debug flag to `false`, removes the lazy Pixi import, emits no
+Pixi chunk, and keeps the published default on Canvas 2D/Main.
 
 Graph-owned errors report through `onError` in three places: the React error boundary, the requestAnimationFrame draw loop, and simulation setup/tick scheduling. Canvas draw-loop and simulation errors stop the active graph loop before reporting. Consumer callback errors remain consumer-owned and are not converted into graph `onError` events.
 

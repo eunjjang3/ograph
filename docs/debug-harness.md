@@ -36,15 +36,18 @@ It is not part of the production package API. Consumers should not import anythi
 
 ### Runtime Experiment Lane
 
-The internal-only runtime selector currently offers Canvas 2D with either the
-main-thread or Worker d3-force simulation. Switching simulation mode remounts
-the graph canvas, resets runtime counters, and keeps the public package API
-unchanged. The Pixi control remains disabled until the renderer stage lands.
+The internal-only runtime selector offers the complete two-by-two renderer and
+simulation matrix. Switching a lane or deterministic fixture remounts the graph
+canvas and resets runtime counters while keeping the public package API
+unchanged. The harness warms the debug Pixi module in the background so lane
+switch latency primarily measures WebGL initialization rather than chunk load.
 
 | Renderer | Simulation | Use |
 | --- | --- | --- |
 | `Canvas 2D` | `Main Thread` | Original baseline. |
 | `Canvas 2D` | `Worker` | Isolates the benefit of moving d3-force off the main thread. |
+| `Pixi WebGL` | `Main Thread` | Isolates retained/GPU rendering while retaining main-thread force cost. |
+| `Pixi WebGL` | `Worker` | Target Obsidian-style lane. |
 
 ### Mock Generator Setup
 
@@ -112,7 +115,7 @@ The harness displays:
 - simulation update count,
 - age of the latest Worker position result,
 - topology sync duration and first-visible-frame latency,
-- materialized label count,
+- materialized and viewport-visible node/link/label object counts,
 - current zoom multiplier,
 - visible node and link counts,
 - active simulated node and link counts, including the hidden local-lens halo,

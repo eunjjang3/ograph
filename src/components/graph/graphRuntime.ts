@@ -16,6 +16,9 @@ export interface GraphRuntimeTelemetry {
   firstVisibleFrameLatencyMs: number;
   runtimeStartedAt: number;
   workerResultAgeMs: number;
+  visibleNodes: number;
+  visibleLinks: number;
+  visibleLabels: number;
 }
 
 export interface GraphRuntimeTelemetryRef {
@@ -27,6 +30,7 @@ export interface GraphRuntimeOptions {
   simulation: GraphSimulationMode;
   telemetryRef?: GraphRuntimeTelemetryRef;
   createSimulationWorker?: () => Worker;
+  runKey?: string;
 }
 
 export const DEFAULT_GRAPH_RUNTIME_OPTIONS: Readonly<GraphRuntimeOptions> = {
@@ -52,6 +56,9 @@ export function createGraphRuntimeTelemetry(
     topologySyncDurationMs: 0,
     firstVisibleFrameLatencyMs: 0,
     runtimeStartedAt: typeof performance === 'undefined' ? 0 : performance.now(),
-    workerResultAgeMs: 0
+    workerResultAgeMs: 0,
+    visibleNodes: 0,
+    visibleLinks: 0,
+    visibleLabels: 0
   };
 }

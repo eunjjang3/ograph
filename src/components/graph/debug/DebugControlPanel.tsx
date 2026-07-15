@@ -152,23 +152,19 @@ export function DebugControlPanel({
                 Renderer
               </label>
               <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setRendererMode('canvas2d')}
-                  className={`py-1.5 rounded-lg text-xs font-bold uppercase transition-all border ${
-                    rendererMode === 'canvas2d'
-                      ? 'bg-violet-600/20 text-violet-300 border-violet-500/80 shadow'
-                      : 'bg-gray-900/40 text-gray-400 border-transparent'
-                  }`}
-                >
-                  Canvas 2D
-                </button>
-                <button
-                  disabled
-                  title="Enabled in the Pixi stage"
-                  className="py-1.5 rounded-lg text-xs font-bold uppercase border border-transparent bg-gray-900/20 text-gray-600 cursor-not-allowed"
-                >
-                  Pixi (next)
-                </button>
+                {(['canvas2d', 'pixi'] as const).map(renderer => (
+                  <button
+                    key={renderer}
+                    onClick={() => setRendererMode(renderer)}
+                    className={`py-1.5 rounded-lg text-xs font-bold uppercase transition-all border ${
+                      rendererMode === renderer
+                        ? 'bg-violet-600/20 text-violet-300 border-violet-500/80 shadow'
+                        : 'bg-gray-900/40 text-gray-400 border-transparent hover:bg-gray-800/40 hover:text-gray-200'
+                    }`}
+                  >
+                    {renderer === 'canvas2d' ? 'Canvas 2D' : 'Pixi WebGL'}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -515,7 +511,12 @@ export function DebugControlPanel({
             <div>Graph Draws: <span className="text-emerald-300 font-bold">{runtimeTelemetry.renderCount}</span></div>
             <div>Last Draw CPU: <span className="text-emerald-300 font-bold">{runtimeTelemetry.lastRenderDurationMs.toFixed(2)}ms</span></div>
             <div>Simulation Updates: <span className="text-cyan-300 font-bold">{runtimeTelemetry.simulationUpdateCount}</span></div>
+            <div>Materialized Nodes: <span className="text-cyan-300 font-bold">{runtimeTelemetry.materializedNodes}</span></div>
+            <div>Materialized Links: <span className="text-cyan-300 font-bold">{runtimeTelemetry.materializedLinks}</span></div>
             <div>Materialized Labels: <span className="text-cyan-300 font-bold">{runtimeTelemetry.materializedLabels}</span></div>
+            <div>Viewport Nodes: <span className="text-cyan-300 font-bold">{runtimeTelemetry.visibleNodes}</span></div>
+            <div>Viewport Links: <span className="text-cyan-300 font-bold">{runtimeTelemetry.visibleLinks}</span></div>
+            <div>Viewport Labels: <span className="text-cyan-300 font-bold">{runtimeTelemetry.visibleLabels}</span></div>
             <div>Topology Sync: <span className="text-cyan-300 font-bold">{runtimeTelemetry.topologySyncDurationMs.toFixed(2)}ms</span></div>
             <div>First Visible: <span className="text-cyan-300 font-bold">{runtimeTelemetry.firstVisibleFrameLatencyMs.toFixed(1)}ms</span></div>
             <div>Worker Result Age: <span className="text-cyan-300 font-bold">{runtimeTelemetry.workerResultAgeMs.toFixed(1)}ms</span></div>

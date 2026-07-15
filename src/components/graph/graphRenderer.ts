@@ -4,6 +4,17 @@ import type { GraphRendererMode } from './graphRuntime';
 import type { GraphSpatialIndex } from './spatialIndex';
 import { drawGraph } from './canvasRenderer';
 
+declare const __OGRAPH_DEBUG_RUNTIME__: boolean;
+
+export interface GraphRendererStats {
+  materializedNodes: number;
+  materializedLinks: number;
+  materializedLabels: number;
+  visibleNodes: number;
+  visibleLinks: number;
+  visibleLabels: number;
+}
+
 export interface GraphRenderFrame {
   width: number;
   height: number;
@@ -29,11 +40,21 @@ export interface GraphRendererBackend {
   initialize: (canvas: HTMLCanvasElement) => void | Promise<void>;
   render: (frame: GraphRenderFrame) => boolean;
   destroy: () => void;
+  getStats?: () => GraphRendererStats;
+  hasPendingWork?: () => boolean;
 }
 
 class CanvasGraphRendererBackend implements GraphRendererBackend {
   readonly kind = 'canvas2d' as const;
   private canvas: HTMLCanvasElement | null = null;
+  private stats: GraphRendererStats = {
+    materializedNodes: 0,
+    materializedLinks: 0,
+    materializedLabels: 0,
+    visibleNodes: 0,
+    visibleLinks: 0,
+    visibleLabels: 0
+  };
 
   initialize(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -73,11 +94,75 @@ class CanvasGraphRendererBackend implements GraphRendererBackend {
       ctx.restore();
     }
 
+    if (__OGRAPH_DEBUG_RUNTIME__) {
+      this.stats = {
+        materializedNodes: frame.nodes.length,
+        materializedLinks: frame.links.length,
+        materializedLabels: frame.labelVisibilityByNodeId.size,
+        visibleNodes: frame.nodes.length,
+        visibleLinks: frame.links.length,
+        visibleLabels: frame.labelVisibilityByNodeId.size
+      };
+    }
+
     return true;
+  }
+
+  getStats() {
+    return this.stats;
   }
 
   destroy() {
     this.canvas = null;
+  }
+}
+
+class LazyPixiGraphRendererBackend implements GraphRendererBackend {
+  readonly kind = 'pixi' as const;
+  private backend: GraphRendererBackend | null = null;
+  private disposed = false;
+
+  async initialize(canvas: HTMLCanvasElement) {
+    if (!__OGRAPH_DEBUG_RUNTIME__) {
+      throw new Error('Pixi graph rendering is available only in the debug harness.');
+    }
+
+    const { createPixiGraphRendererBackend } = await import('./pixiGraphRenderer');
+    if (this.disposed) return;
+
+    const backend = createPixiGraphRendererBackend();
+    this.backend = backend;
+    await backend.initialize(canvas);
+
+    if (this.disposed) {
+      backend.destroy();
+      this.backend = null;
+    }
+  }
+
+  render(frame: GraphRenderFrame) {
+    return this.backend?.render(frame) ?? false;
+  }
+
+  getStats() {
+    return this.backend?.getStats?.() ?? {
+      materializedNodes: 0,
+      materializedLinks: 0,
+      materializedLabels: 0,
+      visibleNodes: 0,
+      visibleLinks: 0,
+      visibleLabels: 0
+    };
+  }
+
+  hasPendingWork() {
+    return this.backend?.hasPendingWork?.() ?? false;
+  }
+
+  destroy() {
+    this.disposed = true;
+    this.backend?.destroy();
+    this.backend = null;
   }
 }
 
@@ -86,5 +171,9 @@ export function createGraphRendererBackend(kind: GraphRendererMode): GraphRender
     return new CanvasGraphRendererBackend();
   }
 
-  throw new Error('Pixi graph renderer is not initialized in this stage.');
+  if (__OGRAPH_DEBUG_RUNTIME__) {
+    return new LazyPixiGraphRendererBackend();
+  }
+
+  throw new Error('Pixi graph renderer is not available in the production runtime.');
 }

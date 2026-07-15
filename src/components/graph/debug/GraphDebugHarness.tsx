@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DebugGraphView } from '../GraphView';
+import { GraphView } from '../GraphView';
 import type { GraphViewRef } from '../GraphView';
+import type { GraphViewProps } from '../types';
 import { Activity, ShieldAlert } from 'lucide-react';
 import { DebugControlPanel } from './DebugControlPanel';
 import { useDebugGraphPreset } from './useDebugGraphPreset';
@@ -27,6 +28,12 @@ interface DragTelemetry {
   eventCount: number;
 }
 
+const DebugGraphView = GraphView as unknown as (
+  props: GraphViewProps &
+    { runtimeOptions: GraphRuntimeOptions } &
+    React.RefAttributes<GraphViewRef>
+) => React.ReactElement | null;
+
 function createDebugSimulationWorker() {
   return new Worker(new URL('../graphSimulation.worker.ts', import.meta.url), {
     type: 'module',
@@ -43,15 +50,29 @@ export function GraphDebugHarness() {
   const [simulationMode, setSimulationMode] = useState<GraphSimulationMode>('main');
   const runtimeTelemetryRef = useMemo<GraphRuntimeTelemetryRef>(() => ({
     current: createGraphRuntimeTelemetry(rendererMode, simulationMode)
-  }), [rendererMode, simulationMode]);
+  }), [
+    graphState.avgLinks,
+    graphState.nodeCount,
+    graphState.seed,
+    rendererMode,
+    simulationMode
+  ]);
   const runtimeOptions = useMemo<GraphRuntimeOptions>(() => ({
     renderer: rendererMode,
     simulation: simulationMode,
     telemetryRef: runtimeTelemetryRef,
     createSimulationWorker: simulationMode === 'worker'
       ? createDebugSimulationWorker
-      : undefined
-  }), [rendererMode, runtimeTelemetryRef, simulationMode]);
+      : undefined,
+    runKey: `${graphState.nodeCount}:${graphState.avgLinks}:${graphState.seed}`
+  }), [
+    graphState.avgLinks,
+    graphState.nodeCount,
+    graphState.seed,
+    rendererMode,
+    runtimeTelemetryRef,
+    simulationMode
+  ]);
   const runtimeTelemetry = useDebugRuntimeTelemetry(runtimeTelemetryRef);
   const [zoomScale, setZoomScale] = useState<number>(0.8);
   const [dragTelemetry, setDragTelemetry] = useState<DragTelemetry>({
@@ -96,6 +117,12 @@ export function GraphDebugHarness() {
     if (dragFrameRef.current !== null) {
       window.cancelAnimationFrame(dragFrameRef.current);
     }
+  }, []);
+
+  useEffect(() => {
+    // Warm the debug-only renderer chunk while the baseline lane is visible so
+    // lane switching measures WebGL initialization rather than network/module latency.
+    void import('../pixiGraphRenderer');
   }, []);
 
   return (

@@ -248,7 +248,10 @@ test('private graph runtime telemetry starts in a deterministic empty state', as
     topologySyncDurationMs: 0,
     firstVisibleFrameLatencyMs: 0,
     runtimeStartedAt: 0,
-    workerResultAgeMs: 0
+    workerResultAgeMs: 0,
+    visibleNodes: 0,
+    visibleLinks: 0,
+    visibleLabels: 0
   });
 });
 
@@ -376,6 +379,37 @@ test('worker simulation client covers lifecycle, pause, restart, drag, and buffe
   assert.equal(worker.messages.at(-1).message.type, 'dispose');
   assert.equal(worker.terminated, true);
   assert.equal(activeStates.at(-1), false);
+});
+
+test('Pixi planning prioritizes viewport nodes and keeps forced labels over budget', async () => {
+  const {
+    prioritizePixiNodeMaterialization,
+    selectPixiLabelNodeIds
+  } = await importSourceModule('src/components/graph/pixiGraphPlanning.ts');
+  const { buildSpatialIndex } = await importSourceModule('src/components/graph/spatialIndex.ts');
+  const nodes = [
+    { id: 'far', label: 'Far', x: 1000, y: 1000 },
+    { id: 'near-b', label: 'Near B', x: 20, y: 20 },
+    { id: 'near-a', label: 'Near A', x: 0, y: 0 }
+  ];
+  const prioritized = prioritizePixiNodeMaterialization(
+    nodes,
+    buildSpatialIndex(nodes),
+    200,
+    200,
+    { x: 100, y: 100, scale: 1 }
+  );
+
+  assert.deepEqual(prioritized.map(node => node.id), ['near-a', 'near-b', 'far']);
+
+  const selected = selectPixiLabelNodeIds([
+    { id: 'forced-a', inputIndex: 0, visibility: 1, degree: 1, forceVisible: true, isNeighbor: false },
+    { id: 'forced-b', inputIndex: 1, visibility: 1, degree: 1, forceVisible: true, isNeighbor: false },
+    { id: 'neighbor', inputIndex: 2, visibility: 0.2, degree: 1, forceVisible: false, isNeighbor: true },
+    { id: 'degree', inputIndex: 3, visibility: 0.9, degree: 10, forceVisible: false, isNeighbor: false }
+  ], 1);
+
+  assert.deepEqual([...selected], ['forced-a', 'forced-b']);
 });
 
 test('buildLocalGraphScope keeps one hidden physics halo and merges transition scopes', async () => {

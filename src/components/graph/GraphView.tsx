@@ -539,23 +539,6 @@ type GraphViewComponent = (<
 };
 
 /** @internal */
-export type DebugGraphViewProps<
-  NodeMetadata extends GraphNodeMetadata = GraphNodeMetadata,
-  LinkMetadata extends GraphNodeMetadata = GraphNodeMetadata
-> = GraphViewProps<NodeMetadata, LinkMetadata> & {
-  /** Debug-harness-only runtime lane. This type is not exported from the package entry. */
-  runtimeOptions: GraphRuntimeOptions;
-};
-
-type DebugGraphViewComponent = (<
-  NodeMetadata extends GraphNodeMetadata = GraphNodeMetadata,
-  LinkMetadata extends GraphNodeMetadata = GraphNodeMetadata
->(
-  props: DebugGraphViewProps<NodeMetadata, LinkMetadata> & React.RefAttributes<GraphViewRef>
-) => React.ReactElement | null) & {
-  displayName?: string;
-};
-
 type GraphViewRuntimeProps<
   NodeMetadata extends GraphNodeMetadata = GraphNodeMetadata,
   LinkMetadata extends GraphNodeMetadata = GraphNodeMetadata
@@ -606,7 +589,9 @@ function GraphViewInner<
     >
       <GraphErrorBoundary onError={onError}>
         <GraphViewCanvas
-          key={`${runtimeOptions.renderer}:${runtimeOptions.simulation}`}
+          key={`${runtimeOptions.renderer}:${runtimeOptions.simulation}:${
+            __OGRAPH_DEBUG_RUNTIME__ ? runtimeOptions.runKey ?? '' : ''
+          }`}
           {...props}
           ref={ref}
           nodes={normalizedGraph.nodes}
@@ -625,8 +610,3 @@ function GraphViewInner<
 export const GraphView = forwardRef(GraphViewInner) as GraphViewComponent;
 
 GraphView.displayName = 'GraphView';
-
-/** @internal */
-export const DebugGraphView = forwardRef(GraphViewInner) as DebugGraphViewComponent;
-
-DebugGraphView.displayName = 'DebugGraphView';

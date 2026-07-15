@@ -118,7 +118,7 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
   - Docs: `docs/architecture.md`, `docs/debug-harness.md`
   - Commit: `58aae4d`
 
-- [ ] Stage 3: Add a Worker simulation lane to the debug harness
+- [x] Stage 3: Add a Worker simulation lane to the debug harness
   - Branch: `feat/obsidian-graph-harness-spike`
   - Likely files: new simulation worker, worker protocol/adapter, simulation
     integration, debug telemetry, unit tests
@@ -131,7 +131,7 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
   - Verification: protocol tests, pause/restart/drag/unmount tests, 1k/5k/10k
     harness runs, `npm run lint`, `npm run test`
   - Docs: worker lifecycle and packaging notes in `docs/architecture.md`
-  - Commit: `<pending>`
+  - Commit: `c07c0b3`
 
 - [ ] Stage 4: Add a Pixi WebGL renderer lane to the debug harness
   - Branch: `feat/obsidian-graph-harness-spike`
