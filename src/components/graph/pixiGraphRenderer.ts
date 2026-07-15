@@ -4,7 +4,8 @@ import {
   Container,
   Graphics,
   GraphicsContext,
-  Sprite,
+  Particle,
+  ParticleContainer,
   Text,
   Texture
 } from 'pixi.js';
@@ -34,6 +35,8 @@ const MAX_RETAINED_LABELS = 800;
 const MAX_IDLE_LABELS = 600;
 const MAX_INTERACTION_LABELS = 280;
 const ALPHA_EPSILON = 0.001;
+const LINK_TEXTURE_WIDTH = Texture.WHITE.orig.width;
+const LINK_TEXTURE_HEIGHT = Texture.WHITE.orig.height;
 
 interface ResolvedColor {
   tint: number;
@@ -135,7 +138,15 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
   private app: Application | null = null;
   private disposed = false;
   private world = new Container();
-  private linkLayer = new Container();
+  private linkLayer = new ParticleContainer<Particle>({
+    texture: Texture.WHITE,
+    dynamicProperties: {
+      vertex: true,
+      position: true,
+      rotation: true,
+      color: true
+    }
+  });
   private nodeFillLayer = new Container();
   private nodeBorderLayer = new Container();
   private labelLayer = new Container();
@@ -144,7 +155,7 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     .circle(0, 0, 1)
     .stroke({ color: 0xffffff, width: 0.16 });
   private nodeViews = new Map<string, PixiNodeView>();
-  private linkViews = new Map<GraphLink, Sprite>();
+  private linkViews = new Map<GraphLink, Particle>();
   private labelViews = new Map<string, PixiLabelView>();
   private nodeById = new Map<string, GraphNode>();
   private pendingNodes: GraphNode[] = [];
@@ -228,14 +239,13 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
       view.fill.destroy();
       view.border.destroy();
     }
-    for (const sprite of this.linkViews.values()) sprite.destroy();
     for (const view of this.labelViews.values()) view.text.destroy();
 
     this.nodeViews.clear();
     this.linkViews.clear();
     this.labelViews.clear();
     this.nodeById.clear();
-    this.linkLayer.removeChildren();
+    this.linkLayer.removeParticles();
     this.nodeFillLayer.removeChildren();
     this.nodeBorderLayer.removeChildren();
     this.labelLayer.removeChildren();
@@ -306,11 +316,14 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     const targetId = getLinkId(link.target);
     if (!this.nodeViews.has(sourceId) || !this.nodeViews.has(targetId)) return false;
 
-    const sprite = new Sprite({ texture: Texture.WHITE, anchor: { x: 0, y: 0.5 } });
-    sprite.eventMode = 'none';
-    sprite.visible = false;
-    this.linkLayer.addChild(sprite);
-    this.linkViews.set(link, sprite);
+    const particle = new Particle({
+      texture: Texture.WHITE,
+      anchorX: 0,
+      anchorY: 0.5,
+      alpha: 0
+    });
+    this.linkLayer.addParticle(particle);
+    this.linkViews.set(link, particle);
     return true;
   }
 
@@ -421,11 +434,11 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     const lineWidth = 1.1 / Math.max(0.6, Math.min(frame.viewport.scale, 2));
     let visibleCount = 0;
 
-    for (const [link, sprite] of this.linkViews) {
+    for (const [link, particle] of this.linkViews) {
       const source = typeof link.source === 'object' ? link.source : null;
       const target = typeof link.target === 'object' ? link.target : null;
       if (!source || !target || !isLinkInBounds(link, bounds)) {
-        sprite.visible = false;
+        particle.alpha = 0;
         continue;
       }
 
@@ -433,7 +446,7 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
       const targetId = target.id;
       const lensAlpha = resolveLensLinkAlpha(sourceId, targetId, frame);
       if (lensAlpha <= ALPHA_EPSILON) {
-        sprite.visible = false;
+        particle.alpha = 0;
         continue;
       }
 
@@ -469,17 +482,17 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
       const dy = (target.y ?? 0) - sourceY;
       const length = Math.hypot(dx, dy);
 
-      sprite.position.set(sourceX, sourceY);
-      sprite.rotation = Math.atan2(dy, dx);
-      sprite.width = Math.max(0.001, length);
-      sprite.height = lineWidth;
-      sprite.tint = overlayColor
+      particle.x = sourceX;
+      particle.y = sourceY;
+      particle.rotation = Math.atan2(dy, dx);
+      particle.scaleX = Math.max(0.001, length) / LINK_TEXTURE_WIDTH;
+      particle.scaleY = lineWidth / LINK_TEXTURE_HEIGHT;
+      particle.tint = overlayColor
         ? mixTint(baseColor, overlayColor, focusProgress)
         : baseColor.tint;
-      sprite.alpha = (
+      particle.alpha = (
         overlayColor ? mixAlpha(baseColor, overlayColor, focusProgress) : baseColor.alpha
       ) * alphaScale * lensAlpha;
-      sprite.visible = sprite.alpha > ALPHA_EPSILON;
       visibleCount += 1;
     }
 
