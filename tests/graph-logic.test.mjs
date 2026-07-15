@@ -513,11 +513,15 @@ test('buildGraphIndexes and getFocusedNeighborSet share graph adjacency rules', 
     { source: { id: 'b', label: 'B' }, target: { id: 'c', label: 'C' } }
   ];
   const indexes = buildGraphIndexes(nodes, links);
+  const focusedNeighbors = getFocusedNeighborSet('b', indexes.adjacencyById);
+  const emptyNeighbors = getFocusedNeighborSet(null, indexes.adjacencyById);
 
   assert.equal(indexes.nodeById.get('a'), nodes[0]);
   assert.equal(indexes.degreeById.get('b'), 2);
-  assert.deepEqual([...getFocusedNeighborSet('b', indexes.adjacencyById)].sort(), ['a', 'c']);
-  assert.deepEqual([...getFocusedNeighborSet(null, indexes.adjacencyById)], []);
+  assert.equal(focusedNeighbors, indexes.adjacencyById.get('b'));
+  assert.deepEqual([...focusedNeighbors].sort(), ['a', 'c']);
+  assert.equal(emptyNeighbors, getFocusedNeighborSet(undefined, indexes.adjacencyById));
+  assert.deepEqual([...emptyNeighbors], []);
 });
 
 test('shared graph adjacency dedupes neighbors while degree keeps link counts', async () => {

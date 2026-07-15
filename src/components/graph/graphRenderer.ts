@@ -27,7 +27,7 @@ export interface GraphRenderFrame {
   selectedNodeId: string | null | undefined;
   hoveredNodeId: string | null | undefined;
   rootNodeId: string | null | undefined;
-  neighbors: Set<string>;
+  neighbors: ReadonlySet<string>;
   dimProgress: number;
   labelVisibilityByNodeId: Map<string, number>;
   lensVisibilityByNodeId: Map<string, number>;
