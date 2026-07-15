@@ -414,6 +414,54 @@ test('Pixi planning prioritizes viewport nodes and keeps forced labels over budg
   assert.deepEqual([...selected], ['forced-a', 'forced-b']);
 });
 
+test('lazy Pixi renderer delegates only after async backend initialization completes', async () => {
+  const previousDebugRuntime = globalThis.__OGRAPH_DEBUG_RUNTIME__;
+  globalThis.__OGRAPH_DEBUG_RUNTIME__ = true;
+
+  try {
+    const { LazyPixiGraphRendererBackend } = await importSourceModule(
+      'src/components/graph/graphRenderer.ts'
+    );
+    let finishInitialization;
+    let renderCalls = 0;
+    let destroyCalls = 0;
+    const concreteBackend = {
+      kind: 'pixi',
+      initialize: () => new Promise(resolve => {
+        finishInitialization = resolve;
+      }),
+      render: () => {
+        renderCalls += 1;
+        return true;
+      },
+      destroy: () => {
+        destroyCalls += 1;
+      }
+    };
+    const lazyBackend = new LazyPixiGraphRendererBackend(async () => concreteBackend);
+    const initialization = lazyBackend.initialize({});
+
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(lazyBackend.render({}), false);
+    assert.equal(renderCalls, 0);
+
+    finishInitialization();
+    await initialization;
+    assert.equal(lazyBackend.render({}), true);
+    assert.equal(renderCalls, 1);
+
+    lazyBackend.destroy();
+    assert.equal(destroyCalls, 1);
+  } finally {
+    if (previousDebugRuntime === undefined) {
+      delete globalThis.__OGRAPH_DEBUG_RUNTIME__;
+    } else {
+      globalThis.__OGRAPH_DEBUG_RUNTIME__ = previousDebugRuntime;
+    }
+  }
+});
+
 test('buildLocalGraphScope keeps one hidden physics halo and merges transition scopes', async () => {
   const {
     buildLocalGraphScope,

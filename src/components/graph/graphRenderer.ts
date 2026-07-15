@@ -117,27 +117,50 @@ class CanvasGraphRendererBackend implements GraphRendererBackend {
   }
 }
 
-class LazyPixiGraphRendererBackend implements GraphRendererBackend {
+type PixiBackendLoader = () => Promise<GraphRendererBackend>;
+
+async function loadPixiGraphRendererBackend() {
+  const { createPixiGraphRendererBackend } = await import('./pixiGraphRenderer');
+  return createPixiGraphRendererBackend();
+}
+
+export class LazyPixiGraphRendererBackend implements GraphRendererBackend {
   readonly kind = 'pixi' as const;
   private backend: GraphRendererBackend | null = null;
   private disposed = false;
+
+  constructor(
+    private readonly loadBackend: PixiBackendLoader = loadPixiGraphRendererBackend
+  ) {}
 
   async initialize(canvas: HTMLCanvasElement) {
     if (!__OGRAPH_DEBUG_RUNTIME__) {
       throw new Error('Pixi graph rendering is available only in the debug harness.');
     }
 
-    const { createPixiGraphRendererBackend } = await import('./pixiGraphRenderer');
-    if (this.disposed) return;
+    const backend = await this.loadBackend();
+    if (this.disposed) {
+      backend.destroy();
+      return;
+    }
 
-    const backend = createPixiGraphRendererBackend();
-    this.backend = backend;
-    await backend.initialize(canvas);
+    try {
+      await backend.initialize(canvas);
+    } catch (caught) {
+      backend.destroy();
+      throw caught;
+    }
 
     if (this.disposed) {
       backend.destroy();
-      this.backend = null;
+      return;
     }
+
+    // Do not expose the concrete renderer until its asynchronous Pixi
+    // Application initialization is complete. Render requests can arrive while
+    // WebGL is still being created; delegating before this point would observe
+    // an Application whose renderer has not been installed yet.
+    this.backend = backend;
   }
 
   render(frame: GraphRenderFrame) {
