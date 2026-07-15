@@ -293,3 +293,44 @@ debug-only and the published default remains Canvas 2D/Main. Further reduction
 of the cold setup frame would require asynchronous generation or staged
 initialization, which is an explicit UX/promotion decision rather than another
 no-UI-change renderer optimization.
+
+## Active-Work Telemetry and Full-Containment Follow-Up (2026-07-16)
+
+The next no-UX-change pass corrected the meaning of the debug counters before
+making another renderer change. Page rAF FPS and p50/p95 now use the same
+timestamp intervals, while invisible debug attributes separately measure
+successful active graph draws and full graph-frame CPU. Idle rAF callbacks no
+longer count as graph rendering evidence.
+
+Fixed-seed Pixi/Worker results with all 10,000 nodes and 17,500 links inside the
+fitted viewport were:
+
+| Version | Graph draws/s | Draw interval p95 | Full-frame CPU p50 | Full-frame CPU p95 | Full-frame CPU max | Pixi culling prep |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Instrumented baseline | 60.0-60.1 | 17.1-17.5ms | 9.3-9.7ms | 10.6-11.1ms | 11.2-12.4ms | 1.8-2.3ms |
+| Pixi containment fast path | 60.0 | 16.8-17.5ms | 7.6-7.7ms | 8.0-8.3ms | 8.1-8.8ms | 0.0-0.1ms |
+
+The retained change performs a Pixi-only finite-coordinate containment scan.
+When every topology node is already inside the padded viewport, it removes the
+redundant grid query, visible-ID set, and link clipping checks. Partial or
+invalid-coordinate views retain the prior culling path. An intermediate design
+that expanded the shared spatial-index record was rejected after it exceeded
+the package gzip budget.
+
+The clean final in-app-browser tab mounted exactly one canvas, materialized all
+10,000 nodes and 17,500 links, reached `Simulation State: idle` / `Frame
+Reasons: idle`, and kept `Graph Draws` fixed at `1335` over a subsequent idle
+window with zero console errors. Its last active window reported 60 graph
+draws/s, `16.8ms` draw-interval p95, and full-frame CPU `6.8ms` p50 / `7.7ms`
+p95 / `8.0ms` max. The focused interaction audit retained hover and selection
+for `node-44`, double-click local focus with 22 visible / 57 simulated nodes,
+selection clearing, local low-heat drag updates, and global restoration. The
+packed consumer suite separately passed pointer release, wheel anchoring, pan,
+focus/ref, resize, local/global, StrictMode, and visual smoke coverage.
+
+The final gate passed TypeScript, 74 unit/API/budget tests, demo and library
+builds, examples, pinned and floating React 18/19 packed consumers, and all 8
+Chromium packed-consumer tests. Package gzip remained `16,881` bytes and the
+runtime exports remained exactly `GraphView`, `defaultGraphPreset`, and
+`defaultGraphTheme`. Pixi/Worker remains debug-only and Canvas 2D/Main remains
+the published default.

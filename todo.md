@@ -326,8 +326,8 @@ still require a separate explicit decision.
   - Branch: `feat/obsidian-graph-harness-spike`
   - Verification: fixed-seed 10k browser A/B plus targeted unit tests
   - Docs: `docs/debug-harness.md`, `docs/architecture.md`
-  - Commit: `<pending>`
-- [ ] Stage 10: Prove public API, visual, interaction, package, and consumer compatibility
+  - Commit: `b69ab71`
+- [x] Stage 10: Prove public API, visual, interaction, package, and consumer compatibility
   - Branch: `feat/obsidian-graph-harness-spike`
   - Verification: full repository and packed-consumer gate
   - Docs: `todo.md`, relevant architecture/debug notes
@@ -359,6 +359,17 @@ the existing 77-node / 81-link simulated halo, and invalid or partial
 viewports remain on the old path. An intermediate shared-index extent design
 was rejected because it exceeded the consumer gzip budget; the retained
 Pixi-only implementation restores the `16,881` byte package result.
+
+Stage 10 passed `npm run lint`, `npm test`, `npm run build`,
+`npm run check:examples`, pinned and floating React 18/19 packed-consumer
+verification, and all 8 Chromium packed-consumer tests. A clean in-app-browser
+tab mounted exactly one Pixi canvas, materialized 10,000 nodes / 17,500 links,
+reached `idle`, held its graph-draw count at `1335`, and reported zero console
+errors. Manual Pixi interaction checks retained hover/selection, double-click
+local focus, local drag updates, selection clearing, and global restoration.
+The built runtime exports remain exactly `GraphView`, `defaultGraphPreset`, and
+`defaultGraphTheme`; package gzip is `16,881` bytes, the production default is
+still Canvas 2D/Main, and no push or production promotion was performed.
 
 ## Stop conditions
 
