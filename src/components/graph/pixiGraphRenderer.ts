@@ -22,8 +22,8 @@ import type {
   GraphRendererStats
 } from './graphRenderer';
 import {
-  hasEquivalentPixiTopology,
   prioritizePixiNodeMaterialization,
+  remapEquivalentPixiTopology,
   selectPixiLabelNodeIds,
   type PixiLabelCandidate
 } from './pixiGraphPlanning';
@@ -310,33 +310,23 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
   }
 
   private reuseEquivalentTopology(frame: GraphRenderFrame) {
-    if (
-      this.pendingNodes.length > 0 ||
-      this.pendingLinks.length > 0 ||
-      this.nodeViews.size !== frame.nodes.length ||
-      this.linkViews.size !== frame.links.length ||
-      !hasEquivalentPixiTopology(
-        this.topologyNodes,
-        this.topologyLinks,
-        frame.nodes,
-        frame.links
-      )
-    ) {
-      return false;
-    }
-
-    const previousLinks = this.topologyLinks!;
-    const nextLinkViews = new Map<GraphLink, Particle>();
-    for (let index = 0; index < frame.links.length; index += 1) {
-      const particle = this.linkViews.get(previousLinks[index]!);
-      if (!particle) return false;
-      nextLinkViews.set(frame.links[index]!, particle);
-    }
+    const remapped = remapEquivalentPixiTopology(
+      this.topologyNodes,
+      this.topologyLinks,
+      frame.nodes,
+      frame.links,
+      this.pendingNodes,
+      this.pendingLinks,
+      this.linkViews
+    );
+    if (!remapped) return false;
 
     this.topologyNodes = frame.nodes;
     this.topologyLinks = frame.links;
-    this.nodeById = new Map(frame.nodes.map(node => [node.id, node]));
-    this.linkViews = nextLinkViews;
+    this.nodeById = remapped.nodeById;
+    this.pendingNodes = remapped.pendingNodes;
+    this.pendingLinks = remapped.pendingLinks;
+    this.linkViews = remapped.linkViews;
     return true;
   }
 

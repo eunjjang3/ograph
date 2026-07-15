@@ -387,6 +387,7 @@ test('Pixi planning prioritizes viewport nodes and keeps forced labels over budg
   const {
     hasEquivalentPixiTopology,
     prioritizePixiNodeMaterialization,
+    remapEquivalentPixiTopology,
     selectPixiLabelNodeIds
   } = await importSourceModule('src/components/graph/pixiGraphPlanning.ts');
   const { buildSpatialIndex } = await importSourceModule('src/components/graph/spatialIndex.ts');
@@ -438,6 +439,36 @@ test('Pixi planning prioritizes viewport nodes and keeps forced labels over budg
       { source: 'near-b', target: 'near-a' }
     ]),
     false
+  );
+
+  const firstLinkView = { id: 'first-view' };
+  const remapped = remapEquivalentPixiTopology(
+    nodes,
+    previousLinks,
+    equivalentNodes,
+    equivalentLinks,
+    [nodes[1], nodes[0]],
+    [previousLinks[1]],
+    new Map([[previousLinks[0], firstLinkView]])
+  );
+
+  assert.ok(remapped);
+  assert.deepEqual(remapped.pendingNodes, [equivalentNodes[1], equivalentNodes[0]]);
+  assert.deepEqual(remapped.pendingLinks, [equivalentLinks[1]]);
+  assert.equal(remapped.linkViews.get(equivalentLinks[0]), firstLinkView);
+  assert.equal(remapped.nodeById.get('near-a'), equivalentNodes[2]);
+
+  assert.equal(
+    remapEquivalentPixiTopology(
+      nodes,
+      previousLinks,
+      [...equivalentNodes].reverse(),
+      equivalentLinks,
+      [],
+      [],
+      new Map()
+    ),
+    null
   );
 });
 

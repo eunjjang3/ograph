@@ -45,6 +45,65 @@ export function hasEquivalentPixiTopology(
   return true;
 }
 
+export interface RemappedPixiTopology<TLinkView> {
+  nodeById: Map<string, GraphNode>;
+  pendingNodes: GraphNode[];
+  pendingLinks: GraphLink[];
+  linkViews: Map<GraphLink, TLinkView>;
+}
+
+// Worker startup replaces the input graph objects with simulation-backed objects.
+// Keep retained Pixi views and unfinished materialization queues aligned by ID/order.
+export function remapEquivalentPixiTopology<TLinkView>(
+  previousNodes: readonly GraphNode[] | null,
+  previousLinks: readonly GraphLink[] | null,
+  nextNodes: readonly GraphNode[],
+  nextLinks: readonly GraphLink[],
+  pendingNodes: readonly GraphNode[],
+  pendingLinks: readonly GraphLink[],
+  linkViews: ReadonlyMap<GraphLink, TLinkView>
+): RemappedPixiTopology<TLinkView> | null {
+  if (!hasEquivalentPixiTopology(previousNodes, previousLinks, nextNodes, nextLinks)) {
+    return null;
+  }
+
+  const nodeById = new Map(nextNodes.map(node => [node.id, node]));
+  const remappedPendingNodes: GraphNode[] = [];
+  for (const node of pendingNodes) {
+    const nextNode = nodeById.get(node.id);
+    if (!nextNode) return null;
+    remappedPendingNodes.push(nextNode);
+  }
+
+  const remappedLinkViews = new Map<GraphLink, TLinkView>();
+  const nextLinkByPrevious = pendingLinks.length > 0
+    ? new Map<GraphLink, GraphLink>()
+    : null;
+
+  for (let index = 0; index < nextLinks.length; index += 1) {
+    const previousLink = previousLinks![index]!;
+    const nextLink = nextLinks[index]!;
+    nextLinkByPrevious?.set(previousLink, nextLink);
+    const view = linkViews.get(previousLink);
+    if (view !== undefined) remappedLinkViews.set(nextLink, view);
+  }
+  if (remappedLinkViews.size !== linkViews.size) return null;
+
+  const remappedPendingLinks: GraphLink[] = [];
+  for (const link of pendingLinks) {
+    const nextLink = nextLinkByPrevious!.get(link);
+    if (!nextLink) return null;
+    remappedPendingLinks.push(nextLink);
+  }
+
+  return {
+    nodeById,
+    pendingNodes: remappedPendingNodes,
+    pendingLinks: remappedPendingLinks,
+    linkViews: remappedLinkViews
+  };
+}
+
 export function prioritizePixiNodeMaterialization(
   nodes: readonly GraphNode[],
   spatialIndex: GraphSpatialIndex,
