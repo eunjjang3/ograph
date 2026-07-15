@@ -195,3 +195,40 @@ The largest built-in size is 10,000 nodes. After the initial global layout stabi
 - pan, zoom, and local transitions remain at or above roughly 30 FPS in the harness telemetry.
 
 For repeatable visual or performance comparisons, keep `nodeCount`, `avgLinks`, `seed`, selected preset, and slider values fixed.
+
+## Acceptance E2E (2026-07-16)
+
+The post-feedback acceptance run used the in-app Chromium browser with average
+degree `3.5`, seed `42`, and the default theme. Canvas/Main, Canvas/Worker,
+Pixi/Main, and Pixi/Worker each mounted exactly one canvas, rendered the 5,000
+node fixture, and reached sustained `Simulation State: idle` / `Frame Reasons:
+idle` after active work completed.
+
+The run found and fixed one lifecycle race: a render request could reach the
+concrete Pixi backend before asynchronous `Application.init()` had installed
+`app.renderer`. The lazy wrapper now delegates only after initialization and a
+regression test covers the readiness boundary (`8986ad3`). Repeating the former
+Canvas/Worker -> Main -> Pixi sequence produced no console error and settled
+normally.
+
+Pixi/Worker interaction coverage included node hover and selection, anchored
+wheel zoom, background pan without node-drag events, node drag/release,
+double-click local focus, local idle shutdown, and global restoration with the
+selection cleared. The final settled 5,000-node target state showed the
+page-level counter at `60 FPS` / `17.4ms` rAF p95 and retained an `8.6ms` last
+graph-draw CPU sample at `0.80x`, with no further graph draws while idle.
+
+At 10,000 nodes, the natural `0.26x` auto-fit viewport sampled `60 FPS`,
+`16.8ms` rAF p95, and `13.0ms` last-draw CPU after materialization while the
+Worker simulation was active. An intentionally wider `0.10x` view that placed
+all 10,000 nodes and 17,500 links in the viewport sampled about `23 FPS`,
+`50.1ms` rAF p95, and `31.5ms` last-draw CPU. That full-view case is a known
+optimization target rather than evidence for the normal culled viewport.
+
+The acceptance gate passed TypeScript, 72 unit/API/budget tests, the full demo
+and library builds, examples, React 18/19 pinned and floating packed-consumer
+verification, and all 8 packed-consumer Chromium tests. The decision is a
+conditional go for Pixi/Worker as the experimental promotion candidate, not an
+immediate production-default change. WebGL fallback, packaged Worker assets,
+cold initialization UX, and the 10,000-node full-view cost remain prerequisites
+for a separate explicitly approved promotion branch.

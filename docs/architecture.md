@@ -169,6 +169,11 @@ Ograph's dirty-frame scheduler calls `app.render()` only for simulation output,
 input, easing, visual transitions, or pending materialization work. Resize and
 DPR changes go through `renderer.resize`; disposal preserves the React-owned
 canvas while releasing the WebGL context and retained children.
+The lazy renderer wrapper exposes the concrete Pixi backend to the draw loop
+only after `Application.init()` resolves. Render requests that arrive while
+WebGL is being created return without delegating, and the renderer hook requests
+a fresh frame after initialization completes. This prevents lane switches from
+observing an `Application` before Pixi has installed its renderer.
 Changing graph fixtures or switching Main/Worker simulation keeps the renderer
 and its WebGL context alive; only switching between Canvas 2D and Pixi replaces
 the HTML canvas, because a canvas cannot change context type after acquisition.

@@ -159,7 +159,7 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
   - Docs: `docs/architecture.md`, `docs/debug-harness.md`
   - Commit: `e357f52`
 
-- [ ] Stage 6: Run the four-lane acceptance comparison and make a promotion decision
+- [x] Stage 6: Run the four-lane acceptance comparison and make a promotion decision
   - Branch: `feat/obsidian-graph-harness-spike`
   - Deliverable: recorded results for all fixtures/phases, visual diffs,
     consumer bundle delta, lifecycle failures, and a written go/no-go decision
@@ -168,7 +168,9 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
     `npm run verify:consumer:floating`, `npm run test:browser`, package budget
   - Docs: results and decision appended to this file plus relevant architecture
     and debug-harness documentation
-  - Commit: `<pending>`
+  - Decision: conditional go for Pixi/Worker as a future promotion candidate;
+    no-go for immediate production-default promotion on this branch
+  - Commit: `8986ad3`
 
 - [ ] Stage 7: Promote the accepted runtime behind the existing public API
   - Branch: separate follow-up branch after explicit approval
@@ -184,10 +186,10 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
 
 ## Human UX checkpoint (2026-07-15)
 
-This is the intentional pause point requested for human feedback. The active
-goal is not complete and Stage 6 remains unchecked until the visual/interaction
-tradeoffs below are reviewed. Production defaults, public types, screenshot
-baselines, and package dependencies have not been promoted.
+This was the intentional pause point requested for human feedback. At the time
+of capture, Stage 6 remained unchecked until the visual/interaction tradeoffs
+below were reviewed. Production defaults, public types, screenshot baselines,
+and package dependencies were not promoted.
 
 Representative single-pass measurements from the in-app Chromium browser at
 `http://127.0.0.1:4435`, using 5,000 nodes, average degree `3.5`, seed `42`, and
@@ -215,7 +217,7 @@ Additional evidence:
 - after settling, Pixi/Worker reported `Simulation State: idle` and
   `Frame Reasons: idle`; `Graph Draws` stayed at `450` across a two-second
   sample, confirming complete dirty-loop shutdown;
-- all 71 unit/API/budget tests and all 8 packed-consumer browser tests passed;
+- all 72 unit/API/budget tests and all 8 packed-consumer browser tests passed;
 - the production entry remained Canvas/Main with only the original runtime
   exports; `dist/index.js` measured about `16.80kB` gzip against the existing
   `16.94kB` limit and contains no Pixi/Worker runtime string or asset;
@@ -223,7 +225,7 @@ Additional evidence:
   and Worker chunks; the packed consumer tarball contains no such runtime asset
   and installing the package does not install Pixi as a consumer dependency.
 
-Human review should decide:
+Questions presented for human review at the checkpoint:
 
 1. Whether the Pixi node/link weight, color blending, focus borders, and
    screen-space labels are visually close enough to the Canvas contract.
@@ -235,8 +237,51 @@ Human review should decide:
 4. Whether the demo-only Pixi chunk and eventual dependency cost are acceptable
    before designing the packaged Worker asset and WebGL failure fallback.
 
-The measurements are diagnostic evidence, not a stable benchmark artifact;
-repeat them on the intended reference desktop before checking Stage 6.
+These measurements were diagnostic evidence, not a stable benchmark artifact.
+The follow-up below repeated the acceptance run before Stage 6 was checked.
+
+## Stage 6 acceptance follow-up (2026-07-16)
+
+Human review reported no major visual or interaction problem in the checkpoint.
+The follow-up in-app-browser E2E exercised all four runtime lanes at 5,000
+nodes, then covered the target Pixi/Worker lane at 10,000 nodes and through
+hover, selection, anchored zoom, background pan, node drag/release,
+double-click local focus, local idle, and global restoration. Every lane kept
+exactly one canvas and reached sustained `Simulation State: idle` / `Frame
+Reasons: idle` after active work.
+
+The E2E found one real lifecycle failure before acceptance: the lazy Pixi
+wrapper exposed its concrete backend while `Application.init()` was still in
+flight, so an early frame could call `renderer.resize` before Pixi installed the
+renderer. Commit `8986ad3` defers delegation until initialization resolves and
+adds a readiness regression test. The exact failing Canvas/Worker -> Main ->
+Pixi transition then settled without console errors.
+
+Representative follow-up samples:
+
+| Fixture and viewport | Lane | Sampled FPS | rAF p95 | Last graph draw CPU |
+| --- | --- | ---: | ---: | ---: |
+| 5,000 nodes, `0.80x` | Pixi/Worker | 60 | 17.4ms | 8.6ms |
+| 10,000 nodes, natural `0.26x` auto-fit | Pixi/Worker | 60 | 16.8ms | 13.0ms |
+| 10,000 nodes, full-view `0.10x` | Pixi/Worker | 23 | 50.1ms | 31.5ms |
+
+The 5k row is the final settled page-level rAF sample; `Graph Draws` remained
+unchanged after it entered `idle`. The two 10k rows are active-simulation
+samples after Pixi materialization completed.
+
+The `0.10x` result deliberately keeps all 10,000 nodes and 17,500 links in the
+viewport and remains a known optimization target. The normal culled 10k view
+meets the provisional target, but immediate production promotion remains a
+no-go until a separate branch adds WebGL failure fallback, packaged Worker
+assets, a cold-initialization policy, and explicit handling of the full-view
+cost. Stage 7 therefore remains unchecked and requires explicit approval.
+
+The completed gate passed `npm run lint`, `npm run test`, `npm run build`,
+`npm run check:examples`, both pinned and floating React 18/19 consumer lanes,
+`npm run test:browser`, and the package budget. The public entry still exports
+only `GraphView`, `defaultGraphPreset`, and `defaultGraphTheme`; Pixi remains a
+debug-only development dependency and no Pixi/Worker marker appears in the
+published entry.
 
 ## Stop conditions
 
