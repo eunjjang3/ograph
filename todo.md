@@ -321,8 +321,8 @@ still require a separate explicit decision.
   - Branch: `feat/obsidian-graph-harness-spike`
   - Verification: `npm run lint && npm run test`
   - Docs: `docs/debug-harness.md`
-  - Commit: `<pending>`
-- [ ] Stage 9: Profile the fixed 10k Pixi/Worker active window and remove one low-risk hot-path waste
+  - Commit: `53268da`
+- [x] Stage 9: Profile the fixed 10k Pixi/Worker active window and remove one low-risk hot-path waste
   - Branch: `feat/obsidian-graph-harness-spike`
   - Verification: fixed-seed 10k browser A/B plus targeted unit tests
   - Docs: `docs/debug-harness.md`, `docs/architecture.md`
@@ -347,6 +347,18 @@ Pixi/Worker baseline, six active windows measured `60.0-60.1` graph draws/s,
 samples attributed roughly `1.0-1.3ms` to spatial-index rebuild, `1.8-2.3ms`
 to Pixi culling/visible-ID preparation, `2.1-2.3ms` to links, `2.3-2.9ms` to
 nodes, and `1.1-1.4ms` to Pixi command submission.
+
+Stage 9 retained one exact full-containment fast path. A Pixi-only scan first
+proves that every finite topology node is inside the padded viewport; only then
+does Pixi bypass the grid query, temporary visible-ID set, and link clipping
+tests. Six same-sequence post-change windows kept `60.0` graph draws/s while
+full-frame CPU p50 fell to `7.6-7.7ms`, p95 to `8.0-8.3ms`, and max to
+`8.1-8.8ms`. Pixi culling preparation fell from `1.8-2.3ms` to `0.0-0.1ms`.
+The local-lens browser check retained 20 visible nodes / 19 visible links over
+the existing 77-node / 81-link simulated halo, and invalid or partial
+viewports remain on the old path. An intermediate shared-index extent design
+was rejected because it exceeded the consumer gzip budget; the retained
+Pixi-only implementation restores the `16,881` byte package result.
 
 ## Stop conditions
 

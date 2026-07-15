@@ -156,6 +156,14 @@ includes pre-render spatial-index and label work, while the Pixi `submit`
 phase still measures JavaScript command submission rather than GPU completion.
 These attributes do not add controls, text, layout, or consumer API surface.
 
+The first optimization driven by this telemetry uses a Pixi-only
+finite-coordinate scan to prove when the padded viewport contains every
+topology node. Every link segment is then contained as well, so Pixi reuses the
+topology node array directly and skips the redundant grid query, 10,000-entry
+visible-ID set, and 17,500 repeated link-bound tests. Any partial viewport or
+invalid coordinate falls back to the exact existing culling path. The shared
+spatial-index shape and production Canvas/Main bundle remain unchanged.
+
 `Frame Reasons` is `idle` once force updates, viewport/focus/lens/label easing,
 and Pixi materialization have all completed. At that point `Graph Draws` must
 remain unchanged across subsequent telemetry samples even though the page-level

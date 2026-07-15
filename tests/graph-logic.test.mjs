@@ -465,6 +465,7 @@ test('worker simulation client covers lifecycle, pause, restart, drag, and buffe
 
 test('Pixi planning prioritizes viewport nodes and keeps forced labels over budget', async () => {
   const {
+    areAllPixiNodesInBounds,
     hasEquivalentPixiTopology,
     prioritizePixiNodeMaterialization,
     remapEquivalentPixiTopology,
@@ -485,6 +486,17 @@ test('Pixi planning prioritizes viewport nodes and keeps forced labels over budg
   );
 
   assert.deepEqual(prioritized.map(node => node.id), ['near-a', 'near-b', 'far']);
+  const containedBounds = { minX: -1, maxX: 30, minY: -1, maxY: 30 };
+  assert.equal(areAllPixiNodesInBounds(nodes.slice(1), containedBounds), true);
+  assert.equal(areAllPixiNodesInBounds(nodes, containedBounds), false);
+  assert.equal(
+    areAllPixiNodesInBounds([{ id: 'invalid', label: 'Invalid', x: Number.NaN, y: 0 }], containedBounds),
+    false
+  );
+  assert.equal(
+    areAllPixiNodesInBounds([], { minX: 10, maxX: -10, minY: 0, maxY: 1 }),
+    false
+  );
 
   const selected = selectPixiLabelNodeIds([
     { id: 'forced-a', inputIndex: 0, visibility: 1, degree: 1, forceVisible: true, isNeighbor: false },

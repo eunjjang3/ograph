@@ -1,7 +1,12 @@
 import type { GraphLink, GraphNode } from './types';
 import type { Viewport } from './graphMath';
 import { getLinkId } from './localGraph';
-import { getPaddedViewportWorldBounds, querySpatialIndex, type GraphSpatialIndex } from './spatialIndex';
+import {
+  getPaddedViewportWorldBounds,
+  querySpatialIndex,
+  type GraphSpatialIndex,
+  type WorldBounds
+} from './spatialIndex';
 
 export interface PixiLabelCandidate {
   id: string;
@@ -10,6 +15,39 @@ export interface PixiLabelCandidate {
   degree: number;
   forceVisible: boolean;
   isNeighbor: boolean;
+}
+
+export function areAllPixiNodesInBounds(
+  nodes: readonly GraphNode[],
+  bounds: WorldBounds
+): boolean {
+  if (
+    !Number.isFinite(bounds.minX) ||
+    !Number.isFinite(bounds.maxX) ||
+    !Number.isFinite(bounds.minY) ||
+    !Number.isFinite(bounds.maxY) ||
+    bounds.minX > bounds.maxX ||
+    bounds.minY > bounds.maxY
+  ) {
+    return false;
+  }
+
+  for (const node of nodes) {
+    const x = node.x ?? 0;
+    const y = node.y ?? 0;
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      x < bounds.minX ||
+      x > bounds.maxX ||
+      y < bounds.minY ||
+      y > bounds.maxY
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function hasEquivalentPixiTopology(

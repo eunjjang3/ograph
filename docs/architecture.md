@@ -193,6 +193,10 @@ Geometry is retained across frames:
 - structurally equivalent graph objects reuse retained particles, labels, and
   unfinished materialization queues when the Worker replaces input objects
   with simulation-backed objects;
+- a cheap Pixi-only finite-coordinate scan proves when the padded viewport
+  contains every topology node, allowing that frame to reuse the topology node
+  array and skip a redundant grid query, visible-ID set, and per-link bounds
+  test; partially containing viewports retain the existing padded culling path;
 - padded viewport culling zeroes offscreen particle alpha and skips offscreen
   labels before their draw updates;
 - screen-space text is created lazily, capped at 800 retained objects, and

@@ -22,6 +22,7 @@ import type {
   GraphRendererStats
 } from './graphRenderer';
 import {
+  areAllPixiNodesInBounds,
   prioritizePixiNodeMaterialization,
   remapEquivalentPixiTopology,
   selectPixiLabelNodeIds,
@@ -421,7 +422,7 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     }
   }
 
-  private updateNodeViews(frame: GraphRenderFrame, visibleNodeIds: Set<string>) {
+  private updateNodeViews(frame: GraphRenderFrame, visibleNodeIds: ReadonlySet<string> | null) {
     const focusId = frame.hoveredNodeId || frame.selectedNodeId;
     const hasFocus = !!focusId;
     const focusProgress = clampUnit(frame.dimProgress);
@@ -430,7 +431,7 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
 
     for (const [nodeId, view] of this.nodeViews) {
       const node = this.nodeById.get(nodeId);
-      if (!node || !visibleNodeIds.has(nodeId)) {
+      if (!node || (visibleNodeIds && !visibleNodeIds.has(nodeId))) {
         view.fill.alpha = 0;
         view.border.alpha = 0;
         continue;
@@ -496,7 +497,7 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     return visibleCount;
   }
 
-  private updateLinkViews(frame: GraphRenderFrame) {
+  private updateLinkViews(frame: GraphRenderFrame, allNodesInViewport: boolean) {
     const focusId = frame.hoveredNodeId || frame.selectedNodeId;
     const hasFocus = !!focusId;
     const focusProgress = clampUnit(frame.dimProgress);
@@ -508,7 +509,7 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     for (const [link, particle] of this.linkViews) {
       const source = typeof link.source === 'object' ? link.source : null;
       const target = typeof link.target === 'object' ? link.target : null;
-      if (!source || !target || !isLinkInBounds(link, bounds)) {
+      if (!source || !target || (!allNodesInViewport && !isLinkInBounds(link, bounds))) {
         particle.alpha = 0;
         continue;
       }
@@ -730,9 +731,14 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     const topologyCompletedAt = performance.now();
 
     const bounds = getPaddedViewportWorldBounds(frame.width, frame.height, frame.viewport);
-    const visibleNodes = querySpatialIndex(frame.spatialIndex, bounds);
-    const visibleNodeIds = new Set<string>();
-    for (const node of visibleNodes) visibleNodeIds.add(node.id);
+    const allNodesInViewport = areAllPixiNodesInBounds(frame.nodes, bounds);
+    const visibleNodes = allNodesInViewport
+      ? frame.nodes
+      : querySpatialIndex(frame.spatialIndex, bounds);
+    const visibleNodeIds = allNodesInViewport ? null : new Set<string>();
+    if (visibleNodeIds) {
+      for (const node of visibleNodes) visibleNodeIds.add(node.id);
+    }
     const cullingCompletedAt = performance.now();
     this.materializeNodes(frame, visibleNodes);
     this.materializeLinks(frame);
@@ -740,7 +746,7 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
 
     this.world.position.set(frame.viewport.x, frame.viewport.y);
     this.world.scale.set(frame.viewport.scale);
-    const visibleLinks = this.updateLinkViews(frame);
+    const visibleLinks = this.updateLinkViews(frame, allNodesInViewport);
     const linksCompletedAt = performance.now();
     const visibleNodeCount = this.updateNodeViews(frame, visibleNodeIds);
     const nodesCompletedAt = performance.now();
