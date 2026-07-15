@@ -271,6 +271,10 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
   }
 
   private materializeNodes(frame: GraphRenderFrame, visibleNodes: GraphNode[]) {
+    // pendingNodes empties only after every topology node owns retained views.
+    // Avoid rechecking every settled visible node on subsequent active frames.
+    if (this.pendingNodes.length === 0) return;
+
     let remaining = NODE_MATERIALIZATION_BUDGET;
 
     for (const node of visibleNodes) {
