@@ -148,6 +148,7 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
   private labelViews = new Map<string, PixiLabelView>();
   private nodeById = new Map<string, GraphNode>();
   private pendingNodes: GraphNode[] = [];
+  private pendingNodeCursor = 0;
   private pendingLinks: GraphLink[] = [];
   private labelsPending = false;
   private topologyNodes: GraphNode[] | null = null;
@@ -252,6 +253,7 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
       frame.height,
       frame.viewport
     );
+    this.pendingNodeCursor = 0;
     this.pendingLinks = [...frame.links];
     this.labelsPending = true;
   }
@@ -284,11 +286,16 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
       remaining -= 1;
     }
 
-    while (remaining > 0 && this.pendingNodes.length > 0) {
-      const node = this.pendingNodes.shift()!;
+    while (remaining > 0 && this.pendingNodeCursor < this.pendingNodes.length) {
+      const node = this.pendingNodes[this.pendingNodeCursor++]!;
       if (this.nodeViews.has(node.id)) continue;
       this.materializeNode(node);
       remaining -= 1;
+    }
+
+    if (this.pendingNodeCursor === this.pendingNodes.length) {
+      this.pendingNodes = [];
+      this.pendingNodeCursor = 0;
     }
   }
 
