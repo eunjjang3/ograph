@@ -645,7 +645,8 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
 
     const bounds = getPaddedViewportWorldBounds(frame.width, frame.height, frame.viewport);
     const visibleNodes = querySpatialIndex(frame.spatialIndex, bounds);
-    const visibleNodeIds = new Set(visibleNodes.map(node => node.id));
+    const visibleNodeIds = new Set<string>();
+    for (const node of visibleNodes) visibleNodeIds.add(node.id);
     this.materializeNodes(frame, visibleNodes);
     this.materializeLinks(frame);
 
