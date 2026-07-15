@@ -283,6 +283,38 @@ only `GraphView`, `defaultGraphPreset`, and `defaultGraphTheme`; Pixi remains a
 debug-only development dependency and no Pixi/Worker marker appears in the
 published entry.
 
+## Post-acceptance 10k optimization follow-up (2026-07-16)
+
+The original full-view result above was treated as a profiling baseline rather
+than a structural limit. Subsequent isolated commits removed settled-loop and
+allocation waste, batched links and nodes with Pixi particles, reused views
+across equivalent graph objects, and preserved unfinished materialization work
+through the input-to-Worker object handoff. No public prop, ref, callback,
+interaction path, screenshot baseline, or production runtime default changed.
+
+Final fixed-seed evidence for Pixi/Worker with all 10,000 nodes and 17,500 links
+inside the `0.07x` fitted viewport:
+
+| Phase | FPS | rAF p95 | Last graph draw CPU |
+| --- | ---: | ---: | ---: |
+| Active/reheated repeat runs | 59-60 | 16.7-17.6ms | 8.4-11.2ms |
+| Final idle review state | 60 | 16.8-17.4ms | 8.8-9.1ms |
+
+Cold materialization improved from `1.51-1.60s` / `53-55` graph draws to
+`1.03-1.08s` / `41-43` graph draws. Materialized node and link counts remained
+monotonic through the Worker handoff. A remaining occasional initial `50ms`
+frame is the sum of mock generation, normalization, topology signature/index,
+spatial-index, and first planning work; attempts to optimize link queue
+rotation, per-item particle registration, or only the planning comparator did
+not improve the browser-level result and were reverted.
+
+The final browser review retained exactly one canvas, default-theme visual
+parity, hover/selection, local/global restoration, and zero console errors.
+The full-view renderer-cost prerequisite is therefore cleared for the harness
+spike. Stage 7 remains intentionally unchecked because Canvas fallback,
+packaged Worker assets, cold-start UX policy, and production-default promotion
+still require a separate explicit decision.
+
 ## Stop conditions
 
 Stop the spike and report rather than silently widening scope when:

@@ -182,13 +182,19 @@ topology and simulation comparisons.
 
 Geometry is retained across frames:
 
-- node fill and border objects share unit-circle `GraphicsContext` geometry;
-- every link is a `Texture.WHITE` sprite stretched and rotated between its
-  endpoints;
+- node fills and borders are separate `ParticleContainer` batches that share
+  high-resolution white circle/ring textures generated once during Pixi
+  initialization;
+- links are `Texture.WHITE` particles stretched and rotated between endpoints
+  in one retained batch;
 - node/link transforms, tint, alpha, and visibility update in place;
 - viewport-prioritized nodes and endpoint-ready links materialize under
   per-frame budgets;
-- padded viewport culling hides objects before render submission;
+- structurally equivalent graph objects reuse retained particles, labels, and
+  unfinished materialization queues when the Worker replaces input objects
+  with simulation-backed objects;
+- padded viewport culling zeroes offscreen particle alpha and skips offscreen
+  labels before their draw updates;
 - screen-space text is created lazily, capped at 800 retained objects, and
   limited to 600 visible labels while idle or 280 during focus/interaction;
 - pointer hit testing remains on Ograph's existing main-thread spatial index,

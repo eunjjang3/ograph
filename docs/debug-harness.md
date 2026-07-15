@@ -223,12 +223,48 @@ At 10,000 nodes, the natural `0.26x` auto-fit viewport sampled `60 FPS`,
 Worker simulation was active. An intentionally wider `0.10x` view that placed
 all 10,000 nodes and 17,500 links in the viewport sampled about `23 FPS`,
 `50.1ms` rAF p95, and `31.5ms` last-draw CPU. That full-view case is a known
-optimization target rather than evidence for the normal culled viewport.
+optimization target rather than evidence for the normal culled viewport. This
+paragraph records the original acceptance baseline; the post-acceptance
+follow-up below supersedes its full-view performance result.
 
 The acceptance gate passed TypeScript, 72 unit/API/budget tests, the full demo
 and library builds, examples, React 18/19 pinned and floating packed-consumer
 verification, and all 8 packed-consumer Chromium tests. The decision is a
 conditional go for Pixi/Worker as the experimental promotion candidate, not an
 immediate production-default change. WebGL fallback, packaged Worker assets,
-cold initialization UX, and the 10,000-node full-view cost remain prerequisites
-for a separate explicitly approved promotion branch.
+cold initialization UX, and explicit human approval remain prerequisites for a
+separate promotion branch.
+
+## Post-Acceptance 10k Optimization Follow-up (2026-07-16)
+
+The same in-app Chromium harness was rerun after the retained Pixi hot path was
+profiled one waste at a time. The accepted changes removed settled scans and
+temporary collections, replaced link and node `Graphics` objects with retained
+particle batches, reused views across equivalent topology objects, and carried
+unfinished materialization queues across the input-to-Worker object handoff.
+Experiments that did not improve the complete browser path were reverted rather
+than retained.
+
+With all 10,000 nodes and 17,500 links in the viewport at the final `0.07x`
+fit, six active/reheated samples held `59-60 FPS`, `16.7-17.6ms` rAF p95, and
+`8.4-11.2ms` last graph-draw CPU across repeat runs and a theme switch. The
+final settled review state held `60 FPS` with no long frame above `33.3ms`,
+exactly one canvas, and no browser console error. Theme changes retained all
+10,000 node and 17,500 link views while remaining at `59-60 FPS`.
+
+Fixed-sequence cold materialization runs improved from `1.51-1.60s` to
+`1.03-1.08s`; the completion-window FPS median rose from `26` to `53`, and the
+number of graph draws needed to finish fell from `53-55` to `41-43`. One
+initial roughly `50ms` frame can still occur. Profiling attributes that frame
+to the aggregate synchronous setup pipeline (deterministic mock generation,
+input normalization, topology signature/index construction, spatial indexing,
+and initial Pixi planning), not to a remaining dominant renderer loop.
+
+Hover, selection, selected borders, local/global scope changes, theme changes,
+and Worker-backed node movement continued to resolve through the existing
+Ograph interaction path. The production build still exports only `GraphView`,
+`defaultGraphPreset`, and `defaultGraphTheme`; Pixi/Worker selection remains
+debug-only and the published default remains Canvas 2D/Main. Further reduction
+of the cold setup frame would require asynchronous generation or staged
+initialization, which is an explicit UX/promotion decision rather than another
+no-UI-change renderer optimization.
