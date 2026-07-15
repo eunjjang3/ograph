@@ -113,6 +113,7 @@ The harness displays:
 - active private renderer and simulation lane,
 - graph draw count and last graph draw CPU duration,
 - simulation update count,
+- simulation active/idle state and the frame reasons keeping dirty rendering awake,
 - age of the latest Worker position result,
 - topology sync duration and first-visible-frame latency,
 - materialized and viewport-visible node/link/label object counts,
@@ -135,6 +136,11 @@ p50/p95 intervals, and long-frame counts are useful for fixed-seed A/B
 comparisons while tuning. They describe main-thread responsiveness rather than
 the graph draw loop alone and are not a replacement for a browser performance
 trace.
+
+`Frame Reasons` is `idle` once force updates, viewport/focus/lens/label easing,
+and Pixi materialization have all completed. At that point `Graph Draws` must
+remain unchanged across subsequent telemetry samples even though the page-level
+FPS counter continues sampling browser `requestAnimationFrame` cadence.
 
 ## Mock Data Shape
 

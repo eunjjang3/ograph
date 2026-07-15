@@ -508,9 +508,11 @@ export function DebugControlPanel({
             <div>&gt;33.3ms: <span className="text-rose-300 font-bold">{frameTelemetry.longFramesOver33Ms}</span></div>
             <div>Renderer: <span className="text-violet-300 font-bold">{runtimeTelemetry.renderer}</span></div>
             <div>Simulation: <span className="text-violet-300 font-bold">{runtimeTelemetry.simulation}</span></div>
-            <div>Graph Draws: <span className="text-emerald-300 font-bold">{runtimeTelemetry.renderCount}</span></div>
+            <div>Graph Draws: <span data-testid="runtime-render-count" className="text-emerald-300 font-bold">{runtimeTelemetry.renderCount}</span></div>
             <div>Last Draw CPU: <span className="text-emerald-300 font-bold">{runtimeTelemetry.lastRenderDurationMs.toFixed(2)}ms</span></div>
-            <div>Simulation Updates: <span className="text-cyan-300 font-bold">{runtimeTelemetry.simulationUpdateCount}</span></div>
+            <div>Simulation Updates: <span data-testid="runtime-simulation-updates" className="text-cyan-300 font-bold">{runtimeTelemetry.simulationUpdateCount}</span></div>
+            <div>Simulation State: <span data-testid="runtime-simulation-state" className="text-cyan-300 font-bold">{runtimeTelemetry.simulationActive ? 'active' : 'idle'}</span></div>
+            <div className="col-span-2">Frame Reasons: <span data-testid="runtime-frame-reasons" className="text-cyan-300 font-bold">{runtimeTelemetry.activeFrameReasons}</span></div>
             <div>Materialized Nodes: <span className="text-cyan-300 font-bold">{runtimeTelemetry.materializedNodes}</span></div>
             <div>Materialized Links: <span className="text-cyan-300 font-bold">{runtimeTelemetry.materializedLinks}</span></div>
             <div>Materialized Labels: <span className="text-cyan-300 font-bold">{runtimeTelemetry.materializedLabels}</span></div>

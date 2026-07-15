@@ -633,7 +633,7 @@ export function useGraphSimulation(
       graphRefreshAlpha,
       preserveScopeCentroid,
       gravityCenterNodeIds: gravityCenterNodeIds ? [...gravityCenterNodeIds] : null,
-      paused
+      paused: pausedRef.current
     };
 
     void import('./workerGraphSimulationClient')
@@ -683,6 +683,7 @@ export function useGraphSimulation(
 
         workerClientRef.current = client;
         client.start();
+        client.setPaused(pausedRef.current);
       })
       .catch(caught => {
         if (!disposed) reportSimulationError(caught);
@@ -711,7 +712,6 @@ export function useGraphSimulation(
     graphRefreshAlpha,
     preserveScopeCentroid,
     gravityCenterNodeIdsSignature,
-    paused,
     createSimulationWorker,
     runtimeTelemetryRef,
     markPayloadSyncedForLatestInputs,
@@ -723,10 +723,7 @@ export function useGraphSimulation(
   ] : []);
 
   useEffect(() => {
-    if (__OGRAPH_DEBUG_RUNTIME__ && engine === 'worker') {
-      workerClientRef.current?.setPaused(paused);
-      return;
-    }
+    if (engine !== 'main') return;
 
     try {
       const syncedInputs = payloadSyncedInputsRef.current;
@@ -780,6 +777,12 @@ export function useGraphSimulation(
       simulation.stop();
     } else if (simulation.alpha() > simulation.alphaMin()) {
       simulation.restart();
+    }
+  }, [engine, paused]);
+
+  useEffect(() => {
+    if (__OGRAPH_DEBUG_RUNTIME__ && engine === 'worker') {
+      workerClientRef.current?.setPaused(paused);
     }
   }, [engine, paused]);
 

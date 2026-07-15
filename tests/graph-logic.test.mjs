@@ -251,7 +251,9 @@ test('private graph runtime telemetry starts in a deterministic empty state', as
     workerResultAgeMs: 0,
     visibleNodes: 0,
     visibleLinks: 0,
-    visibleLabels: 0
+    visibleLabels: 0,
+    simulationActive: false,
+    activeFrameReasons: 'initializing'
   });
 });
 

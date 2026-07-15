@@ -272,6 +272,7 @@ function handleRequest(message: GraphSimulationWorkerRequest) {
   switch (message.type) {
     case 'set-paused':
       if (!simulation) return;
+      if (config) config.paused = message.paused;
       if (message.paused) {
         simulation.stop();
       } else if (simulation.alpha() > simulation.alphaMin()) {
@@ -279,7 +280,7 @@ function handleRequest(message: GraphSimulationWorkerRequest) {
       }
       return;
     case 'restart':
-      simulation?.alpha(message.alpha).restart();
+      if (!config?.paused) simulation?.alpha(message.alpha).restart();
       return;
     case 'drag-start': {
       const node = nodeById.get(message.nodeId);

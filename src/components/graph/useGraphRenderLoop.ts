@@ -149,6 +149,9 @@ export function useGraphRenderLoop({
 
         const simulation = simulationActivityRef.current;
         const isSimulationActive = isGraphSimulationActiveForFrame(simulation, simulationPaused);
+        if (__OGRAPH_DEBUG_RUNTIME__ && runtimeTelemetryRef) {
+          runtimeTelemetryRef.current.simulationActive = isSimulationActive;
+        }
         const renderNodes = renderNodesRef.current;
         const renderLinks = renderLinksRef.current;
       if (
@@ -370,14 +373,29 @@ export function useGraphRenderLoop({
         }
       }
 
-      if (
+      const rendererWorkPending =
+        __OGRAPH_DEBUG_RUNTIME__ && !!rendererBackendRef.current?.hasPendingWork?.();
+      const shouldContinue =
         isSimulationActive ||
         isDimmingActive ||
         isLensAnimationActive ||
         isLabelAnimationActive ||
         viewportAnimationActiveRef.current ||
-        (__OGRAPH_DEBUG_RUNTIME__ && rendererBackendRef.current?.hasPendingWork?.())
-      ) {
+        rendererWorkPending;
+
+      if (__OGRAPH_DEBUG_RUNTIME__ && runtimeTelemetryRef) {
+        const reasons = [
+          isSimulationActive ? 'simulation' : '',
+          isDimmingActive ? 'dimming' : '',
+          isLensAnimationActive ? 'lens' : '',
+          isLabelAnimationActive ? 'labels' : '',
+          viewportAnimationActiveRef.current ? 'viewport' : '',
+          rendererWorkPending ? 'materialization' : ''
+        ].filter(Boolean);
+        runtimeTelemetryRef.current.activeFrameReasons = reasons.join(',') || 'idle';
+      }
+
+      if (shouldContinue) {
         scheduleFrame();
       } else {
         lastFrameTimeRef.current = null;

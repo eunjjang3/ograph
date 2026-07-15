@@ -149,7 +149,9 @@ late frames from a disposed topology are ignored.
 Pause, restart, drag pin/move/release, local drag heat, and connected-neighbor
 wake are represented in the Worker protocol. Cleanup sends `dispose` and then
 terminates the Worker, including React StrictMode remounts and runtime-lane
-switches.
+switches. Pause updates the existing Worker instead of recreating it, prevents
+drag/restart messages from waking force timers while paused, and retains the
+last alpha so resuming an already settled graph remains idle.
 
 The Worker URL is created only by the debug harness. Vite defines
 `__OGRAPH_DEBUG_RUNTIME__` as `true` for the demo and `false` for the library
@@ -181,6 +183,11 @@ Geometry is retained across frames:
   limited to 600 visible labels while idle or 280 during focus/interaction;
 - pointer hit testing remains on Ograph's existing main-thread spatial index,
   with Pixi event traversal disabled.
+
+When simulation, focus/lens/label easing, viewport animation, and incremental
+materialization are all idle, the dirty-frame scheduler stops completely. The
+debug telemetry exposes the active frame reasons so an apparently settled graph
+cannot silently keep calling either Canvas draw or `app.render()`.
 
 `pixi.js` is a development dependency in this harness-first branch. The library
 build compiles the debug flag to `false`, removes the lazy Pixi import, emits no

@@ -37,6 +37,7 @@ export class WorkerGraphSimulationClient {
   private worker: Worker | null = null;
   private mappedNodes: GraphNode[] = [];
   private disposed = false;
+  private latestAlpha = 1;
   private readonly options: WorkerGraphSimulationClientOptions;
 
   constructor(options: WorkerGraphSimulationClientOptions) {
@@ -129,6 +130,7 @@ export class WorkerGraphSimulationClient {
           node.y = packed[index * 2 + 1];
         }
 
+        this.latestAlpha = value.alpha;
         const active = value.alpha > this.options.config.alphaMin && !this.options.config.paused;
         this.options.onActiveChange(active);
         this.options.onTick(performance.now());
@@ -140,6 +142,7 @@ export class WorkerGraphSimulationClient {
         return;
       }
       case 'settled':
+        this.latestAlpha = value.alpha;
         this.options.onActiveChange(false);
         this.options.onTick(performance.now());
         return;
@@ -156,12 +159,15 @@ export class WorkerGraphSimulationClient {
 
   setPaused(paused: boolean) {
     this.options.config.paused = paused;
-    this.options.onActiveChange(!paused && this.mappedNodes.length > 0);
+    this.options.onActiveChange(
+      !paused && this.mappedNodes.length > 0 && this.latestAlpha > this.options.config.alphaMin
+    );
     this.post({ type: 'set-paused', revision: this.options.revision, paused });
   }
 
   restart(alpha = 1) {
     if (this.options.config.paused) return;
+    this.latestAlpha = alpha;
     this.options.onActiveChange(true);
     this.post({ type: 'restart', revision: this.options.revision, alpha });
   }

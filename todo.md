@@ -133,7 +133,7 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
   - Docs: worker lifecycle and packaging notes in `docs/architecture.md`
   - Commit: `c07c0b3`
 
-- [ ] Stage 4: Add a Pixi WebGL renderer lane to the debug harness
+- [x] Stage 4: Add a Pixi WebGL renderer lane to the debug harness
   - Branch: `feat/obsidian-graph-harness-spike`
   - Likely files: `package.json`, lockfile, private renderer backend modules,
     `GraphView.tsx`, debug controls/telemetry
@@ -145,7 +145,7 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
   - Verification: StrictMode init/destroy race, resize/DPR, context failure,
     screenshot comparison, all pointer interactions, 1k/5k/10k harness runs
   - Docs: renderer lifecycle and fallback notes in `docs/architecture.md`
-  - Commit: `<pending>`
+  - Commit: `259aa89`
 
 - [ ] Stage 5: Add Obsidian-style work avoidance to the Pixi lane
   - Branch: `feat/obsidian-graph-harness-spike`

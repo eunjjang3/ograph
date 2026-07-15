@@ -19,6 +19,8 @@ export interface GraphRuntimeTelemetry {
   visibleNodes: number;
   visibleLinks: number;
   visibleLabels: number;
+  simulationActive: boolean;
+  activeFrameReasons: string;
 }
 
 export interface GraphRuntimeTelemetryRef {
@@ -59,6 +61,8 @@ export function createGraphRuntimeTelemetry(
     workerResultAgeMs: 0,
     visibleNodes: 0,
     visibleLinks: 0,
-    visibleLabels: 0
+    visibleLabels: 0,
+    simulationActive: false,
+    activeFrameReasons: 'initializing'
   };
 }
