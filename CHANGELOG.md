@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-## 0.2.0 - 2026-07-17
+## 0.2.0 - 2026-07-18
 
 This release keeps the consumer-facing graph appearance, interactions, public
 runtime exports, and Canvas 2D/Main Thread default unchanged. Pixi WebGL and
