@@ -281,8 +281,8 @@ screenshots were retained; dense WebGL curved-edge antialiasing differed on
 
 Human UX review at `http://127.0.0.1:4435/` accepted the observed differences
 as non-disruptive. Stage 7D is complete and the combined commit/push/PR flow is
-authorized. Version bump, merge, tag, and npm publication remain pending a
-separate approval.
+authorized. Subsequent approval authorized the `0.3.0` version, merge, tag, and
+npm release flow under the same public API and UX/UI constraints.
 
 Stage 7E repeated the full local gate after approval: lint, 77 tests and split
 budgets, demo/library builds, examples, pinned and floating React 18/19 packed
@@ -290,7 +290,8 @@ consumers, release identity, a zero-vulnerability runtime audit, the 21-file
 package dry run, and all 11 Chromium tests passed. Commit `110a45a` was pushed
 to `feat/pixi-worker-production-runtime` and draft PR #48 was opened against
 `main`. A publish dry run remains intentionally deferred to the separately
-approved version step because npm already contains `0.2.0`.
+approved version step because npm already contains `0.2.0`. That version step
+now targets `0.3.0` through the protected PR and release workflow.
 
 ## Human UX checkpoint (2026-07-15)
 

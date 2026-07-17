@@ -4,7 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-The pending release keeps the existing `GraphView` props, ref methods,
+## 0.3.0 - 2026-07-18
+
+This release keeps the existing `GraphView` props, ref methods,
 callbacks, runtime exports, graph appearance, and interaction model. Pixi
 WebGL and Worker simulation become internal defaults with automatic per-lane
 fallbacks; no renderer or simulation selector is added to the public API.

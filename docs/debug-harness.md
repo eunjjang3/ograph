@@ -478,6 +478,6 @@ antialiasing (`0.58%` of pixels), covered by a narrow `0.7%` cross-backend
 tolerance after visual diff inspection.
 
 Human review accepted the remaining cold-load and rasterization differences as
-not harmful to UX. That approval closes the Stage 7D checkpoint and permits the
-branch commit/push/PR flow. Version bump, merge, tag, and npm publication still
-require separate approval.
+not harmful to UX. That approval closed the Stage 7D checkpoint, and subsequent
+maintainer approval authorized the `0.3.0` version, merge, tag, and npm release
+flow without changing the public API or interaction contract.
