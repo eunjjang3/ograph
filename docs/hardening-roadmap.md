@@ -173,17 +173,19 @@ Current external setting evidence, checked on 2026-06-05 KST:
   Best Practices badge, fuzzing, signed releases, and maintainer-approved code
   review rules.
 
-Published package evidence:
+Published package evidence, refreshed on 2026-07-18 KST:
 
-- `npm view @eunjjang/ograph version --json` returns `0.1.0`, and the `latest`
-  dist-tag points at `0.1.0`.
+- `npm view @eunjjang/ograph version --json` returns `0.2.0`, and the `latest`
+  dist-tag points at `0.2.0`.
 - `npm access get status @eunjjang/ograph --json` returns `public`.
-- `npm access list packages eunjjang --json` returns
-  `{"@eunjjang/ograph":"read-write"}`.
-- `npm audit signatures --json` returns no invalid or missing signatures.
-- `npx -y npm@11.16.0 trust list @eunjjang/ograph --json` returns a GitHub
-  trusted publisher for repository `eunjjang3/ograph`, workflow
-  `release.yml`, environment `npm`, and permission `createPackage`.
+- GitHub release `v0.2.0` and its protected tag resolve to commit
+  `352d748d4a0348ffd0a7feceae590bc693b12759` on `main`.
+- Release workflow run `29599814873` completed successfully after the required
+  `npm` environment approval and published through OIDC Trusted Publishing.
+- `npm view @eunjjang/ograph@0.2.0 dist --json` reports a registry signature
+  and SLSA provenance attestation for the 15-file package tarball.
+- `npm audit signatures` verifies all 75 installed registry signatures and 29
+  attestations in the final release install.
 
 ## Completion Evidence
 

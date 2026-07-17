@@ -16,23 +16,23 @@ Do not rename the repository, package, or product during release hardening.
 ## Current Release State
 
 The `@eunjjang/ograph` package is published on npm as a public preview package.
-The first registry package creation has consumed version `0.1.0`, and npm
-Trusted Publishing is configured for the GitHub release workflow.
+The registry's `latest` release is `0.2.0`. The first registry package creation
+consumed version `0.1.0`, and subsequent releases use npm Trusted Publishing
+through the GitHub release workflow.
 
-Current evidence from 2026-06-05 KST:
+Current registry and release evidence from 2026-07-18 KST:
 
-- `npm view @eunjjang/ograph version --json` returns `0.1.0`.
-- `npm view @eunjjang/ograph dist-tags --json` points `latest` at `0.1.0`.
+- `npm view @eunjjang/ograph version --json` returns `0.2.0`.
+- `npm view @eunjjang/ograph dist-tags --json` points `latest` at `0.2.0`.
+- GitHub release `v0.2.0` and protected tag `v0.2.0` resolve to commit
+  `352d748d4a0348ffd0a7feceae590bc693b12759` on `main`.
+- Release workflow run `29599814873` completed successfully after the required
+  `npm` environment approval and published through OIDC Trusted Publishing.
 - `npm access get status @eunjjang/ograph --json` returns `public`.
-- `npm access list packages eunjjang --json` returns
-  `{"@eunjjang/ograph":"read-write"}`.
-- `npm audit signatures --json` returns no invalid or missing signatures.
-- `npx -y npm@11.16.0 trust list @eunjjang/ograph --json` returns a GitHub
-  trusted publisher for repository `eunjjang3/ograph`, workflow
-  `release.yml`, environment `npm`, and permission `createPackage`.
-- Local npm CLI is `11.12.1`; use `npx -y npm@11.16.0` or newer for trust
-  commands that need the allowed-action flags.
-- `npm whoami` returns `eunjjang`.
+- `npm view @eunjjang/ograph@0.2.0 dist --json` reports 15 files, a registry
+  signature, and an SLSA provenance attestation.
+- `npm audit signatures` verifies all 75 installed registry signatures and 29
+  attestations in the final release install.
 - GitHub repository ruleset `Protect release tags` (`17266129`) is active for
   `refs/tags/v*` and blocks deletion and non-fast-forward updates without
   bypass actors.
@@ -116,9 +116,9 @@ release events and `v*` tags are the publish trigger boundary.
      --jq '.enforce_admins.enabled'
    ```
 
-4. Do not republish an already-published version. The manual first publish has
-   already consumed `@eunjjang/ograph@0.1.0`; future npm publishes must bump
-   `package.json` and changelog before tagging.
+4. Do not republish an already-published version. Always query the registry
+   before tagging; as of 2026-07-18, versions `0.1.0` and `0.2.0` are consumed.
+   Future npm publishes must bump `package.json` and changelog before tagging.
 
 5. Configure Trusted Publishing for `@eunjjang/ograph`.
 
@@ -202,6 +202,11 @@ release events and `v*` tags are the publish trigger boundary.
    npm view @eunjjang/ograph repository.url
    npm audit signatures
    ```
+
+11. Refresh the current release evidence in this runbook and
+    `docs/hardening-roadmap.md` through a checked follow-up PR. Preserve dated
+    baseline entries, prior changelog sections, and release-identity fixtures
+    as historical evidence instead of replacing every old version string.
 
 ## Do Not
 
