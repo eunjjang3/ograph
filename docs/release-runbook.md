@@ -16,20 +16,20 @@ Do not rename the repository, package, or product during release hardening.
 ## Current Release State
 
 The `@eunjjang/ograph` package is published on npm as a public preview package.
-The registry's `latest` release is `0.2.0`. The first registry package creation
-consumed version `0.1.0`, and subsequent releases use npm Trusted Publishing
+The registry's `latest` release is `0.3.0`. Versions `0.1.0` and `0.2.0` remain
+consumed historical releases, and current releases use npm Trusted Publishing
 through the GitHub release workflow.
 
 Current registry and release evidence from 2026-07-18 KST:
 
-- `npm view @eunjjang/ograph version --json` returns `0.2.0`.
-- `npm view @eunjjang/ograph dist-tags --json` points `latest` at `0.2.0`.
-- GitHub release `v0.2.0` and protected tag `v0.2.0` resolve to commit
-  `352d748d4a0348ffd0a7feceae590bc693b12759` on `main`.
-- Release workflow run `29599814873` completed successfully after the required
+- `npm view @eunjjang/ograph version --json` returns `0.3.0`.
+- `npm view @eunjjang/ograph dist-tags --json` points `latest` at `0.3.0`.
+- GitHub release `v0.3.0` and protected tag `v0.3.0` resolve to commit
+  `b511c791a3d5fbc6672178b13bd3c319aaa64517` on `main`.
+- Release workflow run `29609893972` completed successfully after the required
   `npm` environment approval and published through OIDC Trusted Publishing.
 - `npm access get status @eunjjang/ograph --json` returns `public`.
-- `npm view @eunjjang/ograph@0.2.0 dist --json` reports 15 files, a registry
+- `npm view @eunjjang/ograph@0.3.0 dist --json` reports 21 files, a registry
   signature, and an SLSA provenance attestation.
 - `npm audit signatures` verifies all 75 installed registry signatures and 29
   attestations in the final release install.

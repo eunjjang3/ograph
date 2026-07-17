@@ -288,10 +288,13 @@ Stage 7E repeated the full local gate after approval: lint, 77 tests and split
 budgets, demo/library builds, examples, pinned and floating React 18/19 packed
 consumers, release identity, a zero-vulnerability runtime audit, the 21-file
 package dry run, and all 11 Chromium tests passed. Commit `110a45a` was pushed
-to `feat/pixi-worker-production-runtime` and draft PR #48 was opened against
-`main`. A publish dry run remains intentionally deferred to the separately
-approved version step because npm already contains `0.2.0`. That version step
-now targets `0.3.0` through the protected PR and release workflow.
+to `feat/pixi-worker-production-runtime`; PR #48 passed CI and CodeQL, then
+squash-merged to `main` as `b511c79`. The approved `0.3.0` package dry run and
+release-event identity gate passed before protected tag `v0.3.0` and the GitHub
+release were created. Release workflow run `29609893972` passed the required
+`npm` environment approval, all repeated consumer/browser gates, and OIDC
+Trusted Publishing. The registry now resolves `latest` to `0.3.0` with a
+registry signature and SLSA provenance attestation.
 
 ## Human UX checkpoint (2026-07-15)
 
