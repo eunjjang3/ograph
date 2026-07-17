@@ -26,6 +26,37 @@ async function importSourceModule(relativePath) {
   return loaded;
 }
 
+async function importHookModuleWithReactStub(relativePath) {
+  const sourcePath = fileURLToPath(new URL(relativePath, repoRoot));
+  const result = await esbuild.build({
+    entryPoints: [sourcePath],
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    write: false,
+    plugins: [{
+      name: 'react-hook-stub',
+      setup(build) {
+        build.onResolve({ filter: /^react$/ }, () => ({
+          path: 'react-hook-stub',
+          namespace: 'ograph-test'
+        }));
+        build.onLoad({ filter: /.*/, namespace: 'ograph-test' }, () => ({
+          contents: [
+            'export const useEffect = () => undefined;',
+            'export const useMemo = factory => factory();',
+            'export const useState = initial => [typeof initial === "function" ? initial() : initial, () => undefined];'
+          ].join('\n'),
+          loader: 'js'
+        }));
+      }
+    }]
+  });
+  const code = result.outputFiles[0].text;
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
+  return import(moduleUrl);
+}
+
 function createSeededRandom(seed) {
   let state = seed >>> 0;
 
@@ -1204,17 +1235,27 @@ test('graph growth options support custom timestamp extractors and safe timing d
   assert.equal(resolveGraphGrowthAnimationOptions({ enabled: false }).enabled, false);
 });
 
-test('complete graph growth frames preserve graph references and expose every source node id', async () => {
+test('disabled graph growth returns the complete graph without reading timestamps', async () => {
   const {
-    createCompleteGraphGrowthFrame
-  } = await importSourceModule('src/components/graph/useGraphGrowthAnimation.ts');
+    useGraphGrowthAnimation
+  } = await importHookModuleWithReactStub('src/components/graph/useGraphGrowthAnimation.ts');
   const nodes = [
     { id: 'a', label: 'A' },
     { id: 'b', label: 'B' }
   ];
   const links = [{ source: 'a', target: 'b' }];
 
-  const frame = createCompleteGraphGrowthFrame(nodes, links);
+  const frame = useGraphGrowthAnimation({
+    nodes,
+    links,
+    animation: {
+      enabled: false,
+      getNodeTimestamp: () => {
+        throw new Error('disabled growth must not read timestamps');
+      }
+    },
+    reduceMotion: false
+  });
 
   assert.equal(frame.nodes, nodes);
   assert.equal(frame.links, links);

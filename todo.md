@@ -388,8 +388,8 @@ changing those contracts.
   - Branch: `feat/obsidian-graph-harness-spike`
   - Verification: same-sequence 10k A/B, interaction smoke, targeted unit tests
   - Docs: `docs/architecture.md`, `docs/debug-harness.md`
-  - Commit: `<pending>`
-- [ ] Stage 13: Re-prove API, UI, interaction, package, and consumer compatibility
+  - Commit: `e70bdcf`
+- [x] Stage 13: Re-prove API, UI, interaction, package, and consumer compatibility
   - Branch: `feat/obsidian-graph-harness-spike`
   - Verification: lint, unit/API/budget, builds, examples, React 18/19 consumers, Chromium E2E
   - Docs: `todo.md`, relevant architecture/debug notes
@@ -398,20 +398,31 @@ changing those contracts.
 Stage 11 added a headed-Chrome/CDP profiler that keeps ordinary timing runs
 separate from allocation sampling, because heap sampling and headless software
 WebGL both distort Pixi timing. The fixed `1k -> 10k` baseline measured
-`1,164-1,215ms` to full materialization, `67.5-71.2ms` to first visible,
-`16.72-16.93MiB` forced-GC heap growth, and `60` settled graph draws/s.
+`1,232-1,249ms` to observed full materialization, `67.7-72.8ms` to first
+visible, `16.55-16.82MiB` forced-GC heap growth, and `60` settled graph draws/s.
 
 Stage 12 retained only the default-disabled growth-animation fast path. It
 skips timestamp extraction, sorting, and signature construction, then reuses
 the complete frame's source-ID set. Enabled growth sequencing and its internal
 revealed-count synchronization remain unchanged. Final same-sequence runs kept
-materialization effectively flat at `1,158-1,173ms`, reduced first visible to
-`64.8-67.1ms`, and reduced the forced-GC heap delta to `16.07-16.23MiB` while
-holding `60` draws/s. The corrected five-cycle run, with profiler observers
-disabled after the cold window, measured `33.93`, `34.16`, `34.59`, `34.55`,
-and `34.72MiB`; its final three settled into a `0.17MiB` band. A cold-link
-containment experiment reduced one sampled function cost but not end-to-end
-time and was reverted.
+materialization effectively flat at `1,236-1,245ms`, reduced first visible to
+`64.4-64.7ms`, and reduced the forced-GC heap delta to `15.76-16.30MiB` while
+holding `60` draws/s. With profiler observers stopped after the cold window, a
+five-cycle run measured 10k heaps of `33.99`, `34.47`, `34.30`, `34.41`, and
+`34.76MiB`; the sequence was not monotonic and the final three 1k readings were
+all `21.69MiB`. A cold-link containment experiment reduced one sampled function
+cost but not end-to-end time and was reverted.
+
+Stage 13 corrected profiler self-interference by using the page clock and
+stopping its private rAF/long-task observers after the cold window. It restored
+direct disabled-growth coverage through a test-only React hook stub and reduced
+the final package entry to `16,908` bytes gzip. The gate passed lint, 75
+unit/API/budget tests, demo/library builds, examples, pinned and floating React
+18/19 consumers, and all 8 Chromium interaction/visual tests. The built entry
+still exports exactly `GraphView`, `defaultGraphPreset`, and
+`defaultGraphTheme`, contains no Pixi/Worker marker, and keeps Canvas 2D/Main
+as the production default. A debug Pixi/Worker smoke retained one canvas,
+hover/select, a 14-node local lens, global restoration, and zero console errors.
 
 ## Stop conditions
 

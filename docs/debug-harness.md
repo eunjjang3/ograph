@@ -345,6 +345,11 @@ main-thread long tasks and rAF gaps, sampled CPU frames, forced-GC heap and DOM
 counters, optional retained-allocation samples, and optional repeated
 `1k <-> 10k` heap cycles.
 
+The cold window uses the page's `performance.now()` clock. Its private
+PerformanceObserver and rAF sampler are disconnected as soon as materialization
+is observed so idle and cycle heap readings do not include profiler-owned work
+or growing sample arrays.
+
 Run timing profiles in a headed Chrome window so the graph uses the machine's
 real GPU:
 
@@ -362,12 +367,12 @@ The pre-change headed baseline produced:
 
 | Metric | Three-run range |
 | --- | ---: |
-| Complete 10k materialization | 1,164-1,215ms |
-| First visible | 67.5-71.2ms |
-| Cold long-task maximum | 94-99ms |
-| Forced-GC JS heap delta from retained 1k | 16.72-16.93MiB |
+| Observed complete 10k materialization | 1,232-1,249ms |
+| First visible | 67.7-72.8ms |
+| Cold long-task maximum | 97-109ms |
+| Forced-GC JS heap delta from retained 1k | 16.55-16.82MiB |
 | Settled active graph draws | 60/s |
-| Settled full-frame CPU p95 | 7.4-8.2ms |
+| Settled full-frame CPU p95 | 7.5-8.1ms |
 
 The allocation sample showed that most of the post-GC plateau is live graph
 state: Pixi particles/maps, the Worker-side simulation copy, main-thread
@@ -388,24 +393,45 @@ Final same-sequence headed results were:
 
 | Metric | Before | After |
 | --- | ---: | ---: |
-| Complete 10k materialization | 1,164-1,215ms | 1,158-1,173ms |
-| First visible | 67.5-71.2ms | 64.8-67.1ms |
-| Cold long-task maximum | 94-99ms | 94-97ms |
-| Forced-GC JS heap delta from retained 1k | 16.72-16.93MiB | 16.07-16.23MiB |
+| Observed complete 10k materialization | 1,232-1,249ms | 1,236-1,245ms |
+| First visible | 67.7-72.8ms | 64.4-64.7ms |
+| Cold long-task maximum | 97-109ms | 93-95ms |
+| Forced-GC JS heap delta from retained 1k | 16.55-16.82MiB | 15.76-16.30MiB |
 | Settled active graph draws | 60/s | 60/s |
-| Settled full-frame CPU p95 | 7.4-8.2ms | 7.5-8.4ms |
+| Settled full-frame CPU p95 | 7.5-8.1ms | 7.5-8.1ms |
 
 The materialization and steady-frame ranges are treated as unchanged; the
-retained result is the roughly `0.49-0.86MiB` heap reduction plus the smaller
-first-visible improvement. After cold-window observers were disabled so the
-profiler could not retain its own samples, a five-cycle forced-GC check placed
-the repeated 10k heaps at `33.93`, `34.16`, `34.59`, `34.55`, and `34.72MiB`.
-The final three stayed within a `0.17MiB` band instead of growing on every
-cycle. The smaller 1k heaps remain above their initial value after the first
+retained result is a `0.25-1.06MiB` heap reduction (`0.78MiB` by median), the
+smaller first-visible result, and a lower cold long-task maximum. With all
+profiler-owned cold observers stopped, a five-cycle forced-GC check measured
+the repeated 10k heaps at `33.99`, `34.47`, `34.30`, `34.41`, and `34.76MiB`.
+The sequence is not monotonic, while the final three 1k readings were all
+`21.69MiB`. The smaller fixture remains above its initial value after the first
 10k visit because the intentional position cache retains coordinates for
 topology continuity.
 
 An exact full-containment shortcut for cold link materialization was also
 tested. It reduced sampled `materializeLinks` self CPU from roughly `52ms` to
-`35ms`, but end-to-end materialization did not improve (`1,172-1,191ms` versus
-the retained `1,158-1,173ms` range), so it was reverted.
+`35ms`, but its same-sequence end-to-end materialization range did not improve,
+so it was reverted.
+
+### Final compatibility gate
+
+The final pass fixed two profiler self-interference issues before accepting the
+evidence: elapsed time now uses the page clock, and the private long-task/rAF
+samplers stop immediately after the cold window. A React-stubbed source test
+also proves that disabled growth returns the original complete graph and never
+calls a supplied timestamp extractor.
+
+`npm run lint`, all 75 unit/API/budget tests, demo and library builds, examples,
+pinned and floating React 18/19 packed consumers, and all 8 Chromium consumer
+tests passed. The deterministic visual smoke baselines did not change. The
+final library entry is `16,908` bytes gzip against the `16,938.9` byte budget,
+exports only `GraphView`, `defaultGraphPreset`, and `defaultGraphTheme`, and
+contains no Pixi/Worker runtime marker or asset.
+
+A debug Pixi/Worker interaction smoke retained exactly one canvas, hovered and
+selected `node-654`, entered a 14-node local lens, restored all 1,000 global
+nodes, and reported zero console errors. Pixi/Worker remains debug-only,
+Canvas 2D/Main remains the production default, and no push or promotion was
+performed.

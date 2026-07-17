@@ -160,8 +160,16 @@ async function runProfile(url, cycles) {
   const cdp = await context.newCDPSession(page);
 
   await page.addInitScript(() => {
-    window.__ographProfile = { active: true, longTasks: [], rafGaps: [], lastRaf: 0 };
-    new PerformanceObserver(list => {
+    const profile = window.__ographProfile = {
+      active: true,
+      longTasks: [],
+      rafGaps: [],
+      lastRaf: 0,
+      rafId: 0,
+      startedAt: 0,
+      observer: null
+    };
+    const observer = new PerformanceObserver(list => {
       if (!window.__ographProfile.active) return;
       for (const entry of list.getEntries()) {
         window.__ographProfile.longTasks.push({
@@ -169,18 +177,24 @@ async function runProfile(url, cycles) {
           duration: entry.duration
         });
       }
-    }).observe({ type: 'longtask', buffered: true });
+    });
+    observer.observe({ type: 'longtask', buffered: true });
+    profile.observer = observer;
 
     const sampleRaf = timestamp => {
       const profile = window.__ographProfile;
-      if (profile.active && profile.lastRaf > 0) {
+      if (!profile.active) {
+        profile.rafId = 0;
+        return;
+      }
+      if (profile.lastRaf > 0) {
         const gap = timestamp - profile.lastRaf;
         if (gap > 20) profile.rafGaps.push(gap);
       }
       profile.lastRaf = timestamp;
-      requestAnimationFrame(sampleRaf);
+      profile.rafId = requestAnimationFrame(sampleRaf);
     };
-    requestAnimationFrame(sampleRaf);
+    profile.rafId = requestAnimationFrame(sampleRaf);
   });
 
   await cdp.send('Performance.enable');
@@ -204,20 +218,21 @@ async function runProfile(url, cycles) {
       window.__ographProfile.longTasks = [];
       window.__ographProfile.rafGaps = [];
       window.__ographProfile.active = true;
-      performance.mark('ograph-profile-start');
+      window.__ographProfile.startedAt = performance.now();
     });
     if (heapProfileEnabled) {
       await cdp.send('HeapProfiler.startSampling', { samplingInterval: 32768 });
     }
     await cdp.send('Profiler.start');
 
-    const startedAt = performance.now();
     await page.getByRole('button', { name: '10000', exact: true }).click();
     const materializedTelemetry = await waitForTelemetry(page, text => (
       text.includes('Materialized Nodes: 10000') &&
       text.includes('Materialized Links: 17500')
     ));
-    const materializedElapsedMs = performance.now() - startedAt;
+    const materializedElapsedMs = await page.evaluate(() => (
+      performance.now() - window.__ographProfile.startedAt
+    ));
     const profile = (await cdp.send('Profiler.stop')).profile;
     const coldWindowSamples = await page.evaluate(() => {
       const samples = {
@@ -225,6 +240,11 @@ async function runProfile(url, cycles) {
         rafGaps: [...window.__ographProfile.rafGaps]
       };
       window.__ographProfile.active = false;
+      if (window.__ographProfile.rafId) {
+        cancelAnimationFrame(window.__ographProfile.rafId);
+        window.__ographProfile.rafId = 0;
+      }
+      window.__ographProfile.observer?.disconnect();
       window.__ographProfile.longTasks = [];
       window.__ographProfile.rafGaps = [];
       return samples;
@@ -233,7 +253,9 @@ async function runProfile(url, cycles) {
     const idleTelemetry = await waitForTelemetry(page, text => (
       text.includes('Simulation State: idle') && text.includes('Frame Reasons: idle')
     ));
-    const idleElapsedMs = performance.now() - startedAt;
+    const idleElapsedMs = await page.evaluate(() => (
+      performance.now() - window.__ographProfile.startedAt
+    ));
 
     await cdp.send('HeapProfiler.collectGarbage');
     const heapProfile = heapProfileEnabled
