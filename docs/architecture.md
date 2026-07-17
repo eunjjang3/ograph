@@ -241,6 +241,12 @@ revealed. This keeps chronological replay app-agnostic: metadata decides reveal
 order, while d3-force still owns the physical attachment and settling behavior.
 Missing or invalid timestamps fall back to input order after timestamped nodes.
 
+When `growthAnimation` is disabled, the hook returns the complete graph without
+extracting timestamps, sorting a sequence, or constructing the sequence
+signature. The complete frame's `revealedNodeIds` set is reused as the render
+loop's source-node set. Enabled animation still follows the same sequence,
+timing, revealed-count synchronization, and link eligibility rules.
+
 Node-focus camera requests run after lens scoping and simulation refs are
 available. They only target IDs in the current visible scope, so hidden local
 halo nodes and unrevealed growth-animation nodes are treated as unavailable

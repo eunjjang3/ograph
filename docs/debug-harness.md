@@ -375,3 +375,37 @@ simulation/render maps, and bounded text objects. It also identified a smaller
 avoidable retained bucket in the default-disabled growth-animation pipeline,
 which still built its timestamp sequence, sorted signature, and a second
 source-ID set. Optimization results are recorded in the follow-up below.
+
+### Disabled-growth fast path
+
+The retained change bypasses timestamp extraction, sorting, and growth-signature
+construction when `growthAnimation` is disabled, which is the default. Its
+complete-frame source-ID set is also reused by the render loop instead of being
+rebuilt. The enabled animation path, revealed-count synchronization, graph
+references, node order, and public options remain unchanged.
+
+Final same-sequence headed results were:
+
+| Metric | Before | After |
+| --- | ---: | ---: |
+| Complete 10k materialization | 1,164-1,215ms | 1,158-1,173ms |
+| First visible | 67.5-71.2ms | 64.8-67.1ms |
+| Cold long-task maximum | 94-99ms | 94-97ms |
+| Forced-GC JS heap delta from retained 1k | 16.72-16.93MiB | 16.07-16.23MiB |
+| Settled active graph draws | 60/s | 60/s |
+| Settled full-frame CPU p95 | 7.4-8.2ms | 7.5-8.4ms |
+
+The materialization and steady-frame ranges are treated as unchanged; the
+retained result is the roughly `0.49-0.86MiB` heap reduction plus the smaller
+first-visible improvement. After cold-window observers were disabled so the
+profiler could not retain its own samples, a five-cycle forced-GC check placed
+the repeated 10k heaps at `33.93`, `34.16`, `34.59`, `34.55`, and `34.72MiB`.
+The final three stayed within a `0.17MiB` band instead of growing on every
+cycle. The smaller 1k heaps remain above their initial value after the first
+10k visit because the intentional position cache retains coordinates for
+topology continuity.
+
+An exact full-containment shortcut for cold link materialization was also
+tested. It reduced sampled `materializeLinks` self CPU from roughly `52ms` to
+`35ms`, but end-to-end materialization did not improve (`1,172-1,191ms` versus
+the retained `1,158-1,173ms` range), so it was reverted.

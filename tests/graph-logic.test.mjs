@@ -1204,6 +1204,24 @@ test('graph growth options support custom timestamp extractors and safe timing d
   assert.equal(resolveGraphGrowthAnimationOptions({ enabled: false }).enabled, false);
 });
 
+test('complete graph growth frames preserve graph references and expose every source node id', async () => {
+  const {
+    createCompleteGraphGrowthFrame
+  } = await importSourceModule('src/components/graph/useGraphGrowthAnimation.ts');
+  const nodes = [
+    { id: 'a', label: 'A' },
+    { id: 'b', label: 'B' }
+  ];
+  const links = [{ source: 'a', target: 'b' }];
+
+  const frame = createCompleteGraphGrowthFrame(nodes, links);
+
+  assert.equal(frame.nodes, nodes);
+  assert.equal(frame.links, links);
+  assert.deepEqual([...frame.revealedNodeIds], ['a', 'b']);
+  assert.equal(frame.isComplete, true);
+});
+
 test('diffGraph reports deterministic node and duplicate-link patches without mutating inputs', async () => {
   const { diffGraph, getGraphLinkDiffKey } = await importSourceModule('src/components/graph/graphDiff.ts');
   const stableNode = { id: 'a', label: 'A' };

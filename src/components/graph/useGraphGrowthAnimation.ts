@@ -40,6 +40,11 @@ export interface GraphGrowthFrame<
   isComplete: boolean;
 }
 
+const EMPTY_GRAPH_GROWTH_SEQUENCE: GraphGrowthSequence = {
+  items: [],
+  signature: ''
+};
+
 function sanitizeMilliseconds(value: number | undefined, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
     ? value
@@ -190,6 +195,21 @@ export function filterGraphByGrowthStep<
   };
 }
 
+export function createCompleteGraphGrowthFrame<
+  NodeMetadata extends GraphNodeMetadata,
+  LinkMetadata extends GraphNodeMetadata
+>(
+  nodes: GraphNode<NodeMetadata>[],
+  links: GraphLink<LinkMetadata, NodeMetadata>[]
+): GraphGrowthFrame<NodeMetadata, LinkMetadata> {
+  return {
+    nodes,
+    links,
+    revealedNodeIds: new Set(nodes.map(node => node.id)),
+    isComplete: true
+  };
+}
+
 export function useGraphGrowthAnimation<
   NodeMetadata extends GraphNodeMetadata,
   LinkMetadata extends GraphNodeMetadata
@@ -206,10 +226,12 @@ export function useGraphGrowthAnimation<
 }): GraphGrowthFrame<NodeMetadata, LinkMetadata> {
   const options = resolveGraphGrowthAnimationOptions(animation);
   const sequence = useMemo(
-    () => buildGraphGrowthSequence(nodes, options),
-    [nodes, options.getNodeTimestamp, options.timestampMetadataKey]
+    () => options.enabled
+      ? buildGraphGrowthSequence(nodes, options)
+      : EMPTY_GRAPH_GROWTH_SEQUENCE,
+    [nodes, options.enabled, options.getNodeTimestamp, options.timestampMetadataKey]
   );
-  const totalNodeCount = sequence.items.length;
+  const totalNodeCount = options.enabled ? sequence.items.length : nodes.length;
   const shouldAnimate = options.enabled && !reduceMotion && totalNodeCount > 0;
   const [revealedCount, setRevealedCount] = useState(() => (
     getInitialGraphGrowthRevealedCount(totalNodeCount, shouldAnimate, options.initialDelayMs)
@@ -268,12 +290,22 @@ export function useGraphGrowthAnimation<
   ]);
 
   return useMemo(
-    () => filterGraphByGrowthStep(
-      nodes,
+    () => options.enabled
+      ? filterGraphByGrowthStep(
+          nodes,
+          links,
+          sequence,
+          shouldAnimate ? revealedCount : totalNodeCount
+        )
+      : createCompleteGraphGrowthFrame(nodes, links),
+    [
       links,
+      nodes,
+      options.enabled,
+      revealedCount,
       sequence,
-      shouldAnimate ? revealedCount : totalNodeCount
-    ),
-    [links, nodes, revealedCount, sequence, shouldAnimate, totalNodeCount]
+      shouldAnimate,
+      totalNodeCount
+    ]
   );
 }

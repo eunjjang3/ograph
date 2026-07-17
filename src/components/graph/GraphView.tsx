@@ -193,7 +193,7 @@ function GraphViewCanvasInner<
     animation: growthAnimation,
     reduceMotion
   });
-  const sourceNodeIds = useMemo(() => new Set(growthGraph.nodes.map(node => node.id)), [growthGraph.nodes]);
+  const sourceNodeIds = growthGraph.revealedNodeIds;
   const lensScope = useGraphLensScope({
     nodes: growthGraph.nodes,
     links: growthGraph.links,

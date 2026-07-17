@@ -383,8 +383,8 @@ changing those contracts.
   - Branch: `feat/obsidian-graph-harness-spike`
   - Verification: fixed-seed 10k Pixi/Worker cold-load profile plus targeted telemetry tests
   - Docs: `docs/debug-harness.md`, `todo.md`
-  - Commit: `<pending>`
-- [ ] Stage 12: Remove the largest low-risk cold-path or allocation waste
+  - Commit: `0f37c1d`
+- [x] Stage 12: Remove the largest low-risk cold-path or allocation waste
   - Branch: `feat/obsidian-graph-harness-spike`
   - Verification: same-sequence 10k A/B, interaction smoke, targeted unit tests
   - Docs: `docs/architecture.md`, `docs/debug-harness.md`
@@ -394,6 +394,24 @@ changing those contracts.
   - Verification: lint, unit/API/budget, builds, examples, React 18/19 consumers, Chromium E2E
   - Docs: `todo.md`, relevant architecture/debug notes
   - Commit: `<pending>`
+
+Stage 11 added a headed-Chrome/CDP profiler that keeps ordinary timing runs
+separate from allocation sampling, because heap sampling and headless software
+WebGL both distort Pixi timing. The fixed `1k -> 10k` baseline measured
+`1,164-1,215ms` to full materialization, `67.5-71.2ms` to first visible,
+`16.72-16.93MiB` forced-GC heap growth, and `60` settled graph draws/s.
+
+Stage 12 retained only the default-disabled growth-animation fast path. It
+skips timestamp extraction, sorting, and signature construction, then reuses
+the complete frame's source-ID set. Enabled growth sequencing and its internal
+revealed-count synchronization remain unchanged. Final same-sequence runs kept
+materialization effectively flat at `1,158-1,173ms`, reduced first visible to
+`64.8-67.1ms`, and reduced the forced-GC heap delta to `16.07-16.23MiB` while
+holding `60` draws/s. The corrected five-cycle run, with profiler observers
+disabled after the cold window, measured `33.93`, `34.16`, `34.59`, `34.55`,
+and `34.72MiB`; its final three settled into a `0.17MiB` band. A cold-link
+containment experiment reduced one sampled function cost but not end-to-end
+time and was reverted.
 
 ## Stop conditions
 

@@ -160,8 +160,9 @@ async function runProfile(url, cycles) {
   const cdp = await context.newCDPSession(page);
 
   await page.addInitScript(() => {
-    window.__ographProfile = { longTasks: [], rafGaps: [], lastRaf: 0 };
+    window.__ographProfile = { active: true, longTasks: [], rafGaps: [], lastRaf: 0 };
     new PerformanceObserver(list => {
+      if (!window.__ographProfile.active) return;
       for (const entry of list.getEntries()) {
         window.__ographProfile.longTasks.push({
           startTime: entry.startTime,
@@ -172,7 +173,7 @@ async function runProfile(url, cycles) {
 
     const sampleRaf = timestamp => {
       const profile = window.__ographProfile;
-      if (profile.lastRaf > 0) {
+      if (profile.active && profile.lastRaf > 0) {
         const gap = timestamp - profile.lastRaf;
         if (gap > 20) profile.rafGaps.push(gap);
       }
@@ -202,6 +203,7 @@ async function runProfile(url, cycles) {
     await page.evaluate(() => {
       window.__ographProfile.longTasks = [];
       window.__ographProfile.rafGaps = [];
+      window.__ographProfile.active = true;
       performance.mark('ograph-profile-start');
     });
     if (heapProfileEnabled) {
@@ -217,10 +219,16 @@ async function runProfile(url, cycles) {
     ));
     const materializedElapsedMs = performance.now() - startedAt;
     const profile = (await cdp.send('Profiler.stop')).profile;
-    const coldWindowSamples = await page.evaluate(() => ({
-      longTasks: [...window.__ographProfile.longTasks],
-      rafGaps: [...window.__ographProfile.rafGaps]
-    }));
+    const coldWindowSamples = await page.evaluate(() => {
+      const samples = {
+        longTasks: [...window.__ographProfile.longTasks],
+        rafGaps: [...window.__ographProfile.rafGaps]
+      };
+      window.__ographProfile.active = false;
+      window.__ographProfile.longTasks = [];
+      window.__ographProfile.rafGaps = [];
+      return samples;
+    });
 
     const idleTelemetry = await waitForTelemetry(page, text => (
       text.includes('Simulation State: idle') && text.includes('Frame Reasons: idle')
