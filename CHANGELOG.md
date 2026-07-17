@@ -4,6 +4,48 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+The pending release keeps the existing `GraphView` props, ref methods,
+callbacks, runtime exports, graph appearance, and interaction model. Pixi
+WebGL and Worker simulation become internal defaults with automatic per-lane
+fallbacks; no renderer or simulation selector is added to the public API.
+
+### Added
+
+- Added package-owned lazy graph chunks and a package-relative module Worker
+  asset, with separate synchronous-entry, lazy-chunk, and Worker gzip budgets.
+- Added packed-consumer coverage proving default Pixi/Worker activation,
+  WebGL-to-Canvas recovery, Worker-to-main recovery, one-canvas lifecycle, and
+  recovered failures that do not surface through consumer `onError`.
+
+### Changed
+
+- Promoted Pixi WebGL plus Worker simulation behind the existing `GraphView`
+  API while retaining Canvas 2D and main-thread simulation as internal
+  environment fallbacks.
+- Made `pixi.js` an exact runtime dependency while keeping it external to
+  Ograph's package-owned chunks for consumer-bundler deduplication.
+- Extended the fixed-seed profiler with a selectable 2,500/5,000/10,000-node
+  target for repeatable intermediate-size qualification.
+
+### Fixed
+
+- Replaced quadratic pending-link `Array.shift()` materialization with in-place
+  queue compaction. The fixed 5,000-node sequence improved complete
+  materialization from `1.188-1.193s` to `0.686-0.713s` without changing its
+  first-visible or steady-frame behavior.
+- Made WebGL pixel smoke checks read browser-composited screenshots instead of
+  an invalidated non-preserved drawing buffer, and stabilized the StrictMode
+  test on completed asynchronous Pixi initialization.
+
+### Verified
+
+- Preserved exactly one canvas, the existing Canvas visual baselines, public
+  declarations, and runtime exports (`GraphView`, `defaultGraphPreset`, and
+  `defaultGraphTheme`).
+- Passed 77 unit/API/release/budget tests and all 11 packed-consumer Chromium
+  interaction, fallback, lifecycle, and visual tests; human review accepted the
+  remaining cold-load and rasterization differences as non-disruptive to UX.
+
 ## 0.2.0 - 2026-07-18
 
 This release keeps the consumer-facing graph appearance, interactions, public

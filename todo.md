@@ -173,7 +173,9 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
   - Commit: `8986ad3`
 
 - [ ] Stage 7: Promote the accepted runtime behind the existing public API
-  - Branch: separate follow-up branch after explicit approval
+  - Worktree: `/Users/eun/Documents/ograph-pixi-worker-production`
+  - Branch: `feat/pixi-worker-production-runtime`
+  - Base: `main` at `f075f6c47df4ba90eef284ce7018510eb7530e99`
   - Preconditions: Stage 6 accepts Pixi/Worker and approves its visual and
     bundle-cost tradeoffs
   - Deliverable: production default selection, transparent Canvas fallback on
@@ -183,6 +185,102 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
   - Docs: API wording remains renderer-neutral; architecture, changelog, and
     release notes document the internal runtime change
   - Commit: `<pending>`
+
+  - [x] Stage 7A: Lock production promotion and fallback invariants
+    - Deliverable: renderer-neutral packed-browser pixel checks; regression
+      coverage for WebGL and Worker construction failure; unchanged public
+      runtime/type exports; exactly one consumer-visible canvas
+    - Verification: targeted API/graph tests and packed-browser nonvisual tests
+    - Docs: this plan
+    - Commit: `<pending>`
+
+  - [x] Stage 7B: Package the lazy Pixi renderer and simulation Worker
+    - Deliverable: `pixi.js` runtime dependency, lazy renderer chunk, bundled
+      module Worker asset, tarball inclusion rules, SSR-safe import, and package
+      budgets split between the synchronous entry and lazy runtime assets
+    - Verification: library build, tarball inventory, React 18/19 packed
+      consumers, direct registry-style browser install
+    - Docs: `docs/architecture.md`, `docs/debug-harness.md`
+    - Commit: `<pending>`
+
+  - [x] Stage 7C: Promote Pixi/Worker with automatic per-lane fallback
+    - Deliverable: package-facing Pixi/Worker default; silent Pixi-to-Canvas
+      canvas replacement on WebGL/init failure; Worker-to-main fallback on
+      construction, protocol, or runtime failure; debug lane failures remain
+      observable instead of silently changing the selected experiment
+    - Verification: fallback unit tests, StrictMode cleanup, pause/restart/drag,
+      one-canvas lifecycle, no consumer `onError` for a recovered environment
+      limitation
+    - Docs: `docs/architecture.md`, renderer-neutral `docs/api.md`
+    - Commit: `<pending>`
+
+  - [x] Stage 7D: Qualify cold start, visuals, interactions, and performance
+    - Deliverable: background-only cold initialization with no spinner or
+      public state; first-visible timing, 1k/5k/10k performance, packed visual
+      diffs, and an explicit human UX checkpoint before baseline updates
+    - Verification: full debug profiler plus packed Playwright interaction and
+      visual suites
+    - Docs: `docs/debug-harness.md`, this plan
+    - Human UX approval: accepted as non-disruptive on 2026-07-18
+    - Commit: `<pending>`
+
+  - [ ] Stage 7E: Integrate only after human approval
+    - Deliverable: full stable release gate, final docs/changelog, pushed branch
+      and checked PR; no merge, version bump, tag, or npm publish without a
+      separate explicit approval
+    - Verification: lint, tests, budgets, builds, examples, React 18/19 packed
+      consumers, browser suite, package dry run, and release identity dry run
+    - Docs: architecture, debug harness, changelog, this plan
+    - Commit: `<pending>`
+
+## Stage 7 production-promotion UX checkpoint (2026-07-18)
+
+Work is isolated in `/Users/eun/Documents/ograph-pixi-worker-production` on
+`feat/pixi-worker-production-runtime`, based on `main` at `f075f6c`. The prior
+spike worktree `/Users/eun/Documents/ograph-obsidian-graph-spike` and its branch
+remain clean and intentionally retained; neither was removed or reused.
+
+The package-facing runtime now selects Pixi WebGL and Worker simulation through
+private defaults while preserving the public props, ref methods, callbacks,
+types, and three runtime exports. WebGL/init failure replaces the owned canvas
+once with Canvas 2D, and Worker construction/protocol/runtime failure falls back
+to main-thread simulation. Recovered environment failures remain silent to
+consumer `onError`; the debug harness disables fallback so its selected lane
+continues to be an observable experiment.
+
+The library package publishes package-relative lazy chunks and a module Worker.
+`pixi.js@8.19.0` is an exact runtime dependency and remains external to Ograph's
+own chunks. Gzip budgets are split into the `17,042`-byte synchronous entry,
+`9,138`-byte lazy-chunk aggregate, and `6,899`-byte Worker baseline, each with a
+10% release guard. The packed tarball contains 21 allowlisted files and the
+runtime exports remain exactly `GraphView`, `defaultGraphPreset`, and
+`defaultGraphTheme`.
+
+The selectable profiler produced these fixed-seed, real-GPU results:
+
+| Nodes | Complete materialization | First visible | Steady FPS | Graph CPU p95 | Cold long-task max |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1,000 | already materialized sample | 16.1ms | 60 | 2.2ms | not sampled |
+| 5,000 | 686-713ms | 44.2-45.8ms | 60 | 5.1-5.5ms | 56-58ms |
+| 10,000 | 1,230-1,246ms | 63.2-66.2ms | 60 | 7.8-8.0ms | 91-94ms |
+
+The 5k run exposed a quadratic `pendingLinks.shift()` queue. In-place
+compaction reduced complete materialization from `1,188-1,193ms` to
+`686-713ms` and the longest cold task from `129-174ms` to `56-58ms`; the 10k
+range and output remained unchanged.
+
+Pre-checkpoint verification passed lint, 77 unit/API/release/budget tests, demo
+and library builds, examples, pinned and floating React 18/19 packed consumers,
+and all 11 Chromium packed-browser tests. The browser matrix covers actual
+default Pixi/Worker activation, both fallbacks, one-canvas/StrictMode cleanup,
+the existing interaction contract, and visual smoke states. Existing Canvas
+screenshots were retained; dense WebGL curved-edge antialiasing differed on
+`0.58%` of pixels and passes a narrow `0.7%` cross-backend tolerance.
+
+Human UX review at `http://127.0.0.1:4435/` accepted the observed differences
+as non-disruptive. Stage 7D is complete and the combined commit/push/PR flow is
+authorized. Version bump, merge, tag, and npm publication remain pending a
+separate approval.
 
 ## Human UX checkpoint (2026-07-15)
 

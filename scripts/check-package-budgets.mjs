@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { performance } from 'node:perf_hooks';
@@ -158,11 +158,34 @@ function assertBudget(key, label, actual) {
   );
 }
 
+function gzipJavaScriptDirectory(relativeDirectory) {
+  const directory = resolve(repoRoot, relativeDirectory);
+  const files = readdirSync(directory)
+    .filter(fileName => fileName.endsWith('.js'))
+    .sort();
+
+  assert.ok(files.length > 0, `${relativeDirectory} must contain JavaScript assets`);
+  return files.reduce(
+    (total, fileName) => total + gzipSync(readFileSync(resolve(directory, fileName))).byteLength,
+    0
+  );
+}
+
 const distIndex = readFileSync(resolve(repoRoot, 'dist/index.js'));
 assertBudget(
   'distIndexGzipBytes',
   'dist/index.js gzip',
   gzipSync(distIndex).byteLength
+);
+assertBudget(
+  'distLazyChunksGzipBytes',
+  'dist/chunks/*.js aggregate gzip',
+  gzipJavaScriptDirectory('dist/chunks')
+);
+assertBudget(
+  'distWorkerGzipBytes',
+  'dist/workers/*.js aggregate gzip',
+  gzipJavaScriptDirectory('dist/workers')
 );
 
 const [

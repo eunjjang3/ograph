@@ -11,6 +11,7 @@ interface UseGraphRendererBackendParams {
   renderer: GraphRendererMode;
   requestRender: () => void;
   telemetryRef?: GraphRuntimeTelemetryRef;
+  onUnavailable?: (renderer: GraphRendererMode, error: Error) => boolean;
   onError?: (error: Error) => void;
 }
 
@@ -23,12 +24,15 @@ export function useGraphRendererBackend({
   renderer,
   requestRender,
   telemetryRef,
+  onUnavailable,
   onError
 }: UseGraphRendererBackendParams) {
   const rendererBackendRef = useRef<GraphRendererBackend | null>(null);
   const onErrorRef = useRef(onError);
+  const onUnavailableRef = useRef(onUnavailable);
   const telemetryRefRef = useRef(telemetryRef);
   onErrorRef.current = onError;
+  onUnavailableRef.current = onUnavailable;
   telemetryRefRef.current = telemetryRef;
 
   useEffect(() => {
@@ -41,7 +45,10 @@ export function useGraphRendererBackend({
     try {
       backend = createGraphRendererBackend(renderer);
     } catch (caught) {
-      onErrorRef.current?.(toGraphError(caught));
+      const error = toGraphError(caught);
+      if (!onUnavailableRef.current?.(renderer, error)) {
+        onErrorRef.current?.(error);
+      }
       return;
     }
 
@@ -60,7 +67,10 @@ export function useGraphRendererBackend({
         if (!disposed) {
           backend.destroy();
           rendererBackendRef.current = null;
-          onErrorRef.current?.(toGraphError(caught));
+          const error = toGraphError(caught);
+          if (!onUnavailableRef.current?.(renderer, error)) {
+            onErrorRef.current?.(error);
+          }
         }
       });
 

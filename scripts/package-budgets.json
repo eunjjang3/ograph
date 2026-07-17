@@ -1,9 +1,21 @@
 {
   "distIndexGzipBytes": {
-    "baseline": 15399,
+    "baseline": 17042,
     "allowedRegressionRatio": 0.1,
     "unit": " bytes",
-    "note": "Current preview gzip size plus a 10% release guard."
+    "note": "Production Pixi/Worker selection entry gzip plus a 10% release guard."
+  },
+  "distLazyChunksGzipBytes": {
+    "baseline": 9138,
+    "allowedRegressionRatio": 0.1,
+    "unit": " bytes",
+    "note": "Aggregate package-owned lazy chunk gzip plus a 10% release guard; pixi.js remains an exact runtime dependency."
+  },
+  "distWorkerGzipBytes": {
+    "baseline": 6899,
+    "allowedRegressionRatio": 0.1,
+    "unit": " bytes",
+    "note": "Aggregate packaged simulation Worker gzip plus a 10% release guard."
   },
   "normalizeMediumMs": {
     "baseline": 0.25,

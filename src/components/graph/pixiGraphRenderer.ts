@@ -23,6 +23,7 @@ import type {
 } from './graphRenderer';
 import {
   areAllPixiNodesInBounds,
+  drainPixiPendingLinks,
   prioritizePixiNodeMaterialization,
   remapEquivalentPixiTopology,
   selectPixiLabelNodeIds,
@@ -410,16 +411,12 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
       if (this.materializeLink(link)) remaining -= 1;
     }
 
-    const attempts = this.pendingLinks.length;
-    for (let index = 0; index < attempts && remaining > 0; index += 1) {
-      const link = this.pendingLinks.shift()!;
-      if (this.linkViews.has(link)) continue;
-      if (this.materializeLink(link)) {
-        remaining -= 1;
-      } else {
-        this.pendingLinks.push(link);
-      }
-    }
+    drainPixiPendingLinks(
+      this.pendingLinks,
+      remaining,
+      link => this.linkViews.has(link),
+      link => this.materializeLink(link)
+    );
   }
 
   private updateNodeViews(frame: GraphRenderFrame, visibleNodeIds: ReadonlySet<string> | null) {
