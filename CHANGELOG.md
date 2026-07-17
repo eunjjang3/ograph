@@ -4,11 +4,48 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## 0.2.0 - 2026-07-17
+
+This release keeps the consumer-facing graph appearance, interactions, public
+runtime exports, and Canvas 2D/Main Thread default unchanged. Pixi WebGL and
+Worker simulation remain debug-harness-only promotion candidates.
+
 ### Added
 
 - Added optional settled and interaction-time label paint budgets to
   `GraphPreset`, allowing consumers to bound canvas text calls while preserving
   hovered, selected, and root labels.
+- Added a private renderer/simulation runtime seam and a four-lane debug matrix
+  for Canvas 2D or Pixi WebGL rendering with Main Thread or Worker simulation.
+- Added debug runtime telemetry for frame cadence, p95 intervals, long tasks,
+  renderer phases, Worker updates, heap use, and cold-path milestones.
+- Added a repeatable Playwright profiling script for fixed-seed 1,000- and
+  10,000-node harness scenarios.
+
+### Changed
+
+- Reduced settled and active-frame work by reusing graph indexes, topology
+  views, materialization queues, particle batches, and full-view culling state.
+- Skipped disabled graph-growth setup and other cold-path allocations without
+  changing growth animation behavior when it is enabled.
+- Bound the local debug server to port `4435` with strict port selection.
+
+### Fixed
+
+- Hardened lazy Pixi initialization so runtime lane changes cannot resize an
+  application before its renderer is ready.
+- Hardened Worker pause, graph-revision, transferable-buffer recycling, and
+  StrictMode cleanup behavior.
+
+### Verified
+
+- Preserved the public runtime exports as `GraphView`, `defaultGraphPreset`,
+  and `defaultGraphTheme`, with no Pixi or Worker assets in the package entry.
+- Re-ran lint, unit and package-budget tests, demo and library builds, examples,
+  React 18/19 packed-consumer checks, browser interactions, and visual smoke
+  coverage.
+- Confirmed the debug Pixi/Worker lane retains hover, selection, local/global
+  transitions, and one-canvas lifecycle behavior at up to 10,000 nodes.
 
 ## 0.1.0 - 2026-06-05
 

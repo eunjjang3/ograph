@@ -369,7 +369,7 @@ errors. Manual Pixi interaction checks retained hover/selection, double-click
 local focus, local drag updates, selection clearing, and global restoration.
 The built runtime exports remain exactly `GraphView`, `defaultGraphPreset`, and
 `defaultGraphTheme`; package gzip is `16,881` bytes, the production default is
-still Canvas 2D/Main, and no push or production promotion was performed.
+still Canvas 2D/Main, and no production promotion was performed.
 
 ## Goal: No-UX cold-path and memory qualification follow-up
 

@@ -433,5 +433,5 @@ contains no Pixi/Worker runtime marker or asset.
 A debug Pixi/Worker interaction smoke retained exactly one canvas, hovered and
 selected `node-654`, entered a 14-node local lens, restored all 1,000 global
 nodes, and reported zero console errors. Pixi/Worker remains debug-only,
-Canvas 2D/Main remains the production default, and no push or promotion was
+Canvas 2D/Main remains the production default, and no production promotion was
 performed.
