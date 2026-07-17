@@ -32,6 +32,11 @@ import { buildSpatialIndex } from './spatialIndex';
 import type { Viewport } from './graphMath';
 import { GraphErrorBoundary } from './GraphErrorBoundary';
 import { normalizeGraphInput } from './inputValidation';
+import { useGraphRendererBackend } from './useGraphRendererBackend';
+import { DEFAULT_GRAPH_RUNTIME_OPTIONS } from './graphRuntime';
+import type { GraphRuntimeOptions } from './graphRuntime';
+
+declare const __OGRAPH_DEBUG_RUNTIME__: boolean;
 
 export interface GraphViewRef {
   /** Fits the current global graph or local lens scope into the container. */
@@ -129,6 +134,7 @@ interface GraphViewCanvasProps<
   presetConf: GraphPreset;
   themeConf: GraphTheme;
   containerRef: React.RefObject<HTMLDivElement | null>;
+  runtimeOptions: GraphRuntimeOptions;
 }
 
 type GraphViewCanvasComponent = (<
@@ -162,6 +168,7 @@ function GraphViewCanvasInner<
     presetConf,
     themeConf,
     containerRef,
+    runtimeOptions,
     onNodeClick,
     onNodeDoubleClick,
     onNodeHover,
@@ -175,6 +182,9 @@ function GraphViewCanvasInner<
   } = props;
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const runtimeTelemetryRef = __OGRAPH_DEBUG_RUNTIME__
+    ? runtimeOptions.telemetryRef
+    : undefined;
   const spatialIndexRef = useRef(buildSpatialIndex([]));
   const [reduceMotion, setReduceMotion] = useState(false);
   const growthGraph = useGraphGrowthAnimation({
@@ -183,7 +193,7 @@ function GraphViewCanvasInner<
     animation: growthAnimation,
     reduceMotion
   });
-  const sourceNodeIds = useMemo(() => new Set(growthGraph.nodes.map(node => node.id)), [growthGraph.nodes]);
+  const sourceNodeIds = growthGraph.revealedNodeIds;
   const lensScope = useGraphLensScope({
     nodes: growthGraph.nodes,
     links: growthGraph.links,
@@ -203,6 +213,13 @@ function GraphViewCanvasInner<
     canvasRef,
     requestRender
   });
+  const rendererBackendRef = useGraphRendererBackend({
+    canvasRef,
+    renderer: runtimeOptions.renderer,
+    requestRender,
+    telemetryRef: runtimeTelemetryRef,
+    onError
+  });
 
   const onTick = useCallback(() => {
     requestRender();
@@ -210,7 +227,7 @@ function GraphViewCanvasInner<
   const dragPhysics = getGraphDragPhysicsForMode(mode);
 
   const {
-    simulationRef,
+    simulationActivityRef,
     activeNodesRef,
     renderNodesRef,
     renderLinksRef,
@@ -234,6 +251,11 @@ function GraphViewCanvasInner<
       gravityCenterNodeIds: lensScope.visibleNodeIds,
       dragPhysics,
       paused,
+      engine: runtimeOptions.simulation,
+      runtimeTelemetryRef,
+      ...(__OGRAPH_DEBUG_RUNTIME__
+        ? { createSimulationWorker: runtimeOptions.createSimulationWorker }
+        : {}),
       onError
     }
   );
@@ -444,7 +466,9 @@ function GraphViewCanvasInner<
     drawFrameRef,
     scheduleFrame,
     requestRender,
-    simulationRef,
+    simulationActivityRef,
+    rendererBackendRef,
+    runtimeTelemetryRef,
     renderNodesRef,
     renderLinksRef,
     neighborsMapRef,
@@ -514,11 +538,19 @@ type GraphViewComponent = (<
   displayName?: string;
 };
 
+/** @internal */
+type GraphViewRuntimeProps<
+  NodeMetadata extends GraphNodeMetadata = GraphNodeMetadata,
+  LinkMetadata extends GraphNodeMetadata = GraphNodeMetadata
+> = GraphViewProps<NodeMetadata, LinkMetadata> & {
+  runtimeOptions?: GraphRuntimeOptions;
+};
+
 function GraphViewInner<
   NodeMetadata extends GraphNodeMetadata = GraphNodeMetadata,
   LinkMetadata extends GraphNodeMetadata = GraphNodeMetadata
 >(
-  props: GraphViewProps<NodeMetadata, LinkMetadata>,
+  props: GraphViewRuntimeProps<NodeMetadata, LinkMetadata>,
   ref: React.ForwardedRef<GraphViewRef>
 ) {
   const {
@@ -529,7 +561,8 @@ function GraphViewInner<
     preset = 'default',
     className = '',
     style,
-    onError
+    onError,
+    runtimeOptions = DEFAULT_GRAPH_RUNTIME_OPTIONS
   } = props;
 
   const normalizedGraph = useMemo(() => normalizeGraphInput({ nodes, links, localDepth }), [nodes, links, localDepth]);
@@ -556,6 +589,7 @@ function GraphViewInner<
     >
       <GraphErrorBoundary onError={onError}>
         <GraphViewCanvas
+          key={runtimeOptions.renderer}
           {...props}
           ref={ref}
           nodes={normalizedGraph.nodes}
@@ -564,6 +598,7 @@ function GraphViewInner<
           presetConf={presetConf}
           themeConf={themeConf}
           containerRef={containerRef}
+          runtimeOptions={runtimeOptions}
         />
       </GraphErrorBoundary>
     </div>

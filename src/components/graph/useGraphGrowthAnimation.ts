@@ -206,11 +206,13 @@ export function useGraphGrowthAnimation<
 }): GraphGrowthFrame<NodeMetadata, LinkMetadata> {
   const options = resolveGraphGrowthAnimationOptions(animation);
   const sequence = useMemo(
-    () => buildGraphGrowthSequence(nodes, options),
-    [nodes, options.getNodeTimestamp, options.timestampMetadataKey]
+    () => options.enabled
+      ? buildGraphGrowthSequence(nodes, options)
+      : null,
+    [nodes, options.enabled, options.getNodeTimestamp, options.timestampMetadataKey]
   );
-  const totalNodeCount = sequence.items.length;
-  const shouldAnimate = options.enabled && !reduceMotion && totalNodeCount > 0;
+  const totalNodeCount = sequence?.items.length ?? nodes.length;
+  const shouldAnimate = sequence !== null && !reduceMotion && totalNodeCount > 0;
   const [revealedCount, setRevealedCount] = useState(() => (
     getInitialGraphGrowthRevealedCount(totalNodeCount, shouldAnimate, options.initialDelayMs)
   ));
@@ -262,18 +264,32 @@ export function useGraphGrowthAnimation<
   }, [
     options.initialDelayMs,
     options.stepMs,
-    sequence.signature,
+    sequence?.signature,
     shouldAnimate,
     totalNodeCount
   ]);
 
   return useMemo(
-    () => filterGraphByGrowthStep(
-      nodes,
+    () => sequence
+      ? filterGraphByGrowthStep(
+          nodes,
+          links,
+          sequence,
+          shouldAnimate ? revealedCount : totalNodeCount
+        )
+      : {
+          nodes,
+          links,
+          revealedNodeIds: new Set(nodes.map(node => node.id)),
+          isComplete: true
+        },
+    [
       links,
+      nodes,
+      revealedCount,
       sequence,
-      shouldAnimate ? revealedCount : totalNodeCount
-    ),
-    [links, nodes, revealedCount, sequence, shouldAnimate, totalNodeCount]
+      shouldAnimate,
+      totalNodeCount
+    ]
   );
 }

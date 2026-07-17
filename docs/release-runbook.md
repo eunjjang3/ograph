@@ -154,7 +154,7 @@ release events and `v*` tags are the publish trigger boundary.
    ```md
    ## Unreleased
 
-   ## 0.2.0 - 2026-06-05
+   ## X.Y.Z - YYYY-MM-DD
    ```
 
    The release identity guard intentionally rejects a release event while notes

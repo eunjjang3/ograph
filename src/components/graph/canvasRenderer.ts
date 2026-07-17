@@ -16,7 +16,7 @@ interface FocusRenderState {
   selectedNodeId: string | null | undefined;
   hoveredNodeId: string | null | undefined;
   rootNodeId: string | null | undefined;
-  neighbors: Set<string>;
+  neighbors: ReadonlySet<string>;
   resolveDimAlpha: (dimAlpha: number) => number;
   isSelected: (id: string) => boolean;
   isHovered: (id: string) => boolean;
@@ -92,7 +92,7 @@ function createFocusRenderState(
   selectedNodeId: string | null | undefined,
   hoveredNodeId: string | null | undefined,
   rootNodeId: string | null | undefined,
-  neighbors: Set<string>,
+  neighbors: ReadonlySet<string>,
   dimProgress: number
 ): FocusRenderState {
   const hasActiveFocus = !!selectedNodeId || !!hoveredNodeId;
@@ -533,7 +533,7 @@ export function drawGraph(
   selectedNodeId: string | null | undefined,
   hoveredNodeId: string | null | undefined,
   rootNodeId: string | null | undefined,
-  neighbors: Set<string>,
+  neighbors: ReadonlySet<string>,
   dimProgress = 1,
   labelVisibilityByNodeId?: Map<string, number>,
   lensVisibilityByNodeId?: Map<string, number>,

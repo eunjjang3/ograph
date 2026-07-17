@@ -1,6 +1,8 @@
 import type { GraphLink, GraphNode } from './types';
 import { buildUndirectedAdjacency, filterLinksByExistingNodes, getLinkId } from './localGraph';
 
+const EMPTY_FOCUSED_NEIGHBORS = new Set<string>();
+
 export interface GraphIndexes<NodeType extends GraphNode = GraphNode> {
   nodeById: Map<string, NodeType>;
   adjacencyById: Map<string, Set<string>>;
@@ -37,10 +39,6 @@ export function buildGraphIndexes<NodeType extends GraphNode>(
 export function getFocusedNeighborSet(
   focusId: string | null | undefined,
   adjacencyById: Map<string, Set<string>>
-): Set<string> {
-  if (!focusId) {
-    return new Set();
-  }
-
-  return new Set(adjacencyById.get(focusId) ?? []);
+): ReadonlySet<string> {
+  return focusId ? adjacencyById.get(focusId) ?? EMPTY_FOCUSED_NEIGHBORS : EMPTY_FOCUSED_NEIGHBORS;
 }

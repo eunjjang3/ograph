@@ -26,6 +26,37 @@ async function importSourceModule(relativePath) {
   return loaded;
 }
 
+async function importHookModuleWithReactStub(relativePath) {
+  const sourcePath = fileURLToPath(new URL(relativePath, repoRoot));
+  const result = await esbuild.build({
+    entryPoints: [sourcePath],
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    write: false,
+    plugins: [{
+      name: 'react-hook-stub',
+      setup(build) {
+        build.onResolve({ filter: /^react$/ }, () => ({
+          path: 'react-hook-stub',
+          namespace: 'ograph-test'
+        }));
+        build.onLoad({ filter: /.*/, namespace: 'ograph-test' }, () => ({
+          contents: [
+            'export const useEffect = () => undefined;',
+            'export const useMemo = factory => factory();',
+            'export const useState = initial => [typeof initial === "function" ? initial() : initial, () => undefined];'
+          ].join('\n'),
+          loader: 'js'
+        }));
+      }
+    }]
+  });
+  const code = result.outputFiles[0].text;
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
+  return import(moduleUrl);
+}
+
 function createSeededRandom(seed) {
   let state = seed >>> 0;
 
@@ -203,6 +234,415 @@ test('filterLocalGraph handles global, missing-root, and depth-limited local gra
   assert.deepEqual(depthTwo.links.map(link => `${link.source}-${link.target}`), ['a-b', 'b-c']);
 });
 
+test('debug frame telemetry summarizes percentiles and long-frame budgets', async () => {
+  const { summarizeFrameIntervals } = await importSourceModule(
+    'src/components/graph/debug/useFpsCounter.ts'
+  );
+  const telemetry = summarizeFrameIntervals([
+    16,
+    16.5,
+    17,
+    20,
+    40,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    -1
+  ]);
+
+  assert.deepEqual(telemetry, {
+    frameIntervalP50Ms: 17,
+    frameIntervalP95Ms: 40,
+    longFramesOver16Ms: 3,
+    longFramesOver33Ms: 1,
+    sampleSize: 5
+  });
+});
+
+test('debug frame telemetry keeps FPS and percentiles on the same timestamp window', async () => {
+  const {
+    createFrameTelemetryWindow,
+    recordFrameTimestamp
+  } = await importSourceModule('src/components/graph/debug/useFpsCounter.ts');
+  const steadyWindow = createFrameTelemetryWindow();
+  let steadyTelemetry = recordFrameTimestamp(steadyWindow, 0);
+
+  for (let index = 1; index <= 60; index += 1) {
+    steadyTelemetry = recordFrameTimestamp(steadyWindow, index * 16.7) ?? steadyTelemetry;
+  }
+
+  assert.equal(steadyTelemetry.fps, 60);
+  assert.equal(steadyTelemetry.frameIntervalP95Ms, 16.7);
+  assert.equal(steadyTelemetry.sampleSize, 60);
+
+  const resumedWindow = createFrameTelemetryWindow();
+  recordFrameTimestamp(resumedWindow, 0);
+  recordFrameTimestamp(resumedWindow, 16.7);
+  recordFrameTimestamp(resumedWindow, 33.4);
+  const resumedTelemetry = recordFrameTimestamp(resumedWindow, 2033.4);
+
+  assert.deepEqual(resumedTelemetry, {
+    fps: 1,
+    frameIntervalP50Ms: 2000,
+    frameIntervalP95Ms: 2000,
+    longFramesOver16Ms: 1,
+    longFramesOver33Ms: 1,
+    sampleSize: 1
+  });
+});
+
+test('private graph runtime telemetry starts in a deterministic empty state', async () => {
+  const { createGraphRuntimeTelemetry } = await importSourceModule(
+    'src/components/graph/graphRuntime.ts'
+  );
+
+  const telemetry = createGraphRuntimeTelemetry('pixi', 'worker');
+  assert.equal(Number.isFinite(telemetry.runtimeStartedAt), true);
+  assert.deepEqual({ ...telemetry, runtimeStartedAt: 0 }, {
+    renderer: 'pixi',
+    simulation: 'worker',
+    renderCount: 0,
+    lastRenderDurationMs: 0,
+    lastRenderAt: 0,
+    lastFrameCpuDurationMs: 0,
+    lastPreRendererDurationMs: 0,
+    lastSpatialIndexDurationMs: 0,
+    lastLabelVisibilityDurationMs: 0,
+    activeRenderFps: 0,
+    activeRenderIntervalP95Ms: 0,
+    activeRenderDurationP50Ms: 0,
+    activeRenderDurationP95Ms: 0,
+    activeRenderDurationMaxMs: 0,
+    activeRenderSampleSize: 0,
+    activeRenderWindowMs: 0,
+    activeRenderSequence: 0,
+    lastRendererProfile: null,
+    simulationUpdateCount: 0,
+    lastSimulationUpdateAt: 0,
+    materializedNodes: 0,
+    materializedLinks: 0,
+    materializedLabels: 0,
+    topologySyncDurationMs: 0,
+    firstVisibleFrameLatencyMs: 0,
+    runtimeStartedAt: 0,
+    workerResultAgeMs: 0,
+    visibleNodes: 0,
+    visibleLinks: 0,
+    visibleLabels: 0,
+    simulationActive: false,
+    activeFrameReasons: 'initializing'
+  });
+});
+
+test('active graph render telemetry excludes idle gaps and summarizes draw CPU', async () => {
+  const {
+    createActiveGraphRenderWindow,
+    createGraphRuntimeTelemetry,
+    recordActiveGraphRenderSample
+  } = await importSourceModule('src/components/graph/graphRuntime.ts');
+  const telemetry = createGraphRuntimeTelemetry('pixi', 'worker');
+  const window = createActiveGraphRenderWindow();
+  let published = false;
+
+  for (let index = 0; index <= 60; index += 1) {
+    published = recordActiveGraphRenderSample(
+      window,
+      telemetry,
+      index * 16.7,
+      index === 60 ? 20 : 5,
+      true
+    ) || published;
+  }
+
+  assert.equal(published, true);
+  assert.equal(telemetry.activeRenderFps, 59.9);
+  assert.equal(telemetry.activeRenderIntervalP95Ms, 16.7);
+  assert.equal(telemetry.activeRenderDurationP50Ms, 5);
+  assert.equal(telemetry.activeRenderDurationP95Ms, 5);
+  assert.equal(telemetry.activeRenderDurationMaxMs, 20);
+  assert.equal(telemetry.activeRenderSampleSize, 60);
+  assert.equal(telemetry.activeRenderSequence, 1);
+
+  recordActiveGraphRenderSample(window, telemetry, 5000, 5, false);
+  assert.equal(recordActiveGraphRenderSample(window, telemetry, 6000, 5, true), false);
+  assert.equal(recordActiveGraphRenderSample(window, telemetry, 6016.7, 5, true), false);
+  assert.equal(telemetry.activeRenderSequence, 1);
+});
+
+test('worker simulation protocol validates and unpacks transferable positions', async () => {
+  const {
+    GRAPH_SIMULATION_PROTOCOL_VERSION,
+    isGraphSimulationWorkerResponse,
+    unpackWorkerPositions
+  } = await importSourceModule('src/components/graph/graphSimulationProtocol.ts');
+  const positions = new Float32Array([1, 2, 3, 4]);
+
+  assert.equal(isGraphSimulationWorkerResponse({
+    type: 'ready',
+    protocolVersion: GRAPH_SIMULATION_PROTOCOL_VERSION,
+    revision: 3,
+    nodeCount: 2
+  }), true);
+  assert.equal(isGraphSimulationWorkerResponse({
+    type: 'tick',
+    revision: 3,
+    alpha: 0.5,
+    positions: positions.buffer
+  }), true);
+  assert.deepEqual([...unpackWorkerPositions(positions.buffer, 2)], [1, 2, 3, 4]);
+  assert.equal(unpackWorkerPositions(new ArrayBuffer(4), 2), null);
+  assert.equal(isGraphSimulationWorkerResponse({ type: 'tick', revision: 3 }), false);
+});
+
+test('worker simulation client covers lifecycle, pause, restart, drag, and buffer recycle', async () => {
+  const { createWorkerGraphSimulationClient } = await importSourceModule(
+    'src/components/graph/workerGraphSimulationClient.ts'
+  );
+  const { GRAPH_SIMULATION_PROTOCOL_VERSION } = await importSourceModule(
+    'src/components/graph/graphSimulationProtocol.ts'
+  );
+
+  class FakeWorker {
+    onmessage = null;
+    onerror = null;
+    onmessageerror = null;
+    messages = [];
+    terminated = false;
+
+    postMessage(message, transfer = []) {
+      this.messages.push({ message, transfer });
+    }
+
+    terminate() {
+      this.terminated = true;
+    }
+
+    emit(data) {
+      this.onmessage?.({ data });
+    }
+  }
+
+  const worker = new FakeWorker();
+  const snapshots = [];
+  const activeStates = [];
+  let tickCount = 0;
+  const client = createWorkerGraphSimulationClient({
+    createWorker: () => worker,
+    revision: 7,
+    nodes: [
+      { id: 'a', label: 'A', x: 0, y: 0 },
+      { id: 'b', label: 'B', x: 10, y: 10 }
+    ],
+    links: [{ source: 'a', target: 'b' }],
+    cachedPositions: new Map(),
+    config: {
+      chargeStrength: -50,
+      linkDistance: 45,
+      nodeRadius: 4.5,
+      collisionRadius: 5,
+      gravityStrength: 0.1,
+      velocityDecay: 0.4,
+      alphaDecay: 0.02,
+      alphaMin: 0.001,
+      graphRefreshAlpha: 0.22,
+      preserveScopeCentroid: false,
+      gravityCenterNodeIds: null,
+      paused: false
+    },
+    onGraphReady: snapshot => snapshots.push(snapshot),
+    onActiveChange: active => activeStates.push(active),
+    onTick: () => { tickCount += 1; },
+    onReady: () => {},
+    onError: error => { throw error; }
+  });
+
+  client.start();
+  assert.equal(worker.messages[0].message.type, 'initialize');
+  assert.equal(worker.messages[0].message.protocolVersion, GRAPH_SIMULATION_PROTOCOL_VERSION);
+  assert.equal(snapshots[0].nodes.length, 2);
+
+  worker.emit({
+    type: 'ready',
+    protocolVersion: GRAPH_SIMULATION_PROTOCOL_VERSION,
+    revision: 7,
+    nodeCount: 2
+  });
+  const positions = new Float32Array([5, 6, 7, 8]);
+  worker.emit({ type: 'tick', revision: 7, alpha: 0.5, positions: positions.buffer });
+  assert.deepEqual(snapshots[0].nodes.map(node => [node.x, node.y]), [[5, 6], [7, 8]]);
+  assert.equal(tickCount, 1);
+  assert.equal(worker.messages.at(-1).message.type, 'recycle');
+  assert.equal(worker.messages.at(-1).transfer.length, 1);
+
+  client.setPaused(true);
+  client.setPaused(false);
+  client.restart(0.75);
+  client.dragStart('a', 0.4);
+  client.dragMove('a', 11, 12, 0.3, true);
+  client.dragEnd('a');
+  assert.deepEqual(worker.messages.slice(-6).map(entry => entry.message.type), [
+    'set-paused',
+    'set-paused',
+    'restart',
+    'drag-start',
+    'drag-move',
+    'drag-end'
+  ]);
+
+  client.dispose();
+  assert.equal(worker.messages.at(-1).message.type, 'dispose');
+  assert.equal(worker.terminated, true);
+  assert.equal(activeStates.at(-1), false);
+});
+
+test('Pixi planning prioritizes viewport nodes and keeps forced labels over budget', async () => {
+  const {
+    areAllPixiNodesInBounds,
+    hasEquivalentPixiTopology,
+    prioritizePixiNodeMaterialization,
+    remapEquivalentPixiTopology,
+    selectPixiLabelNodeIds
+  } = await importSourceModule('src/components/graph/pixiGraphPlanning.ts');
+  const { buildSpatialIndex } = await importSourceModule('src/components/graph/spatialIndex.ts');
+  const nodes = [
+    { id: 'far', label: 'Far', x: 1000, y: 1000 },
+    { id: 'near-b', label: 'Near B', x: 20, y: 20 },
+    { id: 'near-a', label: 'Near A', x: 0, y: 0 }
+  ];
+  const prioritized = prioritizePixiNodeMaterialization(
+    nodes,
+    buildSpatialIndex(nodes),
+    200,
+    200,
+    { x: 100, y: 100, scale: 1 }
+  );
+
+  assert.deepEqual(prioritized.map(node => node.id), ['near-a', 'near-b', 'far']);
+  const containedBounds = { minX: -1, maxX: 30, minY: -1, maxY: 30 };
+  assert.equal(areAllPixiNodesInBounds(nodes.slice(1), containedBounds), true);
+  assert.equal(areAllPixiNodesInBounds(nodes, containedBounds), false);
+  assert.equal(
+    areAllPixiNodesInBounds([{ id: 'invalid', label: 'Invalid', x: Number.NaN, y: 0 }], containedBounds),
+    false
+  );
+  assert.equal(
+    areAllPixiNodesInBounds([], { minX: 10, maxX: -10, minY: 0, maxY: 1 }),
+    false
+  );
+
+  const selected = selectPixiLabelNodeIds([
+    { id: 'forced-a', inputIndex: 0, visibility: 1, degree: 1, forceVisible: true, isNeighbor: false },
+    { id: 'forced-b', inputIndex: 1, visibility: 1, degree: 1, forceVisible: true, isNeighbor: false },
+    { id: 'neighbor', inputIndex: 2, visibility: 0.2, degree: 1, forceVisible: false, isNeighbor: true },
+    { id: 'degree', inputIndex: 3, visibility: 0.9, degree: 10, forceVisible: false, isNeighbor: false }
+  ], 1);
+
+  assert.deepEqual([...selected], ['forced-a', 'forced-b']);
+
+  const previousLinks = [
+    { source: nodes[2], target: nodes[1] },
+    { source: nodes[1], target: nodes[0] }
+  ];
+  const equivalentNodes = nodes.map(node => ({ ...node, label: `${node.label}!` }));
+  const equivalentLinks = [
+    { source: 'near-a', target: 'near-b' },
+    { source: 'near-b', target: 'far' }
+  ];
+
+  assert.equal(
+    hasEquivalentPixiTopology(nodes, previousLinks, equivalentNodes, equivalentLinks),
+    true
+  );
+  assert.equal(
+    hasEquivalentPixiTopology(nodes, previousLinks, [...equivalentNodes].reverse(), equivalentLinks),
+    false
+  );
+  assert.equal(
+    hasEquivalentPixiTopology(nodes, previousLinks, equivalentNodes, [
+      equivalentLinks[0],
+      { source: 'near-b', target: 'near-a' }
+    ]),
+    false
+  );
+
+  const firstLinkView = { id: 'first-view' };
+  const remapped = remapEquivalentPixiTopology(
+    nodes,
+    previousLinks,
+    equivalentNodes,
+    equivalentLinks,
+    [nodes[1], nodes[0]],
+    [previousLinks[1]],
+    new Map([[previousLinks[0], firstLinkView]])
+  );
+
+  assert.ok(remapped);
+  assert.deepEqual(remapped.pendingNodes, [equivalentNodes[1], equivalentNodes[0]]);
+  assert.deepEqual(remapped.pendingLinks, [equivalentLinks[1]]);
+  assert.equal(remapped.linkViews.get(equivalentLinks[0]), firstLinkView);
+  assert.equal(remapped.nodeById.get('near-a'), equivalentNodes[2]);
+
+  assert.equal(
+    remapEquivalentPixiTopology(
+      nodes,
+      previousLinks,
+      [...equivalentNodes].reverse(),
+      equivalentLinks,
+      [],
+      [],
+      new Map()
+    ),
+    null
+  );
+});
+
+test('lazy Pixi renderer delegates only after async backend initialization completes', async () => {
+  const previousDebugRuntime = globalThis.__OGRAPH_DEBUG_RUNTIME__;
+  globalThis.__OGRAPH_DEBUG_RUNTIME__ = true;
+
+  try {
+    const { LazyPixiGraphRendererBackend } = await importSourceModule(
+      'src/components/graph/graphRenderer.ts'
+    );
+    let finishInitialization;
+    let renderCalls = 0;
+    let destroyCalls = 0;
+    const concreteBackend = {
+      kind: 'pixi',
+      initialize: () => new Promise(resolve => {
+        finishInitialization = resolve;
+      }),
+      render: () => {
+        renderCalls += 1;
+        return true;
+      },
+      destroy: () => {
+        destroyCalls += 1;
+      }
+    };
+    const lazyBackend = new LazyPixiGraphRendererBackend(async () => concreteBackend);
+    const initialization = lazyBackend.initialize({});
+
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(lazyBackend.render({}), false);
+    assert.equal(renderCalls, 0);
+
+    finishInitialization();
+    await initialization;
+    assert.equal(lazyBackend.render({}), true);
+    assert.equal(renderCalls, 1);
+
+    lazyBackend.destroy();
+    assert.equal(destroyCalls, 1);
+  } finally {
+    if (previousDebugRuntime === undefined) {
+      delete globalThis.__OGRAPH_DEBUG_RUNTIME__;
+    } else {
+      globalThis.__OGRAPH_DEBUG_RUNTIME__ = previousDebugRuntime;
+    }
+  }
+});
+
 test('buildLocalGraphScope keeps one hidden physics halo and merges transition scopes', async () => {
   const {
     buildLocalGraphScope,
@@ -254,11 +694,15 @@ test('buildGraphIndexes and getFocusedNeighborSet share graph adjacency rules', 
     { source: { id: 'b', label: 'B' }, target: { id: 'c', label: 'C' } }
   ];
   const indexes = buildGraphIndexes(nodes, links);
+  const focusedNeighbors = getFocusedNeighborSet('b', indexes.adjacencyById);
+  const emptyNeighbors = getFocusedNeighborSet(null, indexes.adjacencyById);
 
   assert.equal(indexes.nodeById.get('a'), nodes[0]);
   assert.equal(indexes.degreeById.get('b'), 2);
-  assert.deepEqual([...getFocusedNeighborSet('b', indexes.adjacencyById)].sort(), ['a', 'c']);
-  assert.deepEqual([...getFocusedNeighborSet(null, indexes.adjacencyById)], []);
+  assert.equal(focusedNeighbors, indexes.adjacencyById.get('b'));
+  assert.deepEqual([...focusedNeighbors].sort(), ['a', 'c']);
+  assert.equal(emptyNeighbors, getFocusedNeighborSet(undefined, indexes.adjacencyById));
+  assert.deepEqual([...emptyNeighbors], []);
 });
 
 test('shared graph adjacency dedupes neighbors while degree keeps link counts', async () => {
@@ -789,6 +1233,34 @@ test('graph growth options support custom timestamp extractors and safe timing d
   assert.equal(getInitialGraphGrowthRevealedCount(3, false, 100), 3);
   assert.equal(resolveGraphGrowthAnimationOptions(false).enabled, false);
   assert.equal(resolveGraphGrowthAnimationOptions({ enabled: false }).enabled, false);
+});
+
+test('disabled graph growth returns the complete graph without reading timestamps', async () => {
+  const {
+    useGraphGrowthAnimation
+  } = await importHookModuleWithReactStub('src/components/graph/useGraphGrowthAnimation.ts');
+  const nodes = [
+    { id: 'a', label: 'A' },
+    { id: 'b', label: 'B' }
+  ];
+  const links = [{ source: 'a', target: 'b' }];
+
+  const frame = useGraphGrowthAnimation({
+    nodes,
+    links,
+    animation: {
+      enabled: false,
+      getNodeTimestamp: () => {
+        throw new Error('disabled growth must not read timestamps');
+      }
+    },
+    reduceMotion: false
+  });
+
+  assert.equal(frame.nodes, nodes);
+  assert.equal(frame.links, links);
+  assert.deepEqual([...frame.revealedNodeIds], ['a', 'b']);
+  assert.equal(frame.isComplete, true);
 });
 
 test('diffGraph reports deterministic node and duplicate-link patches without mutating inputs', async () => {

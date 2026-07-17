@@ -1,6 +1,6 @@
 {
   "name": "@eunjjang/ograph",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Reusable interactive force-directed canvas graph component for React applications.",
   "type": "module",
   "main": "./dist/index.js",
@@ -54,7 +54,7 @@
     }
   },
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev": "vite --port=4435 --strictPort --host=0.0.0.0",
     "build": "npm run build:demo && npm run build:lib",
     "build:demo": "vite build --outDir dist/demo",
     "build:demo:pages": "vite build --outDir dist/demo --base=/ograph/",
@@ -90,6 +90,7 @@
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.28.0",
     "lucide-react": "^1.17.0",
+    "pixi.js": "8.19.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "tailwindcss": "^4.1.14",

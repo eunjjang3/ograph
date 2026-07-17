@@ -40,18 +40,27 @@ flowchart TD
   View --> Scheduler["useGraphFrameScheduler"]
   View --> DrawLoop["useGraphRenderLoop"]
   View --> Simulation["useGraphSimulation"]
+  View --> RendererBackend["private renderer backend"]
   Lens --> Simulation
   Lens --> DrawLoop
   Simulation --> D3["d3-force simulation"]
   D3 --> Scheduler
   Scheduler --> DrawLoop
-  DrawLoop --> Renderer["canvasRenderer.drawGraph"]
+  DrawLoop --> RendererBackend
+  RendererBackend --> Renderer["canvasRenderer.drawGraph"]
   Input --> HitTest["hitTest.findNodeAtPosition"]
   Input --> Viewport
   Input --> Drag["simulation drag controls"]
 ```
 
 `GraphView` composes focused hooks for canvas sizing, viewport control, pointer interaction, frame scheduling, render-loop animation, and simulation. Those hooks keep hot-path state in refs so high-frequency pointer and animation paths do not force React renders on every frame.
+
+The render loop and simulation are connected through private backend/activity
+interfaces. The package-facing `GraphView` always chooses Canvas 2D plus the
+main-thread simulation; the debug harness can inject experimental lanes through
+`DebugGraphView`, which is deliberately absent from `index.ts`. This keeps
+renderer and worker choices out of `GraphViewProps`, `GraphViewRef`, and the
+published runtime/type entry points.
 
 ## Core Files
 
@@ -65,8 +74,16 @@ flowchart TD
 | `useViewportControls.ts` | Viewport refs, fit-to-view, reset, immediate viewport updates, and animated viewport targets. |
 | `useGraphFrameScheduler.ts` | Shared requestAnimationFrame scheduling and render request state. |
 | `useGraphRenderLoop.ts` | Canvas draw-loop callback, focus and lens visibility animation, viewport easing, label animation, and spatial-index refresh. |
+| `graphRenderer.ts` | Private renderer frame contract, Canvas 2D adapter, and lazy debug Pixi loader. |
+| `pixiGraphRenderer.ts` | Debug-only imperative Pixi WebGL backend with retained geometry, culling, and bounded text objects. |
+| `pixiGraphPlanning.ts` | Pure viewport-priority and label-budget planning helpers used by the Pixi backend. |
+| `graphRuntime.ts` | Internal renderer/simulation lane names and debug telemetry contract. |
+| `useGraphRendererBackend.ts` | Renderer initialization, disposal, async error routing, and dirty-frame wake-up. |
 | `useGraphPointerInteractions.ts` | Pointer capture, pan, node drag, hover hit testing, click/double-click handling, wheel zoom, and touch pinch zoom. |
 | `useGraphSimulation.ts` | Persistent d3-force setup, graph indexes, degree calculation, cached layout positions, scoped force refresh, drag physics, and simulation restart. |
+| `graphSimulationProtocol.ts` | Debug-only versioned Worker messages plus transferable packed-position validation. |
+| `graphSimulation.worker.ts` | Debug Worker d3-force runtime, drag controls, 60 Hz position publication, and transfer-buffer recycling. |
+| `workerGraphSimulationClient.ts` | Main-thread Worker lifecycle, graph revision checks, packed-position application, and command adapter. |
 | `useGraphLensScope.ts` | Global/local lens scope derivation, render-only transition union, and hidden physics halo scope. |
 | `graphIndexes.ts` | Shared node lookup, degree, and focused-neighbor index helpers over the common undirected adjacency helper. |
 | `graphDiff.ts` | Pure internal graph patch helper for deterministic node and duplicate-link add/remove/update detection. |
@@ -102,7 +119,7 @@ Rendering is canvas-based and happens outside the React tree:
 2. Required outer-container, canvas, touch-action, and tooltip styles are applied inline so package consumers do not need Tailwind CSS or a package stylesheet for core graph behavior.
 3. The canvas backing store is sized in physical pixels using a sanitized `devicePixelRatio`; invalid DPR falls back to `1`, and invalid CSS dimensions are clamped before writing canvas sizes.
 4. The visible canvas size remains in CSS pixels.
-5. A draw frame clears the canvas, scales the drawing context by DPR, and passes CSS-pixel dimensions into `drawGraph`.
+5. A draw frame passes a renderer-neutral frame snapshot to the selected private backend. The production Canvas backend clears the canvas, scales the drawing context by DPR, and passes CSS-pixel dimensions into `drawGraph`.
 6. The draw loop refreshes the uniform-grid spatial index only when simulation ticks can move nodes, render-node arrays change, or a render is explicitly requested after graph data changes.
 7. `drawGraph` computes an 80 CSS-pixel padded viewport, queries the current spatial index, and applies graph viewport translation and zoom.
 8. Visible links and nodes are grouped into canvas path batches; labels draw last.
@@ -118,6 +135,83 @@ The draw loop schedules frames when:
 - the d3 simulation is not paused and is still above `alphaMin`.
 
 When the simulation cools and no explicit render is requested, frame scheduling stops.
+
+### Debug Worker simulation lane
+
+The harness can replace the main-thread timer with a module Worker without
+changing the package API. The main thread builds the same graph indexes and
+render-node objects, while the Worker owns d3-force node velocity, force state,
+and timer work. Position frames are packed as `x,y` pairs in a transferable
+`Float32Array`; after applying them to the retained node objects, the client
+transfers the buffer back for reuse. Every message carries a graph revision so
+late frames from a disposed topology are ignored.
+
+Pause, restart, drag pin/move/release, local drag heat, and connected-neighbor
+wake are represented in the Worker protocol. Cleanup sends `dispose` and then
+terminates the Worker, including React StrictMode remounts and runtime-lane
+switches. Pause updates the existing Worker instead of recreating it, prevents
+drag/restart messages from waking force timers while paused, and retains the
+last alpha so resuming an already settled graph remains idle.
+
+The Worker URL is created only by the debug harness. Vite defines
+`__OGRAPH_DEBUG_RUNTIME__` as `true` for the demo and `false` for the library
+build, allowing Rollup to remove the client import and debug telemetry from the
+consumer entry. The production package therefore has no Worker asset to locate
+or publish during this spike.
+
+### Debug Pixi WebGL renderer lane
+
+The Pixi lane initializes an `Application` asynchronously against the same
+HTML canvas element that `GraphView` already owns. Renderer preference is the
+single-item `['webgl']` list, so the experiment cannot silently turn into a
+Canvas or WebGPU comparison. Pixi's ticker is stopped (`autoStart: false`), and
+Ograph's dirty-frame scheduler calls `app.render()` only for simulation output,
+input, easing, visual transitions, or pending materialization work. Resize and
+DPR changes go through `renderer.resize`; disposal preserves the React-owned
+canvas while releasing the WebGL context and retained children.
+The lazy renderer wrapper exposes the concrete Pixi backend to the draw loop
+only after `Application.init()` resolves. Render requests that arrive while
+WebGL is being created return without delegating, and the renderer hook requests
+a fresh frame after initialization completes. This prevents lane switches from
+observing an `Application` before Pixi has installed its renderer.
+Changing graph fixtures or switching Main/Worker simulation keeps the renderer
+and its WebGL context alive; only switching between Canvas 2D and Pixi replaces
+the HTML canvas, because a canvas cannot change context type after acquisition.
+This avoids a blank-frame/context-init penalty during the common retained
+topology and simulation comparisons.
+
+Geometry is retained across frames:
+
+- node fills and borders are separate `ParticleContainer` batches that share
+  high-resolution white circle/ring textures generated once during Pixi
+  initialization;
+- links are `Texture.WHITE` particles stretched and rotated between endpoints
+  in one retained batch;
+- node/link transforms, tint, alpha, and visibility update in place;
+- viewport-prioritized nodes and endpoint-ready links materialize under
+  per-frame budgets;
+- structurally equivalent graph objects reuse retained particles, labels, and
+  unfinished materialization queues when the Worker replaces input objects
+  with simulation-backed objects;
+- a cheap Pixi-only finite-coordinate scan proves when the padded viewport
+  contains every topology node, allowing that frame to reuse the topology node
+  array and skip a redundant grid query, visible-ID set, and per-link bounds
+  test; partially containing viewports retain the existing padded culling path;
+- padded viewport culling zeroes offscreen particle alpha and skips offscreen
+  labels before their draw updates;
+- screen-space text is created lazily, capped at 800 retained objects, and
+  limited to 600 visible labels while idle or 280 during focus/interaction;
+- pointer hit testing remains on Ograph's existing main-thread spatial index,
+  with Pixi event traversal disabled.
+
+When simulation, focus/lens/label easing, viewport animation, and incremental
+materialization are all idle, the dirty-frame scheduler stops completely. The
+debug telemetry exposes the active frame reasons so an apparently settled graph
+cannot silently keep calling either Canvas draw or `app.render()`.
+
+`pixi.js` is a development dependency in this harness-first branch. The library
+build compiles the debug flag to `false`, removes the lazy Pixi import, emits no
+Pixi chunk, and keeps the published default on Canvas 2D/Main.
 
 Graph-owned errors report through `onError` in three places: the React error boundary, the requestAnimationFrame draw loop, and simulation setup/tick scheduling. Canvas draw-loop and simulation errors stop the active graph loop before reporting. Consumer callback errors remain consumer-owned and are not converted into graph `onError` events.
 
@@ -146,6 +240,12 @@ pipeline. A link is included only when both endpoint nodes have already been
 revealed. This keeps chronological replay app-agnostic: metadata decides reveal
 order, while d3-force still owns the physical attachment and settling behavior.
 Missing or invalid timestamps fall back to input order after timestamped nodes.
+
+When `growthAnimation` is disabled, the hook returns the complete graph without
+extracting timestamps, sorting a sequence, or constructing the sequence
+signature. The complete frame's `revealedNodeIds` set is reused as the render
+loop's source-node set. Enabled animation still follows the same sequence,
+timing, revealed-count synchronization, and link eligibility rules.
 
 Node-focus camera requests run after lens scoping and simulation refs are
 available. They only target IDs in the current visible scope, so hidden local

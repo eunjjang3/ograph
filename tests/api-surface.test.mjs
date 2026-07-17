@@ -72,6 +72,10 @@ test('built declarations preserve consumer metadata through GraphView callbacks'
   assert.match(typeEntry, /ariaLabel\?: string;/);
   assert.match(typeEntry, /canvasRole\?: AriaRole;/);
   assert.match(graphViewEntry, /focusCameraOnNode: \(nodeId: string, options\?: GraphCameraFocusOptions\) => boolean;/);
+  assert.doesNotMatch(graphViewEntry, /DebugGraphView/);
+  assert.doesNotMatch(graphViewEntry, /GraphRuntimeOptions/);
+  assert.doesNotMatch(graphViewEntry, /Pixi/);
+  assert.doesNotMatch(graphViewEntry, /Worker/);
   assert.match(
     graphViewEntry,
     /GraphViewProps<NodeMetadata, LinkMetadata> & React\.RefAttributes<GraphViewRef>/

@@ -4,6 +4,9 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __OGRAPH_DEBUG_RUNTIME__: 'false'
+  },
   build: {
     emptyOutDir: false,
     lib: {

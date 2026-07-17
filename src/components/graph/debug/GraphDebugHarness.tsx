@@ -1,12 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GraphView } from '../GraphView';
 import type { GraphViewRef } from '../GraphView';
+import type { GraphViewProps } from '../types';
 import { Activity, ShieldAlert } from 'lucide-react';
 import { DebugControlPanel } from './DebugControlPanel';
 import { useDebugGraphPreset } from './useDebugGraphPreset';
 import { useDebugGraphState } from './useDebugGraphState';
 import { useFpsCounter } from './useFpsCounter';
 import { getGraphDragPhysicsForMode } from '../useGraphSimulation';
+import { createGraphRuntimeTelemetry } from '../graphRuntime';
+import type { GraphRuntimeOptions, GraphRuntimeTelemetryRef } from '../graphRuntime';
+import type { GraphRendererMode, GraphSimulationMode } from '../graphRuntime';
+import { useDebugRuntimeTelemetry } from './useDebugRuntimeTelemetry';
 
 const CONTROL_HINTS = [
   'Drag Node to slide physics anchors',
@@ -23,11 +28,51 @@ interface DragTelemetry {
   eventCount: number;
 }
 
+const DebugGraphView = GraphView as unknown as (
+  props: GraphViewProps &
+    { runtimeOptions: GraphRuntimeOptions } &
+    React.RefAttributes<GraphViewRef>
+) => React.ReactElement | null;
+
+function createDebugSimulationWorker() {
+  return new Worker(new URL('../graphSimulation.worker.ts', import.meta.url), {
+    type: 'module',
+    name: 'ograph-debug-simulation'
+  });
+}
+
 export function GraphDebugHarness() {
   const graphViewRef = useRef<GraphViewRef | null>(null);
   const graphState = useDebugGraphState();
   const graphPreset = useDebugGraphPreset(graphState.localDepth);
-  const fps = useFpsCounter();
+  const frameTelemetry = useFpsCounter();
+  const [rendererMode, setRendererMode] = useState<GraphRendererMode>('canvas2d');
+  const [simulationMode, setSimulationMode] = useState<GraphSimulationMode>('main');
+  const runtimeTelemetryRef = useMemo<GraphRuntimeTelemetryRef>(() => ({
+    current: createGraphRuntimeTelemetry(rendererMode, simulationMode)
+  }), [
+    graphState.avgLinks,
+    graphState.nodeCount,
+    graphState.seed,
+    rendererMode,
+    simulationMode
+  ]);
+  const runtimeOptions = useMemo<GraphRuntimeOptions>(() => ({
+    renderer: rendererMode,
+    simulation: simulationMode,
+    telemetryRef: runtimeTelemetryRef,
+    createSimulationWorker: simulationMode === 'worker'
+      ? createDebugSimulationWorker
+      : undefined
+  }), [
+    graphState.avgLinks,
+    graphState.nodeCount,
+    graphState.seed,
+    rendererMode,
+    runtimeTelemetryRef,
+    simulationMode
+  ]);
+  const runtimeTelemetry = useDebugRuntimeTelemetry(runtimeTelemetryRef);
   const [zoomScale, setZoomScale] = useState<number>(0.8);
   const [dragTelemetry, setDragTelemetry] = useState<DragTelemetry>({
     phase: 'idle',
@@ -73,14 +118,26 @@ export function GraphDebugHarness() {
     }
   }, []);
 
+  useEffect(() => {
+    // Warm the debug-only renderer chunk while the baseline lane is visible so
+    // lane switching measures WebGL initialization rather than network/module latency.
+    void import('../pixiGraphRenderer');
+  }, []);
+
   return (
     <div className="flex flex-col lg:flex-row h-screen w-screen bg-[#0d0d11] text-gray-200 overflow-hidden font-sans">
       <div className="flex-1 relative flex flex-col min-w-0 order-2 lg:order-1 h-[60vh] lg:h-full border-t border-gray-800 lg:border-t-0 p-3 lg:p-5">
         <div className="absolute top-6 left-6 z-10 flex flex-col gap-1 pointer-events-none">
-          <div className="flex items-center gap-2 bg-[#16161c]/90 backdrop-blur border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/95 shadow-xl">
+          <div
+            data-testid="debug-frame-telemetry"
+            className="flex items-center gap-2 bg-[#16161c]/90 backdrop-blur border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/95 shadow-xl"
+          >
             <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
             <span className="font-semibold uppercase tracking-wider text-[10px] text-gray-400">FPS:</span>
-            <span className="font-mono text-emerald-400 font-bold">{fps}</span>
+            <span className="font-mono text-emerald-400 font-bold">{frameTelemetry.fps}</span>
+            <span className="text-white/20">|</span>
+            <span className="font-semibold uppercase tracking-wider text-[10px] text-gray-400">P95:</span>
+            <span className="font-mono text-amber-300 font-bold">{frameTelemetry.frameIntervalP95Ms.toFixed(1)}ms</span>
             <span className="text-white/20">|</span>
             <span className="font-semibold uppercase tracking-wider text-[10px] text-gray-400">Zoom:</span>
             <span className="font-mono text-cyan-400 font-bold">{zoomScale.toFixed(2)}x</span>
@@ -103,7 +160,7 @@ export function GraphDebugHarness() {
         </div>
 
         <div className="flex-1 rounded-2xl bg-[#121217] border border-gray-850 overflow-hidden relative shadow-2xl shadow-black/80">
-          <GraphView
+          <DebugGraphView
             ref={graphViewRef}
             nodes={graphState.originalNodes}
             links={graphState.originalLinks}
@@ -114,6 +171,7 @@ export function GraphDebugHarness() {
             localDepth={graphState.localDepth}
             preset={graphPreset.finalPreset}
             theme={graphPreset.finalTheme}
+            runtimeOptions={runtimeOptions}
             onNodeClick={(n) => {
               graphState.setSelectedNodeId(n.id);
             }}
@@ -149,6 +207,10 @@ export function GraphDebugHarness() {
       </div>
 
       <DebugControlPanel
+        rendererMode={rendererMode}
+        setRendererMode={setRendererMode}
+        simulationMode={simulationMode}
+        setSimulationMode={setSimulationMode}
         nodeCount={graphState.nodeCount}
         setNodeCount={graphState.setNodeCount}
         avgLinks={graphState.avgLinks}
@@ -184,6 +246,8 @@ export function GraphDebugHarness() {
         hoveredNodeId={graphState.hoveredNodeId}
         selectedNodeId={graphState.selectedNodeId}
         reactRenderCount={reactRenderCounterRef.current}
+        frameTelemetry={frameTelemetry}
+        runtimeTelemetry={runtimeTelemetry}
         dragTelemetry={dragTelemetry}
         dragPhysics={dragPhysics}
         onRandomizeSeed={graphState.randomizeSeed}

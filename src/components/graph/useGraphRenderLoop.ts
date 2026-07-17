@@ -1,11 +1,20 @@
 import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
-import type { Simulation } from 'd3-force';
 import type { GraphLink, GraphNode, GraphPreset, GraphTheme } from './types';
 import { resolveLabelVisibilityTarget, type Viewport } from './graphMath';
-import { drawGraph, resolveLabelRenderBudget } from './canvasRenderer';
+import { resolveLabelRenderBudget } from './canvasRenderer';
 import { getFocusedNeighborSet } from './graphIndexes';
 import { buildSpatialIndex, type GraphSpatialIndex } from './spatialIndex';
+import type { GraphRendererBackend } from './graphRenderer';
+import {
+  createActiveGraphRenderWindow,
+  recordActiveGraphRenderSample,
+  resetActiveGraphRenderWindow,
+  type GraphRuntimeTelemetryRef
+} from './graphRuntime';
+import type { GraphSimulationActivity } from './useGraphSimulation';
+
+declare const __OGRAPH_DEBUG_RUNTIME__: boolean;
 
 const VIEWPORT_SMOOTHING = 18;
 const DIMMING_SMOOTHING = 14;
@@ -14,7 +23,11 @@ const LENS_VISIBILITY_SMOOTHING = 14;
 const ANIMATION_EPSILON = 0.001;
 
 type CurrentRef<T> = { current: T };
-type SimulationActivitySnapshot = Pick<Simulation<GraphNode, GraphLink>, 'alpha' | 'alphaMin'>;
+type D3SimulationActivitySnapshot = {
+  alpha: () => number;
+  alphaMin: () => number;
+};
+type SimulationActivitySnapshot = D3SimulationActivitySnapshot | GraphSimulationActivity;
 
 interface UseGraphRenderLoopParams {
   canvasRef: RefObject<HTMLCanvasElement | null>;
@@ -23,7 +36,9 @@ interface UseGraphRenderLoopParams {
   drawFrameRef: CurrentRef<(timestamp: number) => void>;
   scheduleFrame: () => void;
   requestRender: () => void;
-  simulationRef: CurrentRef<Simulation<GraphNode, GraphLink> | null>;
+  simulationActivityRef: CurrentRef<GraphSimulationActivity | null>;
+  rendererBackendRef: CurrentRef<GraphRendererBackend | null>;
+  runtimeTelemetryRef?: GraphRuntimeTelemetryRef;
   renderNodesRef: CurrentRef<GraphNode[]>;
   renderLinksRef: CurrentRef<GraphLink[]>;
   neighborsMapRef: CurrentRef<Map<string, Set<string>>>;
@@ -61,7 +76,13 @@ export function isGraphSimulationActiveForFrame(
   simulation: SimulationActivitySnapshot | null,
   simulationPaused: boolean
 ): boolean {
-  return !simulationPaused && !!simulation && simulation.alpha() > simulation.alphaMin();
+  if (simulationPaused || !simulation) return false;
+
+  if ('isActive' in simulation) {
+    return simulation.isActive();
+  }
+
+  return simulation.alpha() > simulation.alphaMin();
 }
 
 export function useGraphRenderLoop({
@@ -71,7 +92,9 @@ export function useGraphRenderLoop({
   drawFrameRef,
   scheduleFrame,
   requestRender,
-  simulationRef,
+  simulationActivityRef,
+  rendererBackendRef,
+  runtimeTelemetryRef,
   renderNodesRef,
   renderLinksRef,
   neighborsMapRef,
@@ -97,7 +120,12 @@ export function useGraphRenderLoop({
   const labelVisibilityRef = useRef<Map<string, number>>(new Map());
   const lensVisibilityRef = useRef<Map<string, number>>(new Map());
   const lensVisibilityInitializedRef = useRef<boolean>(false);
+  const lensVisibilityDirtyRef = useRef<boolean>(true);
+  const lastLensNodesRef = useRef<GraphNode[] | null>(null);
   const lastSpatialIndexNodesRef = useRef<GraphNode[] | null>(null);
+  const activeRenderWindowRef = useRef(
+    __OGRAPH_DEBUG_RUNTIME__ ? createActiveGraphRenderWindow() : null
+  );
   const displayedFocusRef = useRef<{ selectedId: string | null | undefined; hoveredId: string | null | undefined }>({
     selectedId: null,
     hoveredId: null
@@ -111,12 +139,14 @@ export function useGraphRenderLoop({
         lensVisibilityRef.current.delete(nodeId);
       }
     }
+    lensVisibilityDirtyRef.current = true;
     requestRender();
   }, [lensVisibleNodeIds, requestRender, sourceNodeIds]);
 
   useEffect(() => {
     drawFrameRef.current = (timestamp: number) => {
       try {
+        const frameCpuStartedAt = __OGRAPH_DEBUG_RUNTIME__ ? performance.now() : 0;
         const previousFrameTime = lastFrameTimeRef.current;
         const deltaSeconds = previousFrameTime === null
           ? 1 / 60
@@ -129,13 +159,18 @@ export function useGraphRenderLoop({
         const { dpr, width: dw, height: dh } = canvasSizeRef.current;
         if (dw === 0 || dh === 0 || dpr === 0) return;
 
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        const simulation = simulationRef.current;
+        const simulation = simulationActivityRef.current;
         const isSimulationActive = isGraphSimulationActiveForFrame(simulation, simulationPaused);
+        if (__OGRAPH_DEBUG_RUNTIME__ && runtimeTelemetryRef) {
+          runtimeTelemetryRef.current.simulationActive = isSimulationActive;
+        }
         const renderNodes = renderNodesRef.current;
         const renderLinks = renderLinksRef.current;
+      if (lastLensNodesRef.current !== renderNodes) {
+        lastLensNodesRef.current = renderNodes;
+        lensVisibilityDirtyRef.current = true;
+      }
+      let spatialIndexDurationMs = 0;
       if (
         shouldRefreshSpatialIndexForFrame(
           lastSpatialIndexNodesRef.current,
@@ -144,8 +179,12 @@ export function useGraphRenderLoop({
           renderRequestedRef.current
         )
       ) {
+        const spatialIndexStartedAt = __OGRAPH_DEBUG_RUNTIME__ ? performance.now() : 0;
         spatialIndexRef.current = buildSpatialIndex(renderNodes);
         lastSpatialIndexNodesRef.current = renderNodes;
+        if (__OGRAPH_DEBUG_RUNTIME__) {
+          spatialIndexDurationMs = performance.now() - spatialIndexStartedAt;
+        }
       }
 
       const hoveredId = hoveredNodeIdRef.current;
@@ -208,27 +247,31 @@ export function useGraphRenderLoop({
           lensVisibilityByNodeId.set(node.id, lensVisibleNodeIds.has(node.id) ? 1 : 0);
         }
         lensVisibilityInitializedRef.current = true;
-      }
+        lensVisibilityDirtyRef.current = false;
+      } else if (lensVisibilityDirtyRef.current) {
+        lensVisibilityDirtyRef.current = false;
 
-      for (const node of renderNodes) {
-        const target = lensVisibleNodeIds.has(node.id) ? 1 : 0;
-        const current = lensVisibilityByNodeId.get(node.id) ?? 0;
+        for (const node of renderNodes) {
+          const target = lensVisibleNodeIds.has(node.id) ? 1 : 0;
+          const current = lensVisibilityByNodeId.get(node.id) ?? 0;
 
-        if (Math.abs(current - target) <= ANIMATION_EPSILON) {
-          lensVisibilityByNodeId.set(node.id, target);
-          continue;
-        }
+          if (Math.abs(current - target) <= ANIMATION_EPSILON) {
+            lensVisibilityByNodeId.set(node.id, target);
+            continue;
+          }
 
-        lensVisibilityChanged = true;
-        const next = reduceMotion
-          ? target
-          : current + (target - current) * blendLensVisibility;
+          lensVisibilityChanged = true;
+          const next = reduceMotion
+            ? target
+            : current + (target - current) * blendLensVisibility;
 
-        if (Math.abs(next - target) <= ANIMATION_EPSILON) {
-          lensVisibilityByNodeId.set(node.id, target);
-        } else {
-          lensVisibilityByNodeId.set(node.id, next);
-          isLensAnimationActive = true;
+          if (Math.abs(next - target) <= ANIMATION_EPSILON) {
+            lensVisibilityByNodeId.set(node.id, target);
+          } else {
+            lensVisibilityByNodeId.set(node.id, next);
+            lensVisibilityDirtyRef.current = true;
+            isLensAnimationActive = true;
+          }
         }
       }
 
@@ -236,6 +279,7 @@ export function useGraphRenderLoop({
       let labelsChanged = false;
       const visibleLabelIds = labelVisibilityRef.current;
       const blendLabels = 1 - Math.exp(-LABEL_SMOOTHING * deltaSeconds);
+      const labelVisibilityStartedAt = __OGRAPH_DEBUG_RUNTIME__ ? performance.now() : 0;
 
       for (let i = 0; i < renderNodes.length; i++) {
         const node = renderNodes[i]!;
@@ -279,6 +323,9 @@ export function useGraphRenderLoop({
           isLabelAnimationActive = true;
         }
       }
+      const labelVisibilityDurationMs = __OGRAPH_DEBUG_RUNTIME__
+        ? performance.now() - labelVisibilityStartedAt
+        : 0;
 
       const shouldDraw =
         renderRequestedRef.current ||
@@ -302,51 +349,113 @@ export function useGraphRenderLoop({
           isInteractionFrame
         );
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.save();
-        try {
-          ctx.scale(dpr, dpr);
-
-          drawGraph(
-            ctx,
-            dw,
-            dh,
-            renderNodes,
-            renderLinks,
-            viewportRef.current,
+        const rendererBackend = rendererBackendRef.current;
+        if (rendererBackend) {
+          const rendererWorkPendingBeforeRender =
+            __OGRAPH_DEBUG_RUNTIME__ && !!rendererBackend.hasPendingWork?.();
+          const renderStartedAt = performance.now();
+          const rendered = rendererBackend.render({
+            width: dw,
+            height: dh,
+            dpr,
+            nodes: renderNodes,
+            links: renderLinks,
+            viewport: viewportRef.current,
             theme,
             preset,
-            renderSelectedId,
-            renderHoveredId,
+            selectedNodeId: renderSelectedId,
+            hoveredNodeId: renderHoveredId,
             rootNodeId,
-            activeNeighbors,
-            dimProgressRef.current,
-            visibleLabelIds,
+            neighbors: activeNeighbors,
+            dimProgress: dimProgressRef.current,
+            labelVisibilityByNodeId: visibleLabelIds,
             lensVisibilityByNodeId,
-            spatialIndexRef.current,
+            spatialIndex: spatialIndexRef.current,
             labelRenderBudget
-          );
-        } finally {
-          ctx.restore();
+          });
+
+          if (__OGRAPH_DEBUG_RUNTIME__ && rendered && runtimeTelemetryRef) {
+            const telemetry = runtimeTelemetryRef.current;
+            const renderedAt = performance.now();
+            const renderDurationMs = renderedAt - renderStartedAt;
+            const frameCpuDurationMs = renderedAt - frameCpuStartedAt;
+            telemetry.renderer = rendererBackend.kind;
+            telemetry.renderCount += 1;
+            telemetry.lastRenderDurationMs = renderDurationMs;
+            telemetry.lastRenderAt = renderedAt;
+            telemetry.lastFrameCpuDurationMs = frameCpuDurationMs;
+            telemetry.lastPreRendererDurationMs = renderStartedAt - frameCpuStartedAt;
+            telemetry.lastSpatialIndexDurationMs = spatialIndexDurationMs;
+            telemetry.lastLabelVisibilityDurationMs = labelVisibilityDurationMs;
+            recordActiveGraphRenderSample(
+              activeRenderWindowRef.current!,
+              telemetry,
+              timestamp,
+              frameCpuDurationMs,
+              isInteractionFrame || rendererWorkPendingBeforeRender
+            );
+            telemetry.materializedNodes = renderNodes.length;
+            telemetry.materializedLinks = renderLinks.length;
+            telemetry.materializedLabels = visibleLabelIds.size;
+            const rendererStats = rendererBackend.getStats?.();
+            if (rendererStats) {
+              telemetry.materializedNodes = rendererStats.materializedNodes;
+              telemetry.materializedLinks = rendererStats.materializedLinks;
+              telemetry.materializedLabels = rendererStats.materializedLabels;
+              telemetry.visibleNodes = rendererStats.visibleNodes;
+              telemetry.visibleLinks = rendererStats.visibleLinks;
+              telemetry.visibleLabels = rendererStats.visibleLabels;
+              telemetry.lastRendererProfile = rendererStats.lastFrameProfile ?? null;
+            }
+            if (
+              telemetry.firstVisibleFrameLatencyMs === 0 &&
+              telemetry.runtimeStartedAt > 0 &&
+              renderNodes.length > 0
+            ) {
+              telemetry.firstVisibleFrameLatencyMs = renderedAt - telemetry.runtimeStartedAt;
+            }
+          }
         }
       }
 
-      if (
+      const rendererWorkPending =
+        __OGRAPH_DEBUG_RUNTIME__ && !!rendererBackendRef.current?.hasPendingWork?.();
+      const shouldContinue =
         isSimulationActive ||
         isDimmingActive ||
         isLensAnimationActive ||
         isLabelAnimationActive ||
-        viewportAnimationActiveRef.current
-      ) {
+        viewportAnimationActiveRef.current ||
+        rendererWorkPending;
+
+      if (__OGRAPH_DEBUG_RUNTIME__ && runtimeTelemetryRef) {
+        const reasons = [
+          isSimulationActive ? 'simulation' : '',
+          isDimmingActive ? 'dimming' : '',
+          isLensAnimationActive ? 'lens' : '',
+          isLabelAnimationActive ? 'labels' : '',
+          viewportAnimationActiveRef.current ? 'viewport' : '',
+          rendererWorkPending ? 'materialization' : ''
+        ].filter(Boolean);
+        runtimeTelemetryRef.current.activeFrameReasons = reasons.join(',') || 'idle';
+      }
+
+      if (shouldContinue) {
         scheduleFrame();
       } else {
         lastFrameTimeRef.current = null;
+        if (__OGRAPH_DEBUG_RUNTIME__ && activeRenderWindowRef.current) {
+          resetActiveGraphRenderWindow(activeRenderWindowRef.current);
+        }
       }
       } catch (caught) {
         lastFrameTimeRef.current = null;
+        if (__OGRAPH_DEBUG_RUNTIME__ && activeRenderWindowRef.current) {
+          resetActiveGraphRenderWindow(activeRenderWindowRef.current);
+        }
         renderRequestedRef.current = false;
         viewportAnimationActiveRef.current = false;
-        simulationRef.current?.stop();
+        simulationActivityRef.current?.stop();
 
         if (onErrorRef.current) {
           onErrorRef.current(toGraphError(caught));
@@ -365,7 +474,9 @@ export function useGraphRenderLoop({
     drawFrameRef,
     scheduleFrame,
     requestRender,
-    simulationRef,
+    simulationActivityRef,
+    rendererBackendRef,
+    runtimeTelemetryRef,
     renderNodesRef,
     renderLinksRef,
     neighborsMapRef,

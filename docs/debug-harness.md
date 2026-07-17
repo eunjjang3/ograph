@@ -9,7 +9,9 @@ npm install
 npm run dev
 ```
 
-Then open the Vite URL printed by the dev server, usually `http://localhost:3000`.
+Then open the fixed debug URL at `http://localhost:4435`. The development
+server uses strict port selection so a conflicting process fails loudly instead
+of silently moving the comparison run to another port.
 
 ## Purpose
 
@@ -25,11 +27,29 @@ It is not part of the production package API. Consumers should not import anythi
 | `DebugControlPanel.tsx` | Debug side-panel controls, preset selectors, command buttons, and telemetry readouts. |
 | `useDebugGraphState.ts` | Generated graph data, local/global mode state, root selection, selected/hovered node state, and active element counts. |
 | `useDebugGraphPreset.ts` | Debug preset selection, force/style slider state, and derived graph preset/theme values. |
-| `useFpsCounter.ts` | Lightweight requestAnimationFrame FPS sampling for rough stress-test feedback. |
+| `useFpsCounter.ts` | Rolling requestAnimationFrame FPS, p50/p95 interval, and long-frame telemetry for repeatable stress comparisons. |
+| `useDebugRuntimeTelemetry.ts` | Samples renderer, simulation, draw-duration, update-count, and materialization counters without putting hot-path state in React. |
 | `generateMockGraphData.ts` | Deterministic graph generator for typed nodes, groups, attachments, unresolved references, hubs, communities, and links. |
 | `mockGraphPresets.ts` | Debug-only visual theme and force preset options. |
 
 ## Controls
+
+### Runtime Experiment Lane
+
+The internal-only runtime selector offers the complete two-by-two renderer and
+simulation matrix. Switching a lane or deterministic fixture remounts the graph
+canvas and resets runtime counters while keeping the public package API
+unchanged. The harness warms the debug Pixi module in the background so lane
+switch latency primarily measures WebGL initialization rather than chunk load.
+Fixture and Main/Worker changes retain the active renderer context; changing
+between Canvas 2D and Pixi WebGL replaces the canvas exactly once.
+
+| Renderer | Simulation | Use |
+| --- | --- | --- |
+| `Canvas 2D` | `Main Thread` | Original baseline. |
+| `Canvas 2D` | `Worker` | Isolates the benefit of moving d3-force off the main thread. |
+| `Pixi WebGL` | `Main Thread` | Isolates retained/GPU rendering while retaining main-thread force cost. |
+| `Pixi WebGL` | `Worker` | Target Obsidian-style lane. |
 
 ### Mock Generator Setup
 
@@ -90,6 +110,15 @@ Runtime sliders override the active preset:
 The harness displays:
 
 - estimated FPS,
+- rolling p50 and p95 requestAnimationFrame interval,
+- sampled frames over the 16.7ms and 33.3ms budgets,
+- active private renderer and simulation lane,
+- graph draw count and last graph draw CPU duration,
+- simulation update count,
+- simulation active/idle state and the frame reasons keeping dirty rendering awake,
+- age of the latest Worker position result,
+- topology sync duration and first-visible-frame latency,
+- materialized and viewport-visible node/link/label object counts,
 - current zoom multiplier,
 - visible node and link counts,
 - active simulated node and link counts, including the hidden local-lens halo,
@@ -104,7 +133,41 @@ The harness displays:
 
 The drag telemetry is intentionally mode-sensitive. In global mode it reports the high-heat drag policy with connected-neighbor wake enabled. In local mode it reports the low-heat drag policy with connected-neighbor wake disabled, so local lens drags remain live in the d3 simulation without re-running the full global wake inside the scoped halo.
 
-FPS is measured with a lightweight `requestAnimationFrame` loop in the harness. It is useful for rough comparison while tuning, not for formal benchmark reporting.
+Frame telemetry is measured in one-second `requestAnimationFrame` windows. FPS,
+p50/p95 intervals, and long-frame counts are useful for fixed-seed A/B
+comparisons while tuning. They describe main-thread responsiveness rather than
+the graph draw loop alone and are not a replacement for a browser performance
+trace.
+
+The page-level FPS value and its percentiles are derived from the same interval
+set. A visibility transition resets the partial window, and a single interval
+that spans a complete window is reported on its own instead of being mixed with
+earlier 60 Hz samples. This prevents a resumed background tab from showing a
+near-zero FPS beside an apparently healthy p95 from a different effective
+window.
+
+The existing telemetry card also carries visually inert debug data attributes
+under `data-testid="runtime-performance-telemetry"`. They expose one-second
+active graph-draw cadence, draw-interval p95, full graph-frame CPU p50/p95/max,
+and the last Pixi phase breakdown. Active graph samples are collected only
+while simulation, interaction animation, or renderer materialization actually
+keeps drawing; idle page rAF callbacks are excluded. Full graph-frame CPU
+includes pre-render spatial-index and label work, while the Pixi `submit`
+phase still measures JavaScript command submission rather than GPU completion.
+These attributes do not add controls, text, layout, or consumer API surface.
+
+The first optimization driven by this telemetry uses a Pixi-only
+finite-coordinate scan to prove when the padded viewport contains every
+topology node. Every link segment is then contained as well, so Pixi reuses the
+topology node array directly and skips the redundant grid query, 10,000-entry
+visible-ID set, and 17,500 repeated link-bound tests. Any partial viewport or
+invalid coordinate falls back to the exact existing culling path. The shared
+spatial-index shape and production Canvas/Main bundle remain unchanged.
+
+`Frame Reasons` is `idle` once force updates, viewport/focus/lens/label easing,
+and Pixi materialization have all completed. At that point `Graph Draws` must
+remain unchanged across subsequent telemetry samples even though the page-level
+FPS counter continues sampling browser `requestAnimationFrame` cadence.
 
 ## Mock Data Shape
 
@@ -157,3 +220,218 @@ The largest built-in size is 10,000 nodes. After the initial global layout stabi
 - pan, zoom, and local transitions remain at or above roughly 30 FPS in the harness telemetry.
 
 For repeatable visual or performance comparisons, keep `nodeCount`, `avgLinks`, `seed`, selected preset, and slider values fixed.
+
+## Acceptance E2E (2026-07-16)
+
+The post-feedback acceptance run used the in-app Chromium browser with average
+degree `3.5`, seed `42`, and the default theme. Canvas/Main, Canvas/Worker,
+Pixi/Main, and Pixi/Worker each mounted exactly one canvas, rendered the 5,000
+node fixture, and reached sustained `Simulation State: idle` / `Frame Reasons:
+idle` after active work completed.
+
+The run found and fixed one lifecycle race: a render request could reach the
+concrete Pixi backend before asynchronous `Application.init()` had installed
+`app.renderer`. The lazy wrapper now delegates only after initialization and a
+regression test covers the readiness boundary (`8986ad3`). Repeating the former
+Canvas/Worker -> Main -> Pixi sequence produced no console error and settled
+normally.
+
+Pixi/Worker interaction coverage included node hover and selection, anchored
+wheel zoom, background pan without node-drag events, node drag/release,
+double-click local focus, local idle shutdown, and global restoration with the
+selection cleared. The final settled 5,000-node target state showed the
+page-level counter at `60 FPS` / `17.4ms` rAF p95 and retained an `8.6ms` last
+graph-draw CPU sample at `0.80x`, with no further graph draws while idle.
+
+At 10,000 nodes, the natural `0.26x` auto-fit viewport sampled `60 FPS`,
+`16.8ms` rAF p95, and `13.0ms` last-draw CPU after materialization while the
+Worker simulation was active. An intentionally wider `0.10x` view that placed
+all 10,000 nodes and 17,500 links in the viewport sampled about `23 FPS`,
+`50.1ms` rAF p95, and `31.5ms` last-draw CPU. That full-view case is a known
+optimization target rather than evidence for the normal culled viewport. This
+paragraph records the original acceptance baseline; the post-acceptance
+follow-up below supersedes its full-view performance result.
+
+The acceptance gate passed TypeScript, 72 unit/API/budget tests, the full demo
+and library builds, examples, React 18/19 pinned and floating packed-consumer
+verification, and all 8 packed-consumer Chromium tests. The decision is a
+conditional go for Pixi/Worker as the experimental promotion candidate, not an
+immediate production-default change. WebGL fallback, packaged Worker assets,
+cold initialization UX, and explicit human approval remain prerequisites for a
+separate promotion branch.
+
+## Post-Acceptance 10k Optimization Follow-up (2026-07-16)
+
+The same in-app Chromium harness was rerun after the retained Pixi hot path was
+profiled one waste at a time. The accepted changes removed settled scans and
+temporary collections, replaced link and node `Graphics` objects with retained
+particle batches, reused views across equivalent topology objects, and carried
+unfinished materialization queues across the input-to-Worker object handoff.
+Experiments that did not improve the complete browser path were reverted rather
+than retained.
+
+With all 10,000 nodes and 17,500 links in the viewport at the final `0.07x`
+fit, six active/reheated samples held `59-60 FPS`, `16.7-17.6ms` rAF p95, and
+`8.4-11.2ms` last graph-draw CPU across repeat runs and a theme switch. The
+final settled review state held `60 FPS` with no long frame above `33.3ms`,
+exactly one canvas, and no browser console error. Theme changes retained all
+10,000 node and 17,500 link views while remaining at `59-60 FPS`.
+
+Fixed-sequence cold materialization runs improved from `1.51-1.60s` to
+`1.03-1.08s`; the completion-window FPS median rose from `26` to `53`, and the
+number of graph draws needed to finish fell from `53-55` to `41-43`. One
+initial roughly `50ms` frame can still occur. Profiling attributes that frame
+to the aggregate synchronous setup pipeline (deterministic mock generation,
+input normalization, topology signature/index construction, spatial indexing,
+and initial Pixi planning), not to a remaining dominant renderer loop.
+
+Hover, selection, selected borders, local/global scope changes, theme changes,
+and Worker-backed node movement continued to resolve through the existing
+Ograph interaction path. The production build still exports only `GraphView`,
+`defaultGraphPreset`, and `defaultGraphTheme`; Pixi/Worker selection remains
+debug-only and the published default remains Canvas 2D/Main. Further reduction
+of the cold setup frame would require asynchronous generation or staged
+initialization, which is an explicit UX/promotion decision rather than another
+no-UI-change renderer optimization.
+
+## Active-Work Telemetry and Full-Containment Follow-Up (2026-07-16)
+
+The next no-UX-change pass corrected the meaning of the debug counters before
+making another renderer change. Page rAF FPS and p50/p95 now use the same
+timestamp intervals, while invisible debug attributes separately measure
+successful active graph draws and full graph-frame CPU. Idle rAF callbacks no
+longer count as graph rendering evidence.
+
+Fixed-seed Pixi/Worker results with all 10,000 nodes and 17,500 links inside the
+fitted viewport were:
+
+| Version | Graph draws/s | Draw interval p95 | Full-frame CPU p50 | Full-frame CPU p95 | Full-frame CPU max | Pixi culling prep |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Instrumented baseline | 60.0-60.1 | 17.1-17.5ms | 9.3-9.7ms | 10.6-11.1ms | 11.2-12.4ms | 1.8-2.3ms |
+| Pixi containment fast path | 60.0 | 16.8-17.5ms | 7.6-7.7ms | 8.0-8.3ms | 8.1-8.8ms | 0.0-0.1ms |
+
+The retained change performs a Pixi-only finite-coordinate containment scan.
+When every topology node is already inside the padded viewport, it removes the
+redundant grid query, visible-ID set, and link clipping checks. Partial or
+invalid-coordinate views retain the prior culling path. An intermediate design
+that expanded the shared spatial-index record was rejected after it exceeded
+the package gzip budget.
+
+The clean final in-app-browser tab mounted exactly one canvas, materialized all
+10,000 nodes and 17,500 links, reached `Simulation State: idle` / `Frame
+Reasons: idle`, and kept `Graph Draws` fixed at `1335` over a subsequent idle
+window with zero console errors. Its last active window reported 60 graph
+draws/s, `16.8ms` draw-interval p95, and full-frame CPU `6.8ms` p50 / `7.7ms`
+p95 / `8.0ms` max. The focused interaction audit retained hover and selection
+for `node-44`, double-click local focus with 22 visible / 57 simulated nodes,
+selection clearing, local low-heat drag updates, and global restoration. The
+packed consumer suite separately passed pointer release, wheel anchoring, pan,
+focus/ref, resize, local/global, StrictMode, and visual smoke coverage.
+
+The final gate passed TypeScript, 74 unit/API/budget tests, demo and library
+builds, examples, pinned and floating React 18/19 packed consumers, and all 8
+Chromium packed-consumer tests. Package gzip remained `16,881` bytes and the
+runtime exports remained exactly `GraphView`, `defaultGraphPreset`, and
+`defaultGraphTheme`. Pixi/Worker remains debug-only and Canvas 2D/Main remains
+the published default.
+
+## Cold-Path and Retained-Heap Profiling (2026-07-17)
+
+`scripts/profile-debug-harness.mjs` records a fixed `1,000 -> 10,000` node,
+average-degree `3.5`, seed `42`, Pixi/Worker transition through Playwright and
+the Chrome DevTools Protocol. It reports time to complete node/link
+materialization, the existing first-visible and active-frame telemetry,
+main-thread long tasks and rAF gaps, sampled CPU frames, forced-GC heap and DOM
+counters, optional retained-allocation samples, and optional repeated
+`1k <-> 10k` heap cycles.
+
+The cold window uses the page's `performance.now()` clock. Its private
+PerformanceObserver and rAF sampler are disconnected as soon as materialization
+is observed so idle and cycle heap readings do not include profiler-owned work
+or growing sample arrays.
+
+Run timing profiles in a headed Chrome window so the graph uses the machine's
+real GPU:
+
+```sh
+node scripts/profile-debug-harness.mjs --headed --runs=3
+```
+
+Use `--heap-profile` only for allocation attribution. Sampling allocations
+substantially slows Pixi particle registration, so its timing fields are not
+valid A/B evidence. `--cycles=3` adds forced-GC fixture cycles for monotonic
+growth checks. Headless software WebGL likewise is suitable for functional
+automation but not renderer timing on this fixture.
+
+The pre-change headed baseline produced:
+
+| Metric | Three-run range |
+| --- | ---: |
+| Observed complete 10k materialization | 1,232-1,249ms |
+| First visible | 67.7-72.8ms |
+| Cold long-task maximum | 97-109ms |
+| Forced-GC JS heap delta from retained 1k | 16.55-16.82MiB |
+| Settled active graph draws | 60/s |
+| Settled full-frame CPU p95 | 7.5-8.1ms |
+
+The allocation sample showed that most of the post-GC plateau is live graph
+state: Pixi particles/maps, the Worker-side simulation copy, main-thread
+simulation/render maps, and bounded text objects. It also identified a smaller
+avoidable retained bucket in the default-disabled growth-animation pipeline,
+which still built its timestamp sequence, sorted signature, and a second
+source-ID set. Optimization results are recorded in the follow-up below.
+
+### Disabled-growth fast path
+
+The retained change bypasses timestamp extraction, sorting, and growth-signature
+construction when `growthAnimation` is disabled, which is the default. Its
+complete-frame source-ID set is also reused by the render loop instead of being
+rebuilt. The enabled animation path, revealed-count synchronization, graph
+references, node order, and public options remain unchanged.
+
+Final same-sequence headed results were:
+
+| Metric | Before | After |
+| --- | ---: | ---: |
+| Observed complete 10k materialization | 1,232-1,249ms | 1,236-1,245ms |
+| First visible | 67.7-72.8ms | 64.4-64.7ms |
+| Cold long-task maximum | 97-109ms | 93-95ms |
+| Forced-GC JS heap delta from retained 1k | 16.55-16.82MiB | 15.76-16.30MiB |
+| Settled active graph draws | 60/s | 60/s |
+| Settled full-frame CPU p95 | 7.5-8.1ms | 7.5-8.1ms |
+
+The materialization and steady-frame ranges are treated as unchanged; the
+retained result is a `0.25-1.06MiB` heap reduction (`0.78MiB` by median), the
+smaller first-visible result, and a lower cold long-task maximum. With all
+profiler-owned cold observers stopped, a five-cycle forced-GC check measured
+the repeated 10k heaps at `33.99`, `34.47`, `34.30`, `34.41`, and `34.76MiB`.
+The sequence is not monotonic, while the final three 1k readings were all
+`21.69MiB`. The smaller fixture remains above its initial value after the first
+10k visit because the intentional position cache retains coordinates for
+topology continuity.
+
+An exact full-containment shortcut for cold link materialization was also
+tested. It reduced sampled `materializeLinks` self CPU from roughly `52ms` to
+`35ms`, but its same-sequence end-to-end materialization range did not improve,
+so it was reverted.
+
+### Final compatibility gate
+
+The final pass fixed two profiler self-interference issues before accepting the
+evidence: elapsed time now uses the page clock, and the private long-task/rAF
+samplers stop immediately after the cold window. A React-stubbed source test
+also proves that disabled growth returns the original complete graph and never
+calls a supplied timestamp extractor.
+
+`npm run lint`, all 75 unit/API/budget tests, demo and library builds, examples,
+pinned and floating React 18/19 packed consumers, and all 8 Chromium consumer
+tests passed. The deterministic visual smoke baselines did not change. The
+final library entry is `16,908` bytes gzip against the `16,938.9` byte budget,
+exports only `GraphView`, `defaultGraphPreset`, and `defaultGraphTheme`, and
+contains no Pixi/Worker runtime marker or asset.
+
+A debug Pixi/Worker interaction smoke retained exactly one canvas, hovered and
+selected `node-654`, entered a 14-node local lens, restored all 1,000 global
+nodes, and reported zero console errors. Pixi/Worker remains debug-only,
+Canvas 2D/Main remains the production default, and no production promotion was
+performed.
