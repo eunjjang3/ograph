@@ -172,7 +172,7 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
     no-go for immediate production-default promotion on this branch
   - Commit: `8986ad3`
 
-- [ ] Stage 7: Promote the accepted runtime behind the existing public API
+- [x] Stage 7: Promote the accepted runtime behind the existing public API
   - Worktree: `/Users/eun/Documents/ograph-pixi-worker-production`
   - Branch: `feat/pixi-worker-production-runtime`
   - Base: `main` at `f075f6c47df4ba90eef284ce7018510eb7530e99`
@@ -184,7 +184,8 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
   - Verification: full stable release gate plus WebGL failure/fallback coverage
   - Docs: API wording remains renderer-neutral; architecture, changelog, and
     release notes document the internal runtime change
-  - Commit: `<pending>`
+  - Commit: `110a45a`
+  - Pull request: https://github.com/eunjjang3/ograph/pull/48 (draft)
 
   - [x] Stage 7A: Lock production promotion and fallback invariants
     - Deliverable: renderer-neutral packed-browser pixel checks; regression
@@ -192,7 +193,7 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
       runtime/type exports; exactly one consumer-visible canvas
     - Verification: targeted API/graph tests and packed-browser nonvisual tests
     - Docs: this plan
-    - Commit: `<pending>`
+    - Commit: `110a45a`
 
   - [x] Stage 7B: Package the lazy Pixi renderer and simulation Worker
     - Deliverable: `pixi.js` runtime dependency, lazy renderer chunk, bundled
@@ -201,7 +202,7 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
     - Verification: library build, tarball inventory, React 18/19 packed
       consumers, direct registry-style browser install
     - Docs: `docs/architecture.md`, `docs/debug-harness.md`
-    - Commit: `<pending>`
+    - Commit: `110a45a`
 
   - [x] Stage 7C: Promote Pixi/Worker with automatic per-lane fallback
     - Deliverable: package-facing Pixi/Worker default; silent Pixi-to-Canvas
@@ -212,7 +213,7 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
       one-canvas lifecycle, no consumer `onError` for a recovered environment
       limitation
     - Docs: `docs/architecture.md`, renderer-neutral `docs/api.md`
-    - Commit: `<pending>`
+    - Commit: `110a45a`
 
   - [x] Stage 7D: Qualify cold start, visuals, interactions, and performance
     - Deliverable: background-only cold initialization with no spinner or
@@ -222,16 +223,17 @@ Provisional acceptance targets, to be recalibrated only from recorded evidence:
       visual suites
     - Docs: `docs/debug-harness.md`, this plan
     - Human UX approval: accepted as non-disruptive on 2026-07-18
-    - Commit: `<pending>`
+    - Commit: `110a45a`
 
-  - [ ] Stage 7E: Integrate only after human approval
+  - [x] Stage 7E: Integrate only after human approval
     - Deliverable: full stable release gate, final docs/changelog, pushed branch
       and checked PR; no merge, version bump, tag, or npm publish without a
       separate explicit approval
     - Verification: lint, tests, budgets, builds, examples, React 18/19 packed
       consumers, browser suite, package dry run, and release identity dry run
     - Docs: architecture, debug harness, changelog, this plan
-    - Commit: `<pending>`
+    - Commit: `110a45a`
+    - Pull request: https://github.com/eunjjang3/ograph/pull/48 (draft)
 
 ## Stage 7 production-promotion UX checkpoint (2026-07-18)
 
@@ -281,6 +283,14 @@ Human UX review at `http://127.0.0.1:4435/` accepted the observed differences
 as non-disruptive. Stage 7D is complete and the combined commit/push/PR flow is
 authorized. Version bump, merge, tag, and npm publication remain pending a
 separate approval.
+
+Stage 7E repeated the full local gate after approval: lint, 77 tests and split
+budgets, demo/library builds, examples, pinned and floating React 18/19 packed
+consumers, release identity, a zero-vulnerability runtime audit, the 21-file
+package dry run, and all 11 Chromium tests passed. Commit `110a45a` was pushed
+to `feat/pixi-worker-production-runtime` and draft PR #48 was opened against
+`main`. A publish dry run remains intentionally deferred to the separately
+approved version step because npm already contains `0.2.0`.
 
 ## Human UX checkpoint (2026-07-15)
 
