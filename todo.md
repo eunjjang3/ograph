@@ -393,7 +393,7 @@ changing those contracts.
   - Branch: `feat/obsidian-graph-harness-spike`
   - Verification: lint, unit/API/budget, builds, examples, React 18/19 consumers, Chromium E2E
   - Docs: `todo.md`, relevant architecture/debug notes
-  - Commit: `<pending>`
+  - Commit: `ce64f8b`
 
 Stage 11 added a headed-Chrome/CDP profiler that keeps ordinary timing runs
 separate from allocation sampling, because heap sampling and headless software
