@@ -175,15 +175,15 @@ Current external setting evidence, checked on 2026-06-05 KST:
 
 Published package evidence, refreshed on 2026-07-18 KST:
 
-- `npm view @eunjjang/ograph version --json` returns `0.2.0`, and the `latest`
-  dist-tag points at `0.2.0`.
+- `npm view @eunjjang/ograph version --json` returns `0.3.0`, and the `latest`
+  dist-tag points at `0.3.0`.
 - `npm access get status @eunjjang/ograph --json` returns `public`.
-- GitHub release `v0.2.0` and its protected tag resolve to commit
-  `352d748d4a0348ffd0a7feceae590bc693b12759` on `main`.
-- Release workflow run `29599814873` completed successfully after the required
+- GitHub release `v0.3.0` and its protected tag resolve to commit
+  `b511c791a3d5fbc6672178b13bd3c319aaa64517` on `main`.
+- Release workflow run `29609893972` completed successfully after the required
   `npm` environment approval and published through OIDC Trusted Publishing.
-- `npm view @eunjjang/ograph@0.2.0 dist --json` reports a registry signature
-  and SLSA provenance attestation for the 15-file package tarball.
+- `npm view @eunjjang/ograph@0.3.0 dist --json` reports a registry signature
+  and SLSA provenance attestation for the 21-file package tarball.
 - `npm audit signatures` verifies all 75 installed registry signatures and 29
   attestations in the final release install.
 
