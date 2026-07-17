@@ -371,6 +371,30 @@ The built runtime exports remain exactly `GraphView`, `defaultGraphPreset`, and
 `defaultGraphTheme`; package gzip is `16,881` bytes, the production default is
 still Canvas 2D/Main, and no push or production promotion was performed.
 
+## Goal: No-UX cold-path and memory qualification follow-up
+
+The graph surface, controls, visual output, interaction semantics, public
+props/refs/callbacks, production Canvas/Main default, and package budget remain
+frozen. This pass may add invisible debug telemetry and retain an internal
+optimization only when a fixed-seed A/B shows a material improvement without
+changing those contracts.
+
+- [x] Stage 11: Split the fixed 10k cold path and memory/allocation baseline
+  - Branch: `feat/obsidian-graph-harness-spike`
+  - Verification: fixed-seed 10k Pixi/Worker cold-load profile plus targeted telemetry tests
+  - Docs: `docs/debug-harness.md`, `todo.md`
+  - Commit: `<pending>`
+- [ ] Stage 12: Remove the largest low-risk cold-path or allocation waste
+  - Branch: `feat/obsidian-graph-harness-spike`
+  - Verification: same-sequence 10k A/B, interaction smoke, targeted unit tests
+  - Docs: `docs/architecture.md`, `docs/debug-harness.md`
+  - Commit: `<pending>`
+- [ ] Stage 13: Re-prove API, UI, interaction, package, and consumer compatibility
+  - Branch: `feat/obsidian-graph-harness-spike`
+  - Verification: lint, unit/API/budget, builds, examples, React 18/19 consumers, Chromium E2E
+  - Docs: `todo.md`, relevant architecture/debug notes
+  - Commit: `<pending>`
+
 ## Stop conditions
 
 Stop the spike and report rather than silently widening scope when:

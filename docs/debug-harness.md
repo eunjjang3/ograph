@@ -334,3 +334,44 @@ Chromium packed-consumer tests. Package gzip remained `16,881` bytes and the
 runtime exports remained exactly `GraphView`, `defaultGraphPreset`, and
 `defaultGraphTheme`. Pixi/Worker remains debug-only and Canvas 2D/Main remains
 the published default.
+
+## Cold-Path and Retained-Heap Profiling (2026-07-17)
+
+`scripts/profile-debug-harness.mjs` records a fixed `1,000 -> 10,000` node,
+average-degree `3.5`, seed `42`, Pixi/Worker transition through Playwright and
+the Chrome DevTools Protocol. It reports time to complete node/link
+materialization, the existing first-visible and active-frame telemetry,
+main-thread long tasks and rAF gaps, sampled CPU frames, forced-GC heap and DOM
+counters, optional retained-allocation samples, and optional repeated
+`1k <-> 10k` heap cycles.
+
+Run timing profiles in a headed Chrome window so the graph uses the machine's
+real GPU:
+
+```sh
+node scripts/profile-debug-harness.mjs --headed --runs=3
+```
+
+Use `--heap-profile` only for allocation attribution. Sampling allocations
+substantially slows Pixi particle registration, so its timing fields are not
+valid A/B evidence. `--cycles=3` adds forced-GC fixture cycles for monotonic
+growth checks. Headless software WebGL likewise is suitable for functional
+automation but not renderer timing on this fixture.
+
+The pre-change headed baseline produced:
+
+| Metric | Three-run range |
+| --- | ---: |
+| Complete 10k materialization | 1,164-1,215ms |
+| First visible | 67.5-71.2ms |
+| Cold long-task maximum | 94-99ms |
+| Forced-GC JS heap delta from retained 1k | 16.72-16.93MiB |
+| Settled active graph draws | 60/s |
+| Settled full-frame CPU p95 | 7.4-8.2ms |
+
+The allocation sample showed that most of the post-GC plateau is live graph
+state: Pixi particles/maps, the Worker-side simulation copy, main-thread
+simulation/render maps, and bounded text objects. It also identified a smaller
+avoidable retained bucket in the default-disabled growth-animation pipeline,
+which still built its timestamp sequence, sorted signature, and a second
+source-ID set. Optimization results are recorded in the follow-up below.
