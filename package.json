@@ -1,6 +1,6 @@
 {
   "name": "@eunjjang/ograph",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Reusable interactive force-directed canvas graph component for React applications.",
   "type": "module",
   "main": "./dist/index.js",
@@ -20,6 +20,8 @@
     "dist/types.d.ts",
     "dist/presets.d.ts",
     "dist/index.js",
+    "dist/chunks/*.js",
+    "dist/workers/*.js",
     "README.md",
     "LICENSE",
     "CHANGELOG.md",
@@ -58,7 +60,7 @@
     "build": "npm run build:demo && npm run build:lib",
     "build:demo": "vite build --outDir dist/demo",
     "build:demo:pages": "vite build --outDir dist/demo --base=/ograph/",
-    "build:lib": "tsc -p tsconfig.lib.json && vite build --config vite.lib.config.ts",
+    "build:lib": "node scripts/clean-library-output.mjs && tsc -p tsconfig.lib.json && vite build --config vite.lib.config.ts",
     "prepare": "npm run build:lib",
     "preview": "vite preview",
     "clean": "rm -rf dist",
@@ -73,7 +75,8 @@
     "verify:consumer:floating": "node scripts/verify-consumer-package.mjs --lane floating"
   },
   "dependencies": {
-    "d3-force": "^3.0.0"
+    "d3-force": "^3.0.0",
+    "pixi.js": "8.19.0"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
@@ -90,7 +93,6 @@
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.28.0",
     "lucide-react": "^1.17.0",
-    "pixi.js": "8.19.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "tailwindcss": "^4.1.14",

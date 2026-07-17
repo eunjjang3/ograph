@@ -229,7 +229,10 @@ Object.assign(window, {
   __ographDiagnostics: {
     activeAnimationFrameCount: () => activeAnimationFrames.size,
     activeGraphListenerCount: () => Array.from(trackedWindowListeners.values())
-      .reduce((count, listeners) => count + listeners.size, 0)
+      .reduce((count, listeners) => count + listeners.size, 0),
+    activeGraphListenerCounts: () => Object.fromEntries(
+      Array.from(trackedWindowListeners, ([type, listeners]) => [type, listeners.size])
+    )
   }
 });
 

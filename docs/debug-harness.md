@@ -435,3 +435,49 @@ selected `node-654`, entered a 14-node local lens, restored all 1,000 global
 nodes, and reported zero console errors. Pixi/Worker remains debug-only,
 Canvas 2D/Main remains the production default, and no production promotion was
 performed.
+
+## Production runtime qualification checkpoint (2026-07-18)
+
+The production-promotion branch keeps the debug four-lane selector for direct
+comparison, while package-facing `GraphView` now selects Pixi/Worker internally
+and recovers to Canvas/main per lane. The packed package contains a lazy Pixi
+backend chunk and package-relative module Worker; neither choice is exposed as
+a prop, ref method, callback, or runtime export. WebGL failure replaces the
+React-owned canvas exactly once, and Worker construction failure reuses the
+same canvas with main-thread physics. Both recovered paths remain silent to
+consumer `onError`.
+
+The profiler accepts `--target=2500`, `--target=5000`, or `--target=10000`; its
+default remains `10000`:
+
+```sh
+node scripts/profile-debug-harness.mjs --headed --runs=3 --target=5000
+```
+
+Fixed-seed, average-degree `3.5`, real-GPU results at the checkpoint were:
+
+| Nodes | Complete materialization | First visible | Steady FPS | Graph-frame CPU p95 | Cold long-task max |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1,000 | already materialized sample | 16.1ms | 60 | 2.2ms | not sampled |
+| 5,000 | 686-713ms | 44.2-45.8ms | 60 | 5.1-5.5ms | 56-58ms |
+| 10,000 | 1,230-1,246ms | 63.2-66.2ms | 60 | 7.8-8.0ms | 91-94ms |
+
+The 5,000-node pre-fix run exposed a non-monotonic `129-174ms` link
+materialization long task. `pendingLinks.shift()` moved the remaining array for
+each attempt; in-place queue compaction reduced complete materialization by
+about 41% and removed that anomaly. The same 10,000-node sequence stayed within
+its previous range, so the change removes the intermediate-size waste without
+altering the existing frame budgets or output.
+
+Packed Chromium verification passed all 11 tests: fixture rendering, actual
+default Pixi/Worker activation, both automatic fallbacks, pointer/drag/pan/zoom
+and camera interactions, resize, local/global transitions, StrictMode cleanup,
+and deterministic visual smoke states. The Canvas baselines were not replaced.
+The only dense-image difference was WebGL-versus-Canvas curved-edge
+antialiasing (`0.58%` of pixels), covered by a narrow `0.7%` cross-backend
+tolerance after visual diff inspection.
+
+Human review accepted the remaining cold-load and rasterization differences as
+not harmful to UX. That approval closed the Stage 7D checkpoint, and subsequent
+maintainer approval authorized the `0.3.0` version, merge, tag, and npm release
+flow without changing the public API or interaction contract.

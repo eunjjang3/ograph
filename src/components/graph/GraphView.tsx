@@ -33,8 +33,16 @@ import type { Viewport } from './graphMath';
 import { GraphErrorBoundary } from './GraphErrorBoundary';
 import { normalizeGraphInput } from './inputValidation';
 import { useGraphRendererBackend } from './useGraphRendererBackend';
-import { DEFAULT_GRAPH_RUNTIME_OPTIONS } from './graphRuntime';
-import type { GraphRuntimeOptions } from './graphRuntime';
+import {
+  DEFAULT_GRAPH_RUNTIME_OPTIONS,
+  resolveGraphRendererFallback,
+  resolveGraphSimulationFallback
+} from './graphRuntime';
+import type {
+  GraphRendererMode,
+  GraphRuntimeOptions,
+  GraphSimulationMode
+} from './graphRuntime';
 
 declare const __OGRAPH_DEBUG_RUNTIME__: boolean;
 
@@ -135,6 +143,8 @@ interface GraphViewCanvasProps<
   themeConf: GraphTheme;
   containerRef: React.RefObject<HTMLDivElement | null>;
   runtimeOptions: GraphRuntimeOptions;
+  onRendererUnavailable: (renderer: GraphRendererMode, error: Error) => boolean;
+  onSimulationUnavailable: (simulation: GraphSimulationMode, error: Error) => boolean;
 }
 
 type GraphViewCanvasComponent = (<
@@ -169,6 +179,8 @@ function GraphViewCanvasInner<
     themeConf,
     containerRef,
     runtimeOptions,
+    onRendererUnavailable,
+    onSimulationUnavailable,
     onNodeClick,
     onNodeDoubleClick,
     onNodeHover,
@@ -218,6 +230,7 @@ function GraphViewCanvasInner<
     renderer: runtimeOptions.renderer,
     requestRender,
     telemetryRef: runtimeTelemetryRef,
+    onUnavailable: onRendererUnavailable,
     onError
   });
 
@@ -253,9 +266,8 @@ function GraphViewCanvasInner<
       paused,
       engine: runtimeOptions.simulation,
       runtimeTelemetryRef,
-      ...(__OGRAPH_DEBUG_RUNTIME__
-        ? { createSimulationWorker: runtimeOptions.createSimulationWorker }
-        : {}),
+      createSimulationWorker: runtimeOptions.createSimulationWorker,
+      onEngineUnavailable: onSimulationUnavailable,
       onError
     }
   );
@@ -486,6 +498,7 @@ function GraphViewCanvasInner<
     reduceMotion,
     preset: presetConf,
     theme: themeConf,
+    onRendererUnavailable,
     onError
   });
 
@@ -565,6 +578,57 @@ function GraphViewInner<
     runtimeOptions = DEFAULT_GRAPH_RUNTIME_OPTIONS
   } = props;
 
+  const [runtimeFallback, setRuntimeFallback] = useState<{
+    rendererRequest: GraphRendererMode | null;
+    renderer: GraphRendererMode | null;
+    simulationRequest: GraphSimulationMode | null;
+    simulation: GraphSimulationMode | null;
+  }>({
+    rendererRequest: null,
+    renderer: null,
+    simulationRequest: null,
+    simulation: null
+  });
+  const allowRuntimeFallback = runtimeOptions.allowFallback === true;
+  const effectiveRenderer =
+    runtimeFallback.rendererRequest === runtimeOptions.renderer && runtimeFallback.renderer
+      ? runtimeFallback.renderer
+      : runtimeOptions.renderer;
+  const effectiveSimulation =
+    runtimeFallback.simulationRequest === runtimeOptions.simulation && runtimeFallback.simulation
+      ? runtimeFallback.simulation
+      : runtimeOptions.simulation;
+  const handleRendererUnavailable = useCallback((renderer: GraphRendererMode, _error: Error) => {
+    const fallback = resolveGraphRendererFallback(renderer, allowRuntimeFallback);
+    if (!fallback) return false;
+
+    setRuntimeFallback(current => ({
+      ...current,
+      rendererRequest: runtimeOptions.renderer,
+      renderer: fallback
+    }));
+    return true;
+  }, [allowRuntimeFallback, runtimeOptions.renderer]);
+  const handleSimulationUnavailable = useCallback((simulation: GraphSimulationMode, _error: Error) => {
+    const fallback = resolveGraphSimulationFallback(simulation, allowRuntimeFallback);
+    if (!fallback) return false;
+
+    setRuntimeFallback(current => ({
+      ...current,
+      simulationRequest: runtimeOptions.simulation,
+      simulation: fallback
+    }));
+    return true;
+  }, [allowRuntimeFallback, runtimeOptions.simulation]);
+  const effectiveRuntimeOptions = useMemo<GraphRuntimeOptions>(() => ({
+    ...runtimeOptions,
+    renderer: effectiveRenderer,
+    simulation: effectiveSimulation,
+    createSimulationWorker: effectiveSimulation === 'worker'
+      ? runtimeOptions.createSimulationWorker
+      : undefined
+  }), [effectiveRenderer, effectiveSimulation, runtimeOptions]);
+
   const normalizedGraph = useMemo(() => normalizeGraphInput({ nodes, links, localDepth }), [nodes, links, localDepth]);
   const presetConf = useMemo<GraphPreset>(() => {
     if (preset === 'default') {
@@ -589,7 +653,7 @@ function GraphViewInner<
     >
       <GraphErrorBoundary onError={onError}>
         <GraphViewCanvas
-          key={runtimeOptions.renderer}
+          key={effectiveRuntimeOptions.renderer}
           {...props}
           ref={ref}
           nodes={normalizedGraph.nodes}
@@ -598,7 +662,9 @@ function GraphViewInner<
           presetConf={presetConf}
           themeConf={themeConf}
           containerRef={containerRef}
-          runtimeOptions={runtimeOptions}
+          runtimeOptions={effectiveRuntimeOptions}
+          onRendererUnavailable={handleRendererUnavailable}
+          onSimulationUnavailable={handleSimulationUnavailable}
         />
       </GraphErrorBoundary>
     </div>

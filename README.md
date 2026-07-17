@@ -7,6 +7,8 @@ The package is designed for applications that need a large interactive node-link
 ## What This Package Provides
 
 - `GraphView`, a canvas-based React component for rendering force-directed graphs.
+- An internal Pixi WebGL/Worker default with automatic Canvas 2D/main-thread
+  fallback, without renderer or simulation selectors in the public API.
 - TypeScript data contracts for graph nodes, links, themes, presets, view modes, and viewport events.
 - Default dark graph theme and force preset values.
 - Local/global graph modes, node selection and hover highlighting, drag-to-reposition, pan, wheel zoom, and pinch zoom.
@@ -16,7 +18,10 @@ The package is designed for applications that need a large interactive node-link
 
 ## Project Status
 
-`@eunjjang/ograph` is an early pre-1.0 package being prepared for public preview so the rendering model, package boundary, and API direction can be reviewed before a production-ready release. Expect API and behavior changes before `1.0.0`.
+`@eunjjang/ograph` is an early pre-1.0 package. The latest stable release is
+`0.3.0`. It promotes the qualified Pixi WebGL/Worker runtime behind the same
+public API with automatic Canvas 2D/main-thread fallback. Expect API and
+behavior changes before `1.0.0`.
 
 ## Documentation
 
@@ -49,10 +54,10 @@ import {
 } from '@eunjjang/ograph';
 ```
 
-Until the first npm publication, install from the GitHub repository after it is public, or clone the repository and build locally:
+Install the stable package from npm:
 
 ```sh
-npm install github:eunjjang3/ograph
+npm install @eunjjang/ograph
 ```
 
 For local package verification:
@@ -217,7 +222,10 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-`npm run test` includes unit/API tests and the no-new-dependency package budget check. `npm run build` creates both the demo build under `dist/demo` and the package build under `dist/index.js` with declarations under `dist`.
+`npm run test` includes unit/API tests and package budgets for the synchronous
+entry, lazy runtime chunks, Worker asset, and graph operations. `npm run build`
+creates the demo under `dist/demo` and the package entry, declarations, lazy
+chunks, and Worker asset under `dist`.
 `npm run test:browser` packs the package, installs that tarball into a temporary Vite React consumer app, and runs the Chromium Playwright browser smoke tests.
 
 ## Contributing And Security

@@ -135,10 +135,6 @@ export class LazyPixiGraphRendererBackend implements GraphRendererBackend {
   ) {}
 
   async initialize(canvas: HTMLCanvasElement) {
-    if (!__OGRAPH_DEBUG_RUNTIME__) {
-      throw new Error('Pixi graph rendering is available only in the debug harness.');
-    }
-
     const backend = await this.loadBackend();
     if (this.disposed) {
       backend.destroy();
@@ -195,9 +191,5 @@ export function createGraphRendererBackend(kind: GraphRendererMode): GraphRender
     return new CanvasGraphRendererBackend();
   }
 
-  if (__OGRAPH_DEBUG_RUNTIME__) {
-    return new LazyPixiGraphRendererBackend();
-  }
-
-  throw new Error('Unsupported graph renderer.');
+  return new LazyPixiGraphRendererBackend();
 }

@@ -87,6 +87,7 @@ export interface GraphSimulationOptions {
   engine?: GraphSimulationMode;
   runtimeTelemetryRef?: GraphRuntimeTelemetryRef;
   createSimulationWorker?: () => Worker;
+  onEngineUnavailable?: (engine: GraphSimulationMode, error: Error) => boolean;
   onError?: (error: Error) => void;
 }
 
@@ -275,11 +276,10 @@ export function useGraphSimulation(
     paused = false,
     engine = 'main',
     runtimeTelemetryRef,
+    onEngineUnavailable,
     onError
   } = options;
-  const createSimulationWorker = __OGRAPH_DEBUG_RUNTIME__
-    ? options.createSimulationWorker
-    : undefined;
+  const createSimulationWorker = options.createSimulationWorker;
   const simulationRef = useRef<Simulation<ExtendedSimulationNode, ExtendedSimulationLink> | null>(null);
   const engineRef = useRef(engine);
   engineRef.current = engine;
@@ -288,7 +288,7 @@ export function useGraphSimulation(
   const workerRevisionRef = useRef(0);
   const simulationActivityRef = useRef<GraphSimulationActivity>({
     isActive: () => {
-      if (__OGRAPH_DEBUG_RUNTIME__ && engineRef.current === 'worker') {
+      if (engineRef.current === 'worker') {
         return workerActiveRef.current;
       }
 
@@ -303,7 +303,9 @@ export function useGraphSimulation(
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
   const onErrorRef = useRef(onError);
+  const onEngineUnavailableRef = useRef(onEngineUnavailable);
   onErrorRef.current = onError;
+  onEngineUnavailableRef.current = onEngineUnavailable;
   
   // Track previous node coordinates so filter/mode switches preserve positions & velocities rather than resetting
   const nodeCacheRef = useRef<Map<string, { x: number; y: number; vx: number; vy: number }>>(new Map());
@@ -456,6 +458,17 @@ export function useGraphSimulation(
     throw caught;
   }, []);
 
+  const reportWorkerUnavailable = useCallback((caught: unknown) => {
+    const error = toGraphError(caught);
+    workerActiveRef.current = false;
+
+    if (onEngineUnavailableRef.current?.('worker', error)) {
+      return;
+    }
+
+    reportSimulationError(error);
+  }, [reportSimulationError]);
+
   const releaseSimulationResources = useCallback(() => {
     const simulation = simulationRef.current;
     if (!simulation) return;
@@ -604,8 +617,6 @@ export function useGraphSimulation(
   ]);
 
   useEffect(() => {
-    if (!__OGRAPH_DEBUG_RUNTIME__) return;
-
     if (engine !== 'worker') {
       releaseWorkerResources();
       return;
@@ -614,7 +625,7 @@ export function useGraphSimulation(
     releaseSimulationResources();
 
     if (!createSimulationWorker) {
-      reportSimulationError(new Error('No graph simulation Worker factory was provided.'));
+      reportWorkerUnavailable(new Error('No graph simulation Worker factory was provided.'));
       return;
     }
 
@@ -678,7 +689,7 @@ export function useGraphSimulation(
               runtimeTelemetryRef.current.simulation = 'worker';
             }
           },
-          onError: reportSimulationError
+          onError: reportWorkerUnavailable
         });
 
         workerClientRef.current = client;
@@ -686,7 +697,10 @@ export function useGraphSimulation(
         client.setPaused(pausedRef.current);
       })
       .catch(caught => {
-        if (!disposed) reportSimulationError(caught);
+        if (!disposed) {
+          releaseWorkerResources();
+          reportWorkerUnavailable(caught);
+        }
       });
 
     return () => {
@@ -695,7 +709,7 @@ export function useGraphSimulation(
         releaseWorkerResources();
       }
     };
-  }, __OGRAPH_DEBUG_RUNTIME__ ? [
+  }, [
     engine,
     topologySignature,
     simulationNodes,
@@ -717,10 +731,10 @@ export function useGraphSimulation(
     markPayloadSyncedForLatestInputs,
     releaseSimulationResources,
     releaseWorkerResources,
-    reportSimulationError,
+    reportWorkerUnavailable,
     syncLatestRenderGraphRefs,
     updateGraphIndexes
-  ] : []);
+  ]);
 
   useEffect(() => {
     if (engine !== 'main') return;
@@ -781,7 +795,7 @@ export function useGraphSimulation(
   }, [engine, paused]);
 
   useEffect(() => {
-    if (__OGRAPH_DEBUG_RUNTIME__ && engine === 'worker') {
+    if (engine === 'worker') {
       workerClientRef.current?.setPaused(paused);
     }
   }, [engine, paused]);
@@ -789,13 +803,13 @@ export function useGraphSimulation(
   useEffect(() => {
     return () => {
       releaseSimulationResources();
-      if (__OGRAPH_DEBUG_RUNTIME__) releaseWorkerResources();
+      releaseWorkerResources();
     };
   }, [releaseSimulationResources, releaseWorkerResources]);
 
   // Node Dragging Physics Control
   const dragStart = useCallback((nodeId: string) => {
-    if (__OGRAPH_DEBUG_RUNTIME__ && engineRef.current === 'worker') {
+    if (engineRef.current === 'worker') {
       const targetNode = nodeByIdRef.current.get(nodeId);
       if (targetNode) {
         targetNode.fx = targetNode.x;
@@ -818,7 +832,7 @@ export function useGraphSimulation(
   }, [dragPhysics.startAlphaTarget]);
 
   const dragMove = useCallback((nodeId: string, worldX: number, worldY: number) => {
-    if (__OGRAPH_DEBUG_RUNTIME__ && engineRef.current === 'worker') {
+    if (engineRef.current === 'worker') {
       const targetNode = nodeByIdRef.current.get(nodeId);
       if (targetNode) {
         targetNode.fx = worldX;
@@ -908,7 +922,7 @@ export function useGraphSimulation(
   }, [dragPhysics.moveAlphaTarget, dragPhysics.wakeConnectedNodes]);
 
   const dragEnd = useCallback((nodeId: string) => {
-    if (__OGRAPH_DEBUG_RUNTIME__ && engineRef.current === 'worker') {
+    if (engineRef.current === 'worker') {
       const targetNode = nodeByIdRef.current.get(nodeId);
       if (targetNode) {
         targetNode.fx = null;
@@ -928,7 +942,7 @@ export function useGraphSimulation(
   }, []);
 
   const restartSimulation = useCallback(() => {
-    if (__OGRAPH_DEBUG_RUNTIME__ && engineRef.current === 'worker') {
+    if (engineRef.current === 'worker') {
       workerClientRef.current?.restart(1);
       return;
     }

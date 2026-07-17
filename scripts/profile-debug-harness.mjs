@@ -120,27 +120,32 @@ function summarizeDurations(values) {
   };
 }
 
-async function waitForTelemetry(page, predicate) {
+async function waitForTelemetry(page, predicate, predicateArgs = {}) {
   const locator = page.getByTestId('runtime-performance-telemetry');
   await locator.waitFor({ state: 'visible' });
   await page.waitForFunction(
-    ({ testId, predicateSource }) => {
+    ({ testId, predicateSource, predicateArgs }) => {
       const element = document.querySelector(`[data-testid="${testId}"]`);
       if (!element) return false;
-      return Function('text', `return (${predicateSource})(text)`)(element.textContent ?? '');
+      return Function('text', 'args', `return (${predicateSource})(text, args)`)(
+        element.textContent ?? '',
+        predicateArgs
+      );
     },
     {
       testId: 'runtime-performance-telemetry',
-      predicateSource: predicate.toString()
+      predicateSource: predicate.toString(),
+      predicateArgs
     },
     { timeout: DEFAULT_TIMEOUT_MS }
   );
   return readTelemetry(await locator.innerText());
 }
 
-async function runProfile(url, cycles) {
+async function runProfile(url, cycles, targetNodes) {
   const headed = process.argv.includes('--headed');
   const heapProfileEnabled = process.argv.includes('--heap-profile');
+  const targetLinks = Math.floor((targetNodes * 3.5) / 2);
   const browser = await chromium.launch({
     headless: !headed,
     channel: headed ? 'chrome' : undefined,
@@ -225,11 +230,11 @@ async function runProfile(url, cycles) {
     }
     await cdp.send('Profiler.start');
 
-    await page.getByRole('button', { name: '10000', exact: true }).click();
-    const materializedTelemetry = await waitForTelemetry(page, text => (
-      text.includes('Materialized Nodes: 10000') &&
-      text.includes('Materialized Links: 17500')
-    ));
+    await page.getByRole('button', { name: String(targetNodes), exact: true }).click();
+    const materializedTelemetry = await waitForTelemetry(page, (text, args) => (
+      text.includes(`Materialized Nodes: ${args.targetNodes}`) &&
+      text.includes(`Materialized Links: ${args.targetLinks}`)
+    ), { targetNodes, targetLinks });
     const materializedElapsedMs = await page.evaluate(() => (
       performance.now() - window.__ographProfile.startedAt
     ));
@@ -284,22 +289,24 @@ async function runProfile(url, cycles) {
         jsHeapUsedMiB: round((smallMetrics.JSHeapUsedSize ?? 0) / 1024 / 1024)
       });
 
-      await page.getByRole('button', { name: '10000', exact: true }).click();
-      await waitForTelemetry(page, text => (
-        /Materialized Nodes:\s+10000(?:\D|$)/.test(text) &&
-        /Materialized Links:\s+17500(?:\D|$)/.test(text)
-      ));
+      await page.getByRole('button', { name: String(targetNodes), exact: true }).click();
+      await waitForTelemetry(page, (text, args) => (
+        new RegExp(`Materialized Nodes:\\s+${args.targetNodes}(?:\\D|$)`).test(text) &&
+        new RegExp(`Materialized Links:\\s+${args.targetLinks}(?:\\D|$)`).test(text)
+      ), { targetNodes, targetLinks });
       await cdp.send('HeapProfiler.collectGarbage');
       const largeMetrics = metricMap((await cdp.send('Performance.getMetrics')).metrics);
       cycleHeap.push({
         cycle,
-        nodes: 10000,
+        nodes: targetNodes,
         jsHeapUsedMiB: round((largeMetrics.JSHeapUsedSize ?? 0) / 1024 / 1024)
       });
     }
 
     return {
       url,
+      targetNodes,
+      targetLinks,
       materializedElapsedMs: round(materializedElapsedMs),
       idleElapsedMs: round(idleElapsedMs),
       materializedTelemetry,
@@ -328,10 +335,14 @@ async function runProfile(url, cycles) {
 const url = readOption('url', DEFAULT_URL);
 const runs = Math.max(1, Number(readOption('runs', '1')) || 1);
 const cycles = Math.max(0, Number(readOption('cycles', '0')) || 0);
+const targetNodes = Number(readOption('target', '10000'));
+if (![2500, 5000, 10000].includes(targetNodes)) {
+  throw new Error('--target must be one of 2500, 5000, or 10000.');
+}
 const results = [];
 
 for (let index = 0; index < runs; index += 1) {
-  results.push(await runProfile(url, cycles));
+  results.push(await runProfile(url, cycles, targetNodes));
 }
 
 console.log(JSON.stringify({ runs: results }, null, 2));

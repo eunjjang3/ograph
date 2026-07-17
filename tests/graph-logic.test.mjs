@@ -497,6 +497,7 @@ test('worker simulation client covers lifecycle, pause, restart, drag, and buffe
 test('Pixi planning prioritizes viewport nodes and keeps forced labels over budget', async () => {
   const {
     areAllPixiNodesInBounds,
+    drainPixiPendingLinks,
     hasEquivalentPixiTopology,
     prioritizePixiNodeMaterialization,
     remapEquivalentPixiTopology,
@@ -537,6 +538,36 @@ test('Pixi planning prioritizes viewport nodes and keeps forced labels over budg
   ], 1);
 
   assert.deepEqual([...selected], ['forced-a', 'forced-b']);
+
+  const pendingLinks = ['already', 'blocked', 'first', 'second', 'tail'];
+  pendingLinks.shift = () => {
+    throw new Error('pending-link draining must not shift the queue');
+  };
+  const materialized = new Set(['already']);
+  const firstRemainingBudget = drainPixiPendingLinks(
+    pendingLinks,
+    2,
+    link => materialized.has(link),
+    link => {
+      if (link === 'blocked') return false;
+      materialized.add(link);
+      return true;
+    }
+  );
+  assert.equal(firstRemainingBudget, 0);
+  assert.deepEqual([...pendingLinks], ['blocked', 'tail']);
+
+  const secondRemainingBudget = drainPixiPendingLinks(
+    pendingLinks,
+    3,
+    link => materialized.has(link),
+    link => {
+      materialized.add(link);
+      return true;
+    }
+  );
+  assert.equal(secondRemainingBudget, 1);
+  assert.deepEqual([...pendingLinks], []);
 
   const previousLinks = [
     { source: nodes[2], target: nodes[1] },
@@ -595,9 +626,9 @@ test('Pixi planning prioritizes viewport nodes and keeps forced labels over budg
   );
 });
 
-test('lazy Pixi renderer delegates only after async backend initialization completes', async () => {
+test('lazy Pixi renderer remains available without debug telemetry and delegates after initialization', async () => {
   const previousDebugRuntime = globalThis.__OGRAPH_DEBUG_RUNTIME__;
-  globalThis.__OGRAPH_DEBUG_RUNTIME__ = true;
+  globalThis.__OGRAPH_DEBUG_RUNTIME__ = false;
 
   try {
     const { LazyPixiGraphRendererBackend } = await importSourceModule(
@@ -641,6 +672,25 @@ test('lazy Pixi renderer delegates only after async backend initialization compl
       globalThis.__OGRAPH_DEBUG_RUNTIME__ = previousDebugRuntime;
     }
   }
+});
+
+test('production runtime defaults to Pixi/Worker with per-lane automatic fallback', async () => {
+  const {
+    DEFAULT_GRAPH_RUNTIME_OPTIONS,
+    resolveGraphRendererFallback,
+    resolveGraphSimulationFallback
+  } = await importSourceModule('src/components/graph/graphRuntime.ts');
+
+  assert.equal(DEFAULT_GRAPH_RUNTIME_OPTIONS.renderer, 'pixi');
+  assert.equal(DEFAULT_GRAPH_RUNTIME_OPTIONS.simulation, 'worker');
+  assert.equal(DEFAULT_GRAPH_RUNTIME_OPTIONS.allowFallback, true);
+  assert.equal(typeof DEFAULT_GRAPH_RUNTIME_OPTIONS.createSimulationWorker, 'function');
+  assert.equal(resolveGraphRendererFallback('pixi', true), 'canvas2d');
+  assert.equal(resolveGraphRendererFallback('canvas2d', true), null);
+  assert.equal(resolveGraphRendererFallback('pixi', false), null);
+  assert.equal(resolveGraphSimulationFallback('worker', true), 'main');
+  assert.equal(resolveGraphSimulationFallback('main', true), null);
+  assert.equal(resolveGraphSimulationFallback('worker', false), null);
 });
 
 test('buildLocalGraphScope keeps one hidden physics halo and merges transition scopes', async () => {

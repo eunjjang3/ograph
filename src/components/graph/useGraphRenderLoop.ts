@@ -10,6 +10,7 @@ import {
   createActiveGraphRenderWindow,
   recordActiveGraphRenderSample,
   resetActiveGraphRenderWindow,
+  type GraphRendererMode,
   type GraphRuntimeTelemetryRef
 } from './graphRuntime';
 import type { GraphSimulationActivity } from './useGraphSimulation';
@@ -56,6 +57,7 @@ interface UseGraphRenderLoopParams {
   reduceMotion: boolean;
   preset: GraphPreset;
   theme: GraphTheme;
+  onRendererUnavailable?: (renderer: GraphRendererMode, error: Error) => boolean;
   onError?: (error: Error) => void;
 }
 
@@ -112,6 +114,7 @@ export function useGraphRenderLoop({
   reduceMotion,
   preset,
   theme,
+  onRendererUnavailable,
   onError
 }: UseGraphRenderLoopParams) {
   const dimProgressRef = useRef<number>(0);
@@ -130,7 +133,9 @@ export function useGraphRenderLoop({
     selectedId: null,
     hoveredId: null
   });
+  const onRendererUnavailableRef = useRef(onRendererUnavailable);
   const onErrorRef = useRef(onError);
+  onRendererUnavailableRef.current = onRendererUnavailable;
   onErrorRef.current = onError;
 
   useEffect(() => {
@@ -352,27 +357,40 @@ export function useGraphRenderLoop({
         const rendererBackend = rendererBackendRef.current;
         if (rendererBackend) {
           const rendererWorkPendingBeforeRender =
-            __OGRAPH_DEBUG_RUNTIME__ && !!rendererBackend.hasPendingWork?.();
+            !!rendererBackend.hasPendingWork?.();
           const renderStartedAt = performance.now();
-          const rendered = rendererBackend.render({
-            width: dw,
-            height: dh,
-            dpr,
-            nodes: renderNodes,
-            links: renderLinks,
-            viewport: viewportRef.current,
-            theme,
-            preset,
-            selectedNodeId: renderSelectedId,
-            hoveredNodeId: renderHoveredId,
-            rootNodeId,
-            neighbors: activeNeighbors,
-            dimProgress: dimProgressRef.current,
-            labelVisibilityByNodeId: visibleLabelIds,
-            lensVisibilityByNodeId,
-            spatialIndex: spatialIndexRef.current,
-            labelRenderBudget
-          });
+          let rendered: boolean;
+          try {
+            rendered = rendererBackend.render({
+              width: dw,
+              height: dh,
+              dpr,
+              nodes: renderNodes,
+              links: renderLinks,
+              viewport: viewportRef.current,
+              theme,
+              preset,
+              selectedNodeId: renderSelectedId,
+              hoveredNodeId: renderHoveredId,
+              rootNodeId,
+              neighbors: activeNeighbors,
+              dimProgress: dimProgressRef.current,
+              labelVisibilityByNodeId: visibleLabelIds,
+              lensVisibilityByNodeId,
+              spatialIndex: spatialIndexRef.current,
+              labelRenderBudget
+            });
+          } catch (caught) {
+            const error = toGraphError(caught);
+            if (onRendererUnavailableRef.current?.(rendererBackend.kind, error)) {
+              lastFrameTimeRef.current = null;
+              renderRequestedRef.current = false;
+              viewportAnimationActiveRef.current = false;
+              simulationActivityRef.current?.stop();
+              return;
+            }
+            throw error;
+          }
 
           if (__OGRAPH_DEBUG_RUNTIME__ && rendered && runtimeTelemetryRef) {
             const telemetry = runtimeTelemetryRef.current;
@@ -418,8 +436,7 @@ export function useGraphRenderLoop({
         }
       }
 
-      const rendererWorkPending =
-        __OGRAPH_DEBUG_RUNTIME__ && !!rendererBackendRef.current?.hasPendingWork?.();
+      const rendererWorkPending = !!rendererBackendRef.current?.hasPendingWork?.();
       const shouldContinue =
         isSimulationActive ||
         isDimmingActive ||

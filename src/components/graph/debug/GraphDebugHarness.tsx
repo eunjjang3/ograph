@@ -60,6 +60,7 @@ export function GraphDebugHarness() {
   const runtimeOptions = useMemo<GraphRuntimeOptions>(() => ({
     renderer: rendererMode,
     simulation: simulationMode,
+    allowFallback: false,
     telemetryRef: runtimeTelemetryRef,
     createSimulationWorker: simulationMode === 'worker'
       ? createDebugSimulationWorker

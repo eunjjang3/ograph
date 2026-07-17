@@ -90,6 +90,35 @@ export interface RemappedPixiTopology<TLinkView> {
   linkViews: Map<GraphLink, TLinkView>;
 }
 
+export function drainPixiPendingLinks<TLink>(
+  pendingLinks: TLink[],
+  budget: number,
+  hasView: (link: TLink) => boolean,
+  materialize: (link: TLink) => boolean
+): number {
+  let remaining = Math.max(0, Math.floor(budget));
+  let readIndex = 0;
+  let writeIndex = 0;
+
+  // Compact in place. Array.shift() moves the entire tail on every attempt and
+  // turns a bounded materialization pass into quadratic work on large graphs.
+  for (; readIndex < pendingLinks.length && remaining > 0; readIndex += 1) {
+    const link = pendingLinks[readIndex]!;
+    if (hasView(link)) continue;
+    if (materialize(link)) {
+      remaining -= 1;
+      continue;
+    }
+    pendingLinks[writeIndex++] = link;
+  }
+
+  while (readIndex < pendingLinks.length) {
+    pendingLinks[writeIndex++] = pendingLinks[readIndex++]!;
+  }
+  pendingLinks.length = writeIndex;
+  return remaining;
+}
+
 // Worker startup replaces the input graph objects with simulation-backed objects.
 // Keep retained Pixi views and unfinished materialization queues aligned by ID/order.
 export function remapEquivalentPixiTopology<TLinkView>(

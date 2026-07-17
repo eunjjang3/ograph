@@ -54,6 +54,7 @@ export interface GraphRuntimeTelemetryRef {
 export interface GraphRuntimeOptions {
   renderer: GraphRendererMode;
   simulation: GraphSimulationMode;
+  allowFallback?: boolean;
   telemetryRef?: GraphRuntimeTelemetryRef;
   createSimulationWorker?: () => Worker;
 }
@@ -136,9 +137,32 @@ export function recordActiveGraphRenderSample(
   return true;
 }
 
+export function createProductionGraphSimulationWorker() {
+  return new Worker(new URL('./graphSimulation.worker.ts', import.meta.url), {
+    type: 'module',
+    name: 'ograph-simulation'
+  });
+}
+
+export function resolveGraphRendererFallback(
+  renderer: GraphRendererMode,
+  allowFallback: boolean
+): GraphRendererMode | null {
+  return allowFallback && renderer === 'pixi' ? 'canvas2d' : null;
+}
+
+export function resolveGraphSimulationFallback(
+  simulation: GraphSimulationMode,
+  allowFallback: boolean
+): GraphSimulationMode | null {
+  return allowFallback && simulation === 'worker' ? 'main' : null;
+}
+
 export const DEFAULT_GRAPH_RUNTIME_OPTIONS: Readonly<GraphRuntimeOptions> = {
-  renderer: 'canvas2d',
-  simulation: 'main'
+  renderer: 'pixi',
+  simulation: 'worker',
+  allowFallback: true,
+  createSimulationWorker: createProductionGraphSimulationWorker
 };
 
 export function createGraphRuntimeTelemetry(

@@ -1,4 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const { PNG } = require('playwright-core/lib/utilsBundle') as {
+  PNG: {
+    sync: {
+      read(buffer: Buffer): { data: Uint8Array };
+    };
+  };
+};
 
 const BACKGROUND_RGB = [22, 22, 26] as const;
 const NON_EMPTY_FIXTURES = [
@@ -14,13 +24,22 @@ const NON_EMPTY_FIXTURES = [
 const ALLOWED_CONSOLE_ERRORS = [
   'Unable to preventDefault inside passive event listener invocation.'
 ] as const;
-const VISUAL_MAX_DIFF_PIXEL_RATIO = 0.005;
+// Canvas2D and WebGL rasterize curved borders with slightly different edge
+// antialiasing. The dense fixture differs on 0.58% of pixels while preserving
+// geometry, color, and layout, so retain the Canvas baseline with a narrow
+// cross-backend tolerance instead of replacing it with a Pixi-only baseline.
+const VISUAL_MAX_DIFF_PIXEL_RATIO = 0.007;
 const unexpectedBrowserErrors = new WeakMap<Page, string[]>();
 
 type Viewport = {
   x: number;
   y: number;
   scale: number;
+};
+
+type RuntimeProbe = {
+  webglAttempts: number;
+  workerAttempts: number;
 };
 
 async function graphCanvas(page: Page) {
@@ -49,39 +68,67 @@ async function expectNoGraphErrors(page: Page) {
 }
 
 async function changedCanvasPixels(page: Page) {
-  return page.evaluate((backgroundRgb) => {
-    const canvas = document.querySelector('canvas');
+  const screenshot = await (await graphCanvas(page)).screenshot({ animations: 'disabled' });
+  const pixels = PNG.sync.read(screenshot).data;
+  let changedPixels = 0;
 
-    if (!canvas) {
-      return 0;
+  for (let index = 0; index < pixels.length; index += 32) {
+    const red = pixels[index] ?? 0;
+    const green = pixels[index + 1] ?? 0;
+    const blue = pixels[index + 2] ?? 0;
+    const alpha = pixels[index + 3] ?? 0;
+    const distanceFromBackground =
+      Math.abs(red - BACKGROUND_RGB[0]) +
+      Math.abs(green - BACKGROUND_RGB[1]) +
+      Math.abs(blue - BACKGROUND_RGB[2]);
+
+    if (alpha > 0 && distanceFromBackground > 12) {
+      changedPixels += 1;
     }
+  }
 
-    const context = canvas.getContext('2d');
+  return changedPixels;
+}
 
-    if (!context || canvas.width === 0 || canvas.height === 0) {
-      return 0;
-    }
+async function installRuntimeProbe(
+  page: Page,
+  options: { failWebgl?: boolean; failWorker?: boolean } = {}
+) {
+  await page.addInitScript(({ failWebgl, failWorker }) => {
+    const runtimeWindow = window as typeof window & { __ographRuntimeProbe: RuntimeProbe };
+    runtimeWindow.__ographRuntimeProbe = {
+      webglAttempts: 0,
+      workerAttempts: 0
+    };
 
-    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-    let changedPixels = 0;
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args) {
+      const contextId = String(args[0]);
+      if (contextId === 'webgl' || contextId === 'webgl2') {
+        runtimeWindow.__ographRuntimeProbe.webglAttempts += 1;
+        if (failWebgl) return null;
+      }
+      return Reflect.apply(originalGetContext, this, args);
+    } as typeof originalGetContext;
 
-    for (let index = 0; index < pixels.length; index += 32) {
-      const red = pixels[index] ?? 0;
-      const green = pixels[index + 1] ?? 0;
-      const blue = pixels[index + 2] ?? 0;
-      const alpha = pixels[index + 3] ?? 0;
-      const distanceFromBackground =
-        Math.abs(red - backgroundRgb[0]) +
-        Math.abs(green - backgroundRgb[1]) +
-        Math.abs(blue - backgroundRgb[2]);
-
-      if (alpha > 0 && distanceFromBackground > 12) {
-        changedPixels += 1;
+    const NativeWorker = window.Worker;
+    class ProbedWorker extends NativeWorker {
+      constructor(scriptURL: string | URL, workerOptions?: WorkerOptions) {
+        runtimeWindow.__ographRuntimeProbe.workerAttempts += 1;
+        if (failWorker) {
+          throw new Error('Forced graph Worker construction failure.');
+        }
+        super(scriptURL, workerOptions);
       }
     }
+    window.Worker = ProbedWorker;
+  }, options);
+}
 
-    return changedPixels;
-  }, BACKGROUND_RGB);
+async function readRuntimeProbe(page: Page): Promise<RuntimeProbe> {
+  return page.evaluate(() => (
+    window as typeof window & { __ographRuntimeProbe: RuntimeProbe }
+  ).__ographRuntimeProbe);
 }
 
 async function expectCanvasHasGraphPixels(page: Page) {
@@ -129,12 +176,14 @@ async function readDiagnostics(page: Page) {
       __ographDiagnostics: {
         activeAnimationFrameCount: () => number;
         activeGraphListenerCount: () => number;
+        activeGraphListenerCounts: () => Record<string, number>;
       };
     }).__ographDiagnostics;
 
     return {
       frames: diagnostics.activeAnimationFrameCount(),
-      listeners: diagnostics.activeGraphListenerCount()
+      listeners: diagnostics.activeGraphListenerCount(),
+      listenersByType: diagnostics.activeGraphListenerCounts()
     };
   });
 }
@@ -184,6 +233,36 @@ test('mounts exactly one packed package canvas and renders the required fixture 
     await setFixture(page, fixture);
     await expectCanvasHasGraphPixels(page);
   }
+});
+
+test('uses the packaged Pixi/Worker runtime by default without public API opt-in', async ({ page }) => {
+  await installRuntimeProbe(page);
+  await page.reload();
+  await setFixture(page, 'medium');
+  await expectCanvasHasGraphPixels(page);
+  await expect.poll(async () => (await readRuntimeProbe(page)).webglAttempts).toBeGreaterThan(0);
+  await expect.poll(async () => (await readRuntimeProbe(page)).workerAttempts).toBeGreaterThan(0);
+  await expect(page.locator('canvas')).toHaveCount(1);
+});
+
+test('falls back to one Canvas 2D graph when WebGL initialization is unavailable', async ({ page }) => {
+  await installRuntimeProbe(page, { failWebgl: true });
+  await page.reload();
+  await setFixture(page, 'medium');
+  await expectCanvasHasGraphPixels(page);
+  await expect.poll(async () => (await readRuntimeProbe(page)).webglAttempts).toBeGreaterThan(0);
+  await expect(page.locator('canvas')).toHaveCount(1);
+  await expectNoGraphErrors(page);
+});
+
+test('falls back to main-thread simulation when Worker construction fails', async ({ page }) => {
+  await installRuntimeProbe(page, { failWorker: true });
+  await page.reload();
+  await setFixture(page, 'medium');
+  await expectCanvasHasGraphPixels(page);
+  await expect.poll(async () => (await readRuntimeProbe(page)).workerAttempts).toBeGreaterThan(0);
+  await expect(page.locator('canvas')).toHaveCount(1);
+  await expectNoGraphErrors(page);
 });
 
 test('supports node hover, click, double-click, drag, and terminal pointer-loss release', async ({ page }) => {
@@ -366,7 +445,11 @@ test('clears inaccessible hover and consumer-controlled selection across local/g
 });
 
 test('StrictMode unmount and remount leave no duplicate listeners or animation frames', async ({ page }) => {
-  await expect.poll(async () => (await readDiagnostics(page)).listeners).toBeGreaterThan(0);
+  // Six listeners belong to GraphView itself; the seventh confirms that the
+  // asynchronously loaded Pixi backend has finished installing its event
+  // system. Waiting for that stable state avoids comparing a half-initialized
+  // mount with a settled remount.
+  await expect.poll(async () => (await readDiagnostics(page)).listeners).toBe(7);
   const mountedDiagnostics = await readDiagnostics(page);
 
   await page.getByTestId('toggle-mount').click();
