@@ -612,7 +612,7 @@ Base: `main` at `9a5ee1fa03f5d0ea0c31cfec4a4b3fd2c0123302`
   - Verification: strict-CSP Next lane, forced partial-init failure, existing
     StrictMode and renderer fallback coverage
   - Docs: `docs/architecture.md`, `todo.md`
-  - Commit: `<pending>`
+  - Commit: `a74c6c6`
 
 - [ ] Stage 4: Separate transparent-background parity from missing primitives
   - Branch: `fix/next-production-consumer-runtime`
