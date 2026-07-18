@@ -1,0 +1,15 @@
+{
+  "name": "ograph-next-production-consumer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1 --port 4310"
+  },
+  "dependencies": {
+    "@eunjjang/ograph": "0.3.0",
+    "next": "16.2.6",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  }
+}

@@ -54,6 +54,9 @@ jobs:
       - name: Verify packed browser consumer
         run: npm run test:browser
 
+      - name: Verify packed Next.js production consumer
+        run: npm run test:browser:next
+
       - name: Verify package budgets
         run: npm run check:budgets
 

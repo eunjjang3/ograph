@@ -68,6 +68,7 @@
     "test": "npm run build:lib && node --test tests/*.test.mjs && npm run check:budgets",
     "test:browser": "node scripts/prepare-browser-consumer.mjs && playwright test",
     "test:browser:update": "node scripts/prepare-browser-consumer.mjs && playwright test --update-snapshots",
+    "test:browser:next": "node scripts/prepare-next-browser-consumer.mjs && playwright test --config playwright.next.config.ts",
     "check:budgets": "node scripts/check-package-budgets.mjs",
     "check:examples": "npm run build:lib && tsc -p examples/tsconfig.json",
     "verify:consumer": "npm run verify:consumer:pinned && npm run verify:consumer:floating",

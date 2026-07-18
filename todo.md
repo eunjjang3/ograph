@@ -547,3 +547,123 @@ Stop the spike and report rather than silently widening scope when:
 - visual parity requires dropping arbitrary CSS colors/fonts or CJK labels,
 - the consumer bundle/runtime cost is not acceptable,
 - WebGL fallback changes error, accessibility, or lifecycle semantics.
+
+# Goal: Next.js production consumer recovery
+
+## Objective
+
+Make the packaged production default actually run Pixi WebGL plus Worker
+simulation in a Next.js/Turbopack consumer with a strict CSP, while preserving
+the existing public API, interaction behavior, fallback policy, and visual
+contract. Treat transparent-background rendering and missing graph primitives
+as separate findings until each has independent evidence.
+
+Worktree: `/Users/eun/Documents/ograph-next-production-consumer`
+
+Branch: `fix/next-production-consumer-runtime`
+
+Base: `main` at `9a5ee1fa03f5d0ea0c31cfec4a4b3fd2c0123302`
+
+## Non-negotiable invariants
+
+- Keep the runtime exports exactly `GraphView`, `defaultGraphPreset`, and
+  `defaultGraphTheme`.
+- Keep public props, refs, callbacks, generic metadata, and declarations
+  unchanged; do not add a public runtime selector or diagnostic callback.
+- Keep fallback behavior silent for recovered environment failures and keep
+  consumer `onError` semantics unchanged.
+- Add runtime proof through test-owned external instrumentation rather than a
+  new production API or visible UI.
+- Do not change graph controls, interaction timing, camera behavior, force
+  constants, node/link/label appearance, or existing screenshot baselines while
+  fixing the Next.js activation failures.
+- Do not treat the opaque transparent-theme background and missing primitives
+  as one root cause. Fix or approve visual behavior only after a real packed
+  consumer proves the exact before/after state.
+- Do not push, open a PR, merge, bump the version, tag, or publish without a
+  separate explicit approval.
+
+## Stages
+
+- [x] Stage 1: Lock a packed Next.js production consumer failure lane
+  - Branch: `fix/next-production-consumer-runtime`
+  - Deliverable: fixture-local Next.js/Turbopack production app installed from
+    the packed Ograph tarball, strict CSP without `unsafe-eval`, transparent
+    theme, deterministic graph, root/selection, and test-owned probes for WebGL,
+    Worker construction/messages, fallback, one-canvas lifecycle, and pixels
+  - Verification: targeted Next production build/start/Chromium test proving
+    the released code does not reach Pixi/Worker
+  - Docs: `todo.md`
+  - Commit: `<pending>`
+
+- [ ] Stage 2: Make the packaged Worker consumer-relative
+  - Branch: `fix/next-production-consumer-runtime`
+  - Deliverable: Worker starts from the consumer HTTP origin and emits `ready`
+    and `tick` without changing public runtime selection or fallback policy
+  - Verification: Stage 1 Next production lane plus existing Worker/fallback
+    tests and package asset assertions
+  - Docs: `docs/architecture.md`, `todo.md`
+  - Commit: `<pending>`
+
+- [ ] Stage 3: Make Pixi strict-CSP initialization and cleanup reliable
+  - Branch: `fix/next-production-consumer-runtime`
+  - Deliverable: CSP-safe Pixi startup, idempotent partial initialization
+    cleanup, preserved root errors, and no fallback in the success lane
+  - Verification: strict-CSP Next lane, forced partial-init failure, existing
+    StrictMode and renderer fallback coverage
+  - Docs: `docs/architecture.md`, `todo.md`
+  - Commit: `<pending>`
+
+- [ ] Stage 4: Separate transparent-background parity from missing primitives
+  - Branch: `fix/next-production-consumer-runtime`
+  - Deliverable: transparent pixels remain transparent and packed 1k/5k
+    fixtures report and visibly render nonzero nodes/links; any remaining
+    Afterglow-only empty state gets its own proven cause
+  - Verification: pixel smoke, selected/root and unselected fixtures, pan,
+    zoom, hover, selection, and camera focus
+  - Docs: `docs/architecture.md`, `todo.md`
+  - Human UX checkpoint: required before accepting visual-output changes
+  - Commit: `<pending>`
+
+- [ ] Stage 5: Re-prove compatibility and prepare a patch release
+  - Branch: `fix/next-production-consumer-runtime`
+  - Verification: lint, unit/API/budget tests, demo/library builds, examples,
+    pinned and floating React 18/19 consumers, Vite packed browser suite, Next
+    production consumer suite, package dry run, and release identity dry run
+  - Docs: architecture, debug harness, changelog, this plan
+  - Commit: `<pending>`
+
+## Stop conditions
+
+Stop and report rather than widening scope when:
+
+- the fix requires a public API or observable interaction change,
+- Worker packaging cannot be made consumer-relative across both Vite and Next,
+- CSP compatibility requires weakening the consumer policy,
+- transparent-background parity requires changing opaque-theme output,
+- missing primitives cannot be reproduced independently of the background, or
+- a screenshot baseline would need to change before human UX approval.
+
+## Stage 1 failure evidence (2026-07-19)
+
+The fixture packs the current branch, installs that tarball into a fixture-local
+Next.js `16.2.6` application, runs a Turbopack production build, starts the
+production server on port `4310`, and applies a strict CSP without
+`unsafe-eval`. Browser probes are installed before application code and do not
+change the package API or production DOM contract.
+
+The production build and mount succeeded. The three-test Chromium lane produced
+the intended red baseline: the transparent-pixel and one-canvas checks passed,
+while the effective-runtime check failed with `renderer: 2d`, a `file:` Worker
+URL, one Worker construction error, no `ready` or `tick` response, and one CSP
+violation. Consumer `onError` remained empty. This independently locks the two
+activation failures from #54 without treating #55's transparent background as
+already broken on the Canvas fallback path.
+
+Stage verification:
+
+- `npm run lint` — passed.
+- fixture `next build` — passed.
+- `npx playwright test --config playwright.next.config.ts` — expected baseline:
+  2 passed, 1 failed on the Pixi/Worker success assertion.
+- `git diff --check` — passed.
