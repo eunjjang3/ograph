@@ -158,10 +158,14 @@ switches. Pause updates the existing Worker instead of recreating it, prevents
 drag/restart messages from waking force timers while paused, and retains the
 last alpha so resuming an already settled graph remains idle.
 
-The library entry constructs the Worker from a package-relative `import.meta.url`.
-Vite emits the module Worker under `dist/workers/`, and the package allowlist
-publishes that asset with the lazy client chunk. Worker construction, protocol,
-or asynchronous runtime failure is recovered once by selecting the existing
+The library imports the simulation through Vite's Worker-constructor module.
+Vite emits the module Worker under `dist/workers/` and generates one
+package-relative `import.meta.url` asset reference in the library entry. Keeping
+that reference single-layered lets downstream bundlers such as Vite and
+Next.js/Turbopack rebase the Worker to the consumer's HTTP origin instead of
+resolving an outer URL against the package file. The package allowlist publishes
+the Worker asset with the lazy client chunk. Worker construction, protocol, or
+asynchronous runtime failure is recovered once by selecting the existing
 main-thread simulation. A recovered environment limitation does not call the
 consumer's `onError`; an unrecovered graph failure still does.
 

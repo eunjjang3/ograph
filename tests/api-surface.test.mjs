@@ -35,6 +35,11 @@ test('built package keeps lazy runtime chunks and its Worker URL package-relativ
     'library build should emit the simulation Worker asset'
   );
   assert.match(runtimeEntry, /new URL\(["'](?:\.\/)?workers\/graphSimulation\.worker-/);
+  assert.match(
+    runtimeEntry,
+    /new Worker\((?:["']{2} \+ )?new URL\(["'](?:\.\/)?workers\/graphSimulation\.worker-/
+  );
+  assert.doesNotMatch(runtimeEntry, /new URL\(\s*\/\* @vite-ignore \*\//);
   assert.doesNotMatch(runtimeEntry, /["']\/workers\/graphSimulation\.worker-/);
 
   const pixiChunk = await readFile(new URL(`../dist/chunks/${pixiChunkName}`, import.meta.url), 'utf8');

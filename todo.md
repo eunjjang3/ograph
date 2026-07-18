@@ -594,9 +594,9 @@ Base: `main` at `9a5ee1fa03f5d0ea0c31cfec4a4b3fd2c0123302`
   - Verification: targeted Next production build/start/Chromium test proving
     the released code does not reach Pixi/Worker
   - Docs: `todo.md`
-  - Commit: `<pending>`
+  - Commit: `b423a21`
 
-- [ ] Stage 2: Make the packaged Worker consumer-relative
+- [x] Stage 2: Make the packaged Worker consumer-relative
   - Branch: `fix/next-production-consumer-runtime`
   - Deliverable: Worker starts from the consumer HTTP origin and emits `ready`
     and `tick` without changing public runtime selection or fallback policy
@@ -666,4 +666,27 @@ Stage verification:
 - fixture `next build` — passed.
 - `npx playwright test --config playwright.next.config.ts` — expected baseline:
   2 passed, 1 failed on the Pixi/Worker success assertion.
+- `git diff --check` — passed.
+
+## Stage 2 Worker evidence (2026-07-19)
+
+The production Worker factory now consumes Vite's Worker-constructor module
+instead of wrapping Vite's generated asset URL in a second `new URL(...)`.
+The built library retains one package-relative Worker asset reference and the
+same module/name semantics. No public type or runtime export changed.
+
+In the packed Next.js production lane, the failure state narrowed exactly as
+intended: the Worker URL changed from `file:` to `http:` on
+`http://127.0.0.1:4310`, construction errors fell from one to zero, and both
+`ready` and `tick` arrived. The lane remains intentionally red only because
+Pixi still violates CSP and recovers to Canvas 2D; the transparent-pixel and
+one-canvas checks continue to pass.
+
+Stage verification:
+
+- `npm test` — 77 passed; package and performance budgets passed.
+- `npm run test:browser` — 11 passed in the packed Vite consumer.
+- `npm run test:browser:next` — expected intermediate state: 2 passed, 1 failed
+  only on `cspViolationCount: 1` and `renderer: 2d`; Worker fields all matched
+  the success contract.
 - `git diff --check` — passed.

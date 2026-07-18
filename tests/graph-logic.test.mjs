@@ -7,6 +7,22 @@ import * as esbuild from 'esbuild';
 const repoRoot = new URL('../', import.meta.url);
 const moduleCache = new Map();
 
+function viteWorkerImportStubPlugin() {
+  return {
+    name: 'vite-worker-import-stub',
+    setup(build) {
+      build.onResolve({ filter: /\?worker$/ }, args => ({
+        path: args.path,
+        namespace: 'ograph-worker-test'
+      }));
+      build.onLoad({ filter: /.*/, namespace: 'ograph-worker-test' }, () => ({
+        contents: 'export default class TestWorker {}',
+        loader: 'js'
+      }));
+    }
+  };
+}
+
 async function importSourceModule(relativePath) {
   const sourcePath = fileURLToPath(new URL(relativePath, repoRoot));
   const cached = moduleCache.get(sourcePath);
@@ -17,7 +33,8 @@ async function importSourceModule(relativePath) {
     bundle: true,
     format: 'esm',
     platform: 'node',
-    write: false
+    write: false,
+    plugins: [viteWorkerImportStubPlugin()]
   });
   const code = result.outputFiles[0].text;
   const moduleUrl = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
@@ -34,7 +51,7 @@ async function importHookModuleWithReactStub(relativePath) {
     format: 'esm',
     platform: 'node',
     write: false,
-    plugins: [{
+    plugins: [viteWorkerImportStubPlugin(), {
       name: 'react-hook-stub',
       setup(build) {
         build.onResolve({ filter: /^react$/ }, () => ({
