@@ -43,6 +43,7 @@ test('built package keeps lazy runtime chunks and its Worker URL package-relativ
   assert.doesNotMatch(runtimeEntry, /["']\/workers\/graphSimulation\.worker-/);
 
   const pixiChunk = await readFile(new URL(`../dist/chunks/${pixiChunkName}`, import.meta.url), 'utf8');
+  assert.match(pixiChunk, /import ["']pixi\.js\/unsafe-eval["']/);
   assert.match(pixiChunk, /from ["']pixi\.js["']/);
 });
 

@@ -26,7 +26,14 @@ export default defineConfig({
       fileName: () => 'index.js'
     },
     rollupOptions: {
-      external: ['d3-force', 'pixi.js', 'react', 'react/jsx-runtime', 'react-dom'],
+      external: [
+        'd3-force',
+        'pixi.js',
+        'pixi.js/unsafe-eval',
+        'react',
+        'react/jsx-runtime',
+        'react-dom'
+      ],
       output: {
         banner: '"use client";',
         chunkFileNames: 'chunks/[name]-[hash].js',

@@ -603,9 +603,9 @@ Base: `main` at `9a5ee1fa03f5d0ea0c31cfec4a4b3fd2c0123302`
   - Verification: Stage 1 Next production lane plus existing Worker/fallback
     tests and package asset assertions
   - Docs: `docs/architecture.md`, `todo.md`
-  - Commit: `<pending>`
+  - Commit: `516bae4`
 
-- [ ] Stage 3: Make Pixi strict-CSP initialization and cleanup reliable
+- [x] Stage 3: Make Pixi strict-CSP initialization and cleanup reliable
   - Branch: `fix/next-production-consumer-runtime`
   - Deliverable: CSP-safe Pixi startup, idempotent partial initialization
     cleanup, preserved root errors, and no fallback in the success lane
@@ -667,6 +667,34 @@ Stage verification:
 - `npx playwright test --config playwright.next.config.ts` — expected baseline:
   2 passed, 1 failed on the Pixi/Worker success assertion.
 - `git diff --check` — passed.
+
+## Stage 3 CSP and cleanup evidence (2026-07-19)
+
+The lazy Pixi chunk now loads `pixi.js/unsafe-eval` before the main Pixi import,
+and the library build externalizes both specifiers so the compatibility
+extensions register on the same Pixi instance in downstream bundles. The
+consumer CSP remains unchanged and does not include `unsafe-eval`.
+
+Initialization cleanup now nulls the retained application reference before
+destroying Pixi resources, and the lazy wrapper preserves the original
+initialization error if partial cleanup also throws. A focused unit regression
+forces both failures and proves that the initialization error remains the
+reported one.
+
+The packed Next.js success test now passes with WebGL2, an HTTP-origin Worker,
+`ready` and `tick` messages, zero CSP violations, zero Worker errors, zero
+browser errors, zero consumer `onError` entries, and exactly one canvas. The
+only remaining Next failure is the independent #55 alpha assertion: the
+transparent fixture produced just `48` transparent pixels instead of the
+required `>1,000`. StrictMode's one-canvas test still passes.
+
+Stage verification:
+
+- `npm test` — 78 passed; package and performance budgets passed.
+- `npm run test:browser` — 11 passed in the packed Vite consumer.
+- `npx playwright test --config playwright.next.config.ts` — 2 passed, 1 failed
+  only on transparent alpha, with the Pixi/Worker strict-CSP success lane green.
+- `npm run lint` and `git diff --check` — passed before commit.
 
 ## Stage 2 Worker evidence (2026-07-19)
 

@@ -691,6 +691,33 @@ test('lazy Pixi renderer remains available without debug telemetry and delegates
   }
 });
 
+test('lazy Pixi renderer preserves initialization errors when partial cleanup also fails', async () => {
+  const { LazyPixiGraphRendererBackend } = await importSourceModule(
+    'src/components/graph/graphRenderer.ts'
+  );
+  const initializationError = new Error('Pixi initialization failed.');
+  let destroyCalls = 0;
+  const concreteBackend = {
+    kind: 'pixi',
+    initialize: async () => {
+      throw initializationError;
+    },
+    render: () => false,
+    destroy: () => {
+      destroyCalls += 1;
+      throw new Error('Partial Pixi cleanup failed.');
+    }
+  };
+  const lazyBackend = new LazyPixiGraphRendererBackend(async () => concreteBackend);
+
+  await assert.rejects(
+    lazyBackend.initialize({}),
+    caught => caught === initializationError
+  );
+  assert.equal(destroyCalls, 1);
+  assert.equal(lazyBackend.render({}), false);
+});
+
 test('production runtime defaults to Pixi/Worker with per-lane automatic fallback', async () => {
   const {
     DEFAULT_GRAPH_RUNTIME_OPTIONS,

@@ -183,7 +183,13 @@ The lazy renderer wrapper exposes the concrete Pixi backend to the draw loop
 only after `Application.init()` resolves. Render requests that arrive while
 WebGL is being created return without delegating, and the renderer hook requests
 a fresh frame after initialization completes. This prevents lane switches from
-observing an `Application` before Pixi has installed its renderer.
+observing an `Application` before Pixi has installed its renderer. The lazy
+chunk loads Pixi's CSP compatibility module before creating the application and
+keeps that subpath external beside `pixi.js`, so both imports share one Pixi
+extension registry in consumer bundles. Production consumers therefore do not
+need to add `unsafe-eval` to `script-src`. If initialization fails, cleanup is
+best-effort and the original initialization error remains authoritative even
+when a partially initialized Pixi application also throws during disposal.
 Changing graph fixtures or switching Main/Worker simulation keeps the renderer
 and its WebGL context alive; only switching between Canvas 2D and Pixi replaces
 the HTML canvas, because a canvas cannot change context type after acquisition.
@@ -219,9 +225,10 @@ materialization are all idle, the dirty-frame scheduler stops completely. The
 debug telemetry exposes the active frame reasons so an apparently settled graph
 cannot silently keep calling either Canvas draw or `app.render()`.
 
-`pixi.js` is an exact runtime dependency and remains external to Ograph's own
-library chunks so consumer bundlers can deduplicate it. The package entry loads
-the backend lazily, publishes package-owned chunks under `dist/chunks/`, and
+`pixi.js` and its CSP compatibility subpath remain external to Ograph's own
+library chunks so consumer bundlers can deduplicate one exact runtime
+dependency. The package entry loads the backend lazily, publishes package-owned
+chunks under `dist/chunks/`, and
 keeps cold initialization visually background-only without adding a spinner or
 public loading state. If WebGL creation or renderer initialization fails,
 `GraphView` remounts exactly one replacement canvas with the Canvas 2D backend.

@@ -107,12 +107,13 @@ async function readVisibleCanvasContext(page: Page) {
 async function readEffectiveRuntimeState(page: Page) {
   const probe = await readRuntimeProbe(page);
   const workerUrls = probe.workerUrls.map(value => new URL(value));
+  const visibleContext = await readVisibleCanvasContext(page);
 
   return {
     browserErrorCount: (unexpectedBrowserErrors.get(page) ?? []).length,
     canvasCount: await page.locator('canvas').count(),
     cspViolationCount: probe.cspViolations.length,
-    renderer: await readVisibleCanvasContext(page),
+    renderer: visibleContext.startsWith('webgl') ? 'webgl' : visibleContext,
     workerConstructionErrorCount: probe.workerConstructionErrors.length,
     workerErrorCount: probe.workerErrors.length,
     workerOrigins: [...new Set(workerUrls.map(url => url.origin))],

@@ -1,3 +1,4 @@
+import 'pixi.js/unsafe-eval';
 import {
   Application,
   Color,
@@ -784,13 +785,14 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
   destroy() {
     if (this.disposed) return;
     this.disposed = true;
+    const app = this.app;
+    this.app = null;
     this.clearTopology();
     this.nodeFillTexture?.destroy(true);
     this.nodeBorderTexture?.destroy(true);
     this.nodeFillTexture = null;
     this.nodeBorderTexture = null;
-    this.app?.destroy(false, { children: true, context: true });
-    this.app = null;
+    app?.destroy(false, { children: true, context: true });
   }
 }
 
