@@ -7,6 +7,22 @@ import * as esbuild from 'esbuild';
 const repoRoot = new URL('../', import.meta.url);
 const moduleCache = new Map();
 
+function viteWorkerImportStubPlugin() {
+  return {
+    name: 'vite-worker-import-stub',
+    setup(build) {
+      build.onResolve({ filter: /\?worker$/ }, args => ({
+        path: args.path,
+        namespace: 'ograph-worker-test'
+      }));
+      build.onLoad({ filter: /.*/, namespace: 'ograph-worker-test' }, () => ({
+        contents: 'export default class TestWorker {}',
+        loader: 'js'
+      }));
+    }
+  };
+}
+
 async function importSourceModule(relativePath) {
   const sourcePath = fileURLToPath(new URL(relativePath, repoRoot));
   const cached = moduleCache.get(sourcePath);
@@ -17,7 +33,8 @@ async function importSourceModule(relativePath) {
     bundle: true,
     format: 'esm',
     platform: 'node',
-    write: false
+    write: false,
+    plugins: [viteWorkerImportStubPlugin()]
   });
   const code = result.outputFiles[0].text;
   const moduleUrl = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
@@ -34,7 +51,7 @@ async function importHookModuleWithReactStub(relativePath) {
     format: 'esm',
     platform: 'node',
     write: false,
-    plugins: [{
+    plugins: [viteWorkerImportStubPlugin(), {
       name: 'react-hook-stub',
       setup(build) {
         build.onResolve({ filter: /^react$/ }, () => ({
@@ -672,6 +689,33 @@ test('lazy Pixi renderer remains available without debug telemetry and delegates
       globalThis.__OGRAPH_DEBUG_RUNTIME__ = previousDebugRuntime;
     }
   }
+});
+
+test('lazy Pixi renderer preserves initialization errors when partial cleanup also fails', async () => {
+  const { LazyPixiGraphRendererBackend } = await importSourceModule(
+    'src/components/graph/graphRenderer.ts'
+  );
+  const initializationError = new Error('Pixi initialization failed.');
+  let destroyCalls = 0;
+  const concreteBackend = {
+    kind: 'pixi',
+    initialize: async () => {
+      throw initializationError;
+    },
+    render: () => false,
+    destroy: () => {
+      destroyCalls += 1;
+      throw new Error('Partial Pixi cleanup failed.');
+    }
+  };
+  const lazyBackend = new LazyPixiGraphRendererBackend(async () => concreteBackend);
+
+  await assert.rejects(
+    lazyBackend.initialize({}),
+    caught => caught === initializationError
+  );
+  assert.equal(destroyCalls, 1);
+  assert.equal(lazyBackend.render({}), false);
 });
 
 test('production runtime defaults to Pixi/Worker with per-lane automatic fallback', async () => {
@@ -1610,6 +1654,50 @@ test('canvas label paint calls are capped before strokeText and fillText', async
 
   assert.deepEqual(strokedLabels, ['High', 'Medium']);
   assert.deepEqual(filledLabels, ['High', 'Medium']);
+});
+
+test('canvas nodes erase and restore their backdrop before drawing translucent fills', async () => {
+  const { drawGraph } = await importSourceModule('src/components/graph/canvasRenderer.ts');
+  const { defaultGraphPreset, defaultGraphTheme } = await importSourceModule('src/components/graph/presets.ts');
+  const compositeModes = [];
+  const ctx = {
+    arc() {},
+    beginPath() {},
+    fill() {},
+    fillRect() {},
+    fillText() {},
+    lineTo() {},
+    moveTo() {},
+    restore() {},
+    save() {},
+    scale() {},
+    stroke() {},
+    strokeText() {},
+    translate() {},
+    set globalCompositeOperation(value) {
+      compositeModes.push(value);
+    }
+  };
+  const source = { id: 'source', label: 'Source', x: 20, y: 50, degree: 1 };
+  const target = { id: 'target', label: 'Target', x: 80, y: 50, degree: 1 };
+
+  drawGraph(
+    ctx,
+    100,
+    100,
+    [source, target],
+    [{ source, target }],
+    { x: 0, y: 0, scale: 1 },
+    { ...defaultGraphTheme, backgroundColor: 'rgba(0, 0, 0, 0)' },
+    defaultGraphPreset,
+    'source',
+    null,
+    null,
+    new Set(['target']),
+    1
+  );
+
+  assert.deepEqual(compositeModes, ['destination-out', 'source-over']);
 });
 
 test('canvas label budget keeps source-order tie breaks when spatial index order differs', async () => {

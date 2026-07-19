@@ -547,3 +547,281 @@ Stop the spike and report rather than silently widening scope when:
 - visual parity requires dropping arbitrary CSS colors/fonts or CJK labels,
 - the consumer bundle/runtime cost is not acceptable,
 - WebGL fallback changes error, accessibility, or lifecycle semantics.
+
+# Goal: Next.js production consumer recovery
+
+## Objective
+
+Make the packaged production default actually run Pixi WebGL plus Worker
+simulation in a Next.js/Turbopack consumer with a strict CSP, while preserving
+the existing public API, interaction behavior, fallback policy, and visual
+contract. Treat transparent-background rendering and missing graph primitives
+as separate findings until each has independent evidence.
+
+Worktree: `/Users/eun/Documents/ograph-next-production-consumer`
+
+Branch: `fix/next-production-consumer-runtime`
+
+Base: `main` at `9a5ee1fa03f5d0ea0c31cfec4a4b3fd2c0123302`
+
+## Non-negotiable invariants
+
+- Keep the runtime exports exactly `GraphView`, `defaultGraphPreset`, and
+  `defaultGraphTheme`.
+- Keep public props, refs, callbacks, generic metadata, and declarations
+  unchanged; do not add a public runtime selector or diagnostic callback.
+- Keep fallback behavior silent for recovered environment failures and keep
+  consumer `onError` semantics unchanged.
+- Add runtime proof through test-owned external instrumentation rather than a
+  new production API or visible UI.
+- Do not change graph controls, interaction timing, camera behavior, force
+  constants, node/link/label appearance, or existing screenshot baselines while
+  fixing the Next.js activation failures.
+- Do not treat the opaque transparent-theme background and missing primitives
+  as one root cause. Fix or approve visual behavior only after a real packed
+  consumer proves the exact before/after state.
+- Do not push, open a PR, merge, bump the version, tag, or publish without a
+  separate explicit approval.
+
+## Stages
+
+- [x] Stage 1: Lock a packed Next.js production consumer failure lane
+  - Branch: `fix/next-production-consumer-runtime`
+  - Deliverable: fixture-local Next.js/Turbopack production app installed from
+    the packed Ograph tarball, strict CSP without `unsafe-eval`, transparent
+    theme, deterministic graph, root/selection, and test-owned probes for WebGL,
+    Worker construction/messages, fallback, one-canvas lifecycle, and pixels
+  - Verification: targeted Next production build/start/Chromium test proving
+    the released code does not reach Pixi/Worker
+  - Docs: `todo.md`
+  - Commit: `b423a21`
+
+- [x] Stage 2: Make the packaged Worker consumer-relative
+  - Branch: `fix/next-production-consumer-runtime`
+  - Deliverable: Worker starts from the consumer HTTP origin and emits `ready`
+    and `tick` without changing public runtime selection or fallback policy
+  - Verification: Stage 1 Next production lane plus existing Worker/fallback
+    tests and package asset assertions
+  - Docs: `docs/architecture.md`, `todo.md`
+  - Commit: `516bae4`
+
+- [x] Stage 3: Make Pixi strict-CSP initialization and cleanup reliable
+  - Branch: `fix/next-production-consumer-runtime`
+  - Deliverable: CSP-safe Pixi startup, idempotent partial initialization
+    cleanup, preserved root errors, and no fallback in the success lane
+  - Verification: strict-CSP Next lane, forced partial-init failure, existing
+    StrictMode and renderer fallback coverage
+  - Docs: `docs/architecture.md`, `todo.md`
+  - Commit: `a74c6c6`
+
+- [x] Stage 4: Separate transparent-background parity from missing primitives
+  - Branch: `fix/next-production-consumer-runtime`
+  - Deliverable: transparent pixels remain transparent and packed 1k/5k
+    fixtures report and visibly render nonzero nodes/links; any remaining
+    Afterglow-only empty state gets its own proven cause
+  - Verification: pixel smoke, selected/root and unselected fixtures, pan,
+    zoom, hover, selection, and camera focus
+  - Docs: `docs/architecture.md`, `todo.md`
+  - Human UX checkpoint: accepted on 2026-07-19
+  - Commit: `3fa0294`
+  - Status: complete; direct transparent 10k A/B profiling deferred as follow-up
+
+- [x] Stage 5: Re-prove compatibility and prepare a patch release
+  - Branch: `fix/next-production-consumer-runtime`
+  - Verification: lint, unit/API/budget tests, demo/library builds, examples,
+    pinned and floating React 18/19 consumers, Vite packed browser suite, Next
+    production consumer suite, package dry run, and release identity dry run
+  - Docs: architecture, README, changelog, this plan
+  - Commit: `1b850a2`
+  - Status: `0.3.1` release candidate prepared locally; no push, PR, tag, or
+    publish performed
+
+## Stop conditions
+
+Stop and report rather than widening scope when:
+
+- the fix requires a public API or observable interaction change,
+- Worker packaging cannot be made consumer-relative across both Vite and Next,
+- CSP compatibility requires weakening the consumer policy,
+- transparent-background parity requires changing opaque-theme output,
+- missing primitives cannot be reproduced independently of the background, or
+- a screenshot baseline would need to change before human UX approval.
+
+## Stage 1 failure evidence (2026-07-19)
+
+The fixture packs the current branch, installs that tarball into a fixture-local
+Next.js `16.2.6` application, runs a Turbopack production build, starts the
+production server on port `4310`, and applies a strict CSP without
+`unsafe-eval`. Browser probes are installed before application code and do not
+change the package API or production DOM contract.
+
+The production build and mount succeeded. The three-test Chromium lane produced
+the intended red baseline: the transparent-pixel and one-canvas checks passed,
+while the effective-runtime check failed with `renderer: 2d`, a `file:` Worker
+URL, one Worker construction error, no `ready` or `tick` response, and one CSP
+violation. Consumer `onError` remained empty. This independently locks the two
+activation failures from #54 without treating #55's transparent background as
+already broken on the Canvas fallback path.
+
+Stage verification:
+
+- `npm run lint` — passed.
+- fixture `next build` — passed.
+- `npx playwright test --config playwright.next.config.ts` — expected baseline:
+  2 passed, 1 failed on the Pixi/Worker success assertion.
+- `git diff --check` — passed.
+
+## Stage 3 CSP and cleanup evidence (2026-07-19)
+
+The lazy Pixi chunk now loads `pixi.js/unsafe-eval` before the main Pixi import,
+and the library build externalizes both specifiers so the compatibility
+extensions register on the same Pixi instance in downstream bundles. The
+consumer CSP remains unchanged and does not include `unsafe-eval`.
+
+Initialization cleanup now nulls the retained application reference before
+destroying Pixi resources, and the lazy wrapper preserves the original
+initialization error if partial cleanup also throws. A focused unit regression
+forces both failures and proves that the initialization error remains the
+reported one.
+
+The packed Next.js success test now passes with WebGL2, an HTTP-origin Worker,
+`ready` and `tick` messages, zero CSP violations, zero Worker errors, zero
+browser errors, zero consumer `onError` entries, and exactly one canvas. The
+only remaining Next failure is the independent #55 alpha assertion: the
+transparent fixture produced just `48` transparent pixels instead of the
+required `>1,000`. StrictMode's one-canvas test still passes.
+
+Stage verification:
+
+- `npm test` — 78 passed; package and performance budgets passed.
+- `npm run test:browser` — 11 passed in the packed Vite consumer.
+- `npx playwright test --config playwright.next.config.ts` — 2 passed, 1 failed
+  only on transparent alpha, with the Pixi/Worker strict-CSP success lane green.
+- `npm run lint` and `git diff --check` — passed before commit.
+
+## Stage 4 transparency and primitive evidence (2026-07-19)
+
+Pixi previously created its WebGL context with `backgroundAlpha: 1`. Pixi's
+background system can change the clear color later, but the browser context
+cannot gain an alpha channel after creation. The renderer now creates an
+alpha-capable context and applies both tint and alpha parsed from each frame's
+`theme.backgroundColor`. This does not add or change a public prop, ref method,
+callback, export, interaction, or fallback rule.
+
+Before the renderer change, the stricter pixel probe already found more than
+50 colored graph pixels while the transparent-pixel count remained `48`. That
+separates present graph primitives from the opaque-background failure: missing
+nodes or links did not reproduce independently in the packed Next fixture.
+The completed test fixture adds test-only switches for an opaque background,
+5,000 nodes, focus removal, and a diagnostic magenta link theme. External PNG
+sampling proves transparent and opaque background output separately and proves
+nonzero node and link pixels at 5,000 nodes with and without selected/root
+focus. Worker ticks continue after the topology change.
+
+Automated verification after the human-feedback pass:
+
+- `npm test` — 79 passed; package and performance budgets passed.
+- `npm run test:browser` — 11 passed, including hover, click, drag, pan, zoom,
+  camera focus, StrictMode, fallback, and existing visual snapshots.
+- `npm run test:browser:next` — 6 passed with WebGL2, strict CSP, HTTP Worker,
+  transparent and opaque pixel assertions, 1,000/5,000-node primitive smoke,
+  selected/root and unselected states, deterministic link occlusion, and one
+  canvas.
+- In-app Chromium on `4435` — Pixi/Worker displayed 5,000 nodes and 8,750
+  links on one canvas; hover, selection, and anchored wheel zoom updated as
+  expected with no visible blank state.
+- Packed Next production consumer on `4310` — the checkerboard remained visible
+  through the transparent canvas and disappeared only after the test-only
+  opaque-theme toggle.
+
+The required human UX checkpoint accepted the transparent/opaque background
+output and the later node/link occlusion adjustment.
+
+The first human checkpoint found three fixture states worth separating. Turning
+focus off removes the selected/root state for `node-0`, so directly connected
+`node-31` correctly loses its neighbor highlight without leaving the graph.
+With a transparent theme, focus-dimmed nodes reveal the page behind their lower
+alpha; this matches the existing Canvas 2D composition rather than introducing
+a Pixi-only visual change. The diagnostic link theme did contain a fixture bug:
+it replaced the complete theme and therefore forced a transparent background
+even after the status switched to opaque. The probe now overlays only link
+colors on the current background theme, and the opaque test asserts both opaque
+background pixels and magenta link pixels in the combined state.
+
+The second human checkpoint accepted page-background visibility through dimmed
+nodes but rejected graph links showing through the same node fills. A fixed
+three-node transparent probe places a magenta link beneath a dimmed endpoint
+and centers that endpoint through the existing public camera ref. Before the
+renderer change, the center sample contained six link-tinted pixels. Canvas 2D
+now erases node silhouettes from the link pass and restores the theme backdrop;
+Pixi uses precomposed fills for opaque themes and lazily allocated erase/backdrop
+particles only for alpha themes. The post-change sample contains zero
+link-tinted pixels while retaining the node alpha and checkerboard visibility.
+
+The first direct Pixi implementation kept two extra particles per node and was
+rejected after its 10,000-node profile raised steady draw CPU p95 from the
+existing `7.8-8.0ms` range to `9.6ms` and forced-GC heap growth to `19.46MiB`.
+The retained lazy/precomposed version measured `60 FPS`, `8.0ms` CPU p95,
+`15.74MiB` heap growth, `64.9ms` first visible, `1,251ms` complete
+materialization, and a `93ms` cold long-task maximum. These values are within
+the recorded pre-change ranges apart from a non-material five-millisecond
+materialization delta. The revised focus appearance was accepted. The
+maintainer explicitly deferred a direct transparent-versus-opaque 10,000-node
+A/B trace to a later performance follow-up; it is recorded as a remaining
+qualification item rather than a Stage 4 or patch-release blocker.
+
+## Stage 5 patch-release evidence (2026-07-19)
+
+The package, lockfile root, debug fallback label, packed Next template, README,
+and changelog now identify `0.3.1`. Historical documents that report the live
+`0.3.0` registry release and tag remain unchanged until an actual release is
+published. The changelog keeps `## Unreleased` empty and contains exactly one
+dated `0.3.1` release heading.
+
+Release-candidate verification:
+
+- `npm run lint` — passed.
+- `npm test` — 79 passed; package and performance budgets passed.
+- `npm run build` — demo and library builds passed.
+- `npm run check:examples` — library build and example typecheck passed.
+- `npm run verify:consumer` — React 18/19 lock-pinned and floating tarball
+  installs, runtime imports, and strict TypeScript checks passed.
+- `npm run test:browser` — all 11 packed Vite Chromium tests passed.
+- `npm run test:browser:next` — all 6 packed Next production Chromium tests
+  passed after stopping the separately retained review server on port `4310`.
+- `npm audit --omit=dev` — zero production vulnerabilities.
+- `npm publish --dry-run --access public` — passed with 21 files, a `72.7kB`
+  tarball, and public `latest` publication intent; no publish occurred.
+- Workflow-dispatch release identity dry run — passed for the canonical
+  repository and `refs/heads/main` identity.
+- `npm view @eunjjang/ograph@0.3.1 version --json` — expected `E404`, proving
+  the patch version is not currently published.
+
+The release-event identity gate still must prove the eventual `v0.3.1` tag
+commit is reachable from protected `origin/main`; that check is intentionally
+deferred until after an approved merge. Direct transparent/opaque 10,000-node
+A/B profiling is also an explicitly deferred performance follow-up and is not
+represented as completed here.
+
+## Stage 2 Worker evidence (2026-07-19)
+
+The production Worker factory now consumes Vite's Worker-constructor module
+instead of wrapping Vite's generated asset URL in a second `new URL(...)`.
+The built library retains one package-relative Worker asset reference and the
+same module/name semantics. No public type or runtime export changed.
+
+In the packed Next.js production lane, the failure state narrowed exactly as
+intended: the Worker URL changed from `file:` to `http:` on
+`http://127.0.0.1:4310`, construction errors fell from one to zero, and both
+`ready` and `tick` arrived. The lane remains intentionally red only because
+Pixi still violates CSP and recovers to Canvas 2D; the transparent-pixel and
+one-canvas checks continue to pass.
+
+Stage verification:
+
+- `npm test` — 77 passed; package and performance budgets passed.
+- `npm run test:browser` — 11 passed in the packed Vite consumer.
+- `npm run test:browser:next` — expected intermediate state: 2 passed, 1 failed
+  only on `cspViolationCount: 1` and `renderer: 2d`; Worker fields all matched
+  the success contract.
+- `git diff --check` — passed.

@@ -18,7 +18,8 @@
     "src/components/graph/canvasRenderer.ts",
     "src/components/graph/graphMath.ts",
     "src/components/graph/hitTest.ts",
-    "src/components/graph/localGraph.ts"
+    "src/components/graph/localGraph.ts",
+    "src/components/graph/viteWorkerImport.d.ts"
   ],
   "exclude": [
     "src/App.tsx",

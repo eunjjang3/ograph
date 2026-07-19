@@ -1,3 +1,4 @@
+import 'pixi.js/unsafe-eval';
 import {
   Application,
   Color,
@@ -84,6 +85,19 @@ function mixAlpha(left: ResolvedColor, right: ResolvedColor, progress: number) {
   return left.alpha + (right.alpha - left.alpha) * amount;
 }
 
+function compositeTintOverOpaqueBackground(
+  background: ResolvedColor,
+  foregroundTint: number,
+  foregroundAlpha: number
+) {
+  const alpha = clampUnit(foregroundAlpha);
+  return (
+    (mixChannel(background.red, (foregroundTint >> 16) & 0xff, alpha) << 16) |
+    (mixChannel(background.green, (foregroundTint >> 8) & 0xff, alpha) << 8) |
+    mixChannel(background.blue, foregroundTint & 0xff, alpha)
+  );
+}
+
 function resolveLensNodeAlpha(nodeId: string, frame: GraphRenderFrame) {
   return frame.lensVisibilityByNodeId.get(nodeId) ?? 1;
 }
@@ -159,6 +173,20 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
       color: true
     }
   });
+  private nodeOcclusionLayer = new ParticleContainer<Particle>({
+    dynamicProperties: {
+      vertex: true,
+      position: true,
+      color: true
+    }
+  });
+  private nodeBackdropLayer = new ParticleContainer<Particle>({
+    dynamicProperties: {
+      vertex: true,
+      position: true,
+      color: true
+    }
+  });
   private nodeBorderLayer = new ParticleContainer<Particle>({
     dynamicProperties: {
       vertex: true,
@@ -173,6 +201,8 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
   private linkViews = new Map<GraphLink, Particle>();
   private labelViews = new Map<string, PixiLabelView>();
   private nodeById = new Map<string, GraphNode>();
+  private nodeOcclusionViews = new Map<string, Particle>();
+  private nodeBackdropViews = new Map<string, Particle>();
   private pendingNodes: GraphNode[] = [];
   private pendingNodeCursor = 0;
   private pendingLinks: GraphLink[] = [];
@@ -208,7 +238,7 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
       sharedTicker: false,
       preference: ['webgl'],
       powerPreference: 'high-performance',
-      backgroundAlpha: 1
+      backgroundAlpha: 0
     });
 
     if (this.disposed) {
@@ -221,10 +251,19 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     this.createNodeTextures(app);
     this.world.eventMode = 'none';
     this.linkLayer.eventMode = 'none';
+    this.nodeOcclusionLayer.eventMode = 'none';
+    this.nodeOcclusionLayer.blendMode = 'erase';
+    this.nodeBackdropLayer.eventMode = 'none';
     this.nodeFillLayer.eventMode = 'none';
     this.nodeBorderLayer.eventMode = 'none';
     this.labelLayer.eventMode = 'none';
-    this.world.addChild(this.linkLayer, this.nodeFillLayer, this.nodeBorderLayer);
+    this.world.addChild(
+      this.linkLayer,
+      this.nodeOcclusionLayer,
+      this.nodeBackdropLayer,
+      this.nodeFillLayer,
+      this.nodeBorderLayer
+    );
     app.stage.addChild(this.world, this.labelLayer);
   }
 
@@ -254,6 +293,8 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
       textureSourceOptions: { scaleMode: 'linear' }
     });
     this.nodeFillLayer.texture = this.nodeFillTexture;
+    this.nodeOcclusionLayer.texture = this.nodeFillTexture;
+    this.nodeBackdropLayer.texture = this.nodeFillTexture;
     this.nodeBorderLayer.texture = this.nodeBorderTexture;
     fillSource.destroy();
     borderSource.destroy();
@@ -289,6 +330,10 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     this.labelViews.clear();
     this.nodeById.clear();
     this.linkLayer.removeParticles();
+    this.nodeOcclusionLayer.removeParticles();
+    this.nodeBackdropLayer.removeParticles();
+    this.nodeOcclusionViews.clear();
+    this.nodeBackdropViews.clear();
     this.nodeFillLayer.removeParticles();
     this.nodeBorderLayer.removeParticles();
     this.labelLayer.removeChildren();
@@ -350,6 +395,34 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     this.nodeFillLayer.addParticle(fill);
     this.nodeBorderLayer.addParticle(border);
     this.nodeViews.set(node.id, { fill, border });
+  }
+
+  private ensureOcclusionParticle(
+    nodeId: string,
+    views: Map<string, Particle>,
+    layer: ParticleContainer<Particle>
+  ) {
+    const existing = views.get(nodeId);
+    if (existing) return existing;
+
+    const particle = new Particle({
+      texture: this.nodeFillTexture!,
+      anchorX: 0.5,
+      anchorY: 0.5,
+      alpha: 0
+    });
+    views.set(nodeId, particle);
+    layer.addParticle(particle);
+    return particle;
+  }
+
+  private clearOcclusionParticles(
+    views: Map<string, Particle>,
+    layer: ParticleContainer<Particle>
+  ) {
+    if (views.size === 0) return;
+    views.clear();
+    layer.removeParticles();
   }
 
   private materializeNodes(frame: GraphRenderFrame, visibleNodes: GraphNode[]) {
@@ -419,16 +492,35 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     );
   }
 
-  private updateNodeViews(frame: GraphRenderFrame, visibleNodeIds: ReadonlySet<string> | null) {
+  private updateNodeViews(
+    frame: GraphRenderFrame,
+    visibleNodeIds: ReadonlySet<string> | null,
+    backgroundColor: ResolvedColor
+  ) {
     const focusId = frame.hoveredNodeId || frame.selectedNodeId;
     const hasFocus = !!focusId;
     const focusProgress = clampUnit(frame.dimProgress);
     const dimAlpha = resolveFocusDimAlpha(frame);
+    const eraseLinks = backgroundColor.alpha < 1 - ALPHA_EPSILON;
+    const restoreTranslucentBackdrop =
+      eraseLinks && backgroundColor.alpha > ALPHA_EPSILON;
+    this.nodeOcclusionLayer.visible = eraseLinks;
+    this.nodeBackdropLayer.visible = restoreTranslucentBackdrop;
+    if (!eraseLinks) {
+      this.clearOcclusionParticles(this.nodeOcclusionViews, this.nodeOcclusionLayer);
+      this.clearOcclusionParticles(this.nodeBackdropViews, this.nodeBackdropLayer);
+    } else if (!restoreTranslucentBackdrop) {
+      this.clearOcclusionParticles(this.nodeBackdropViews, this.nodeBackdropLayer);
+    }
     let visibleCount = 0;
 
     for (const [nodeId, view] of this.nodeViews) {
       const node = this.nodeById.get(nodeId);
       if (!node || (visibleNodeIds && !visibleNodeIds.has(nodeId))) {
+        const occlusion = this.nodeOcclusionViews.get(nodeId);
+        const backdrop = this.nodeBackdropViews.get(nodeId);
+        if (occlusion) occlusion.alpha = 0;
+        if (backdrop) backdrop.alpha = 0;
         view.fill.alpha = 0;
         view.border.alpha = 0;
         continue;
@@ -436,6 +528,10 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
 
       const lensAlpha = resolveLensNodeAlpha(nodeId, frame);
       if (lensAlpha <= ALPHA_EPSILON) {
+        const occlusion = this.nodeOcclusionViews.get(nodeId);
+        const backdrop = this.nodeBackdropViews.get(nodeId);
+        if (occlusion) occlusion.alpha = 0;
+        if (backdrop) backdrop.alpha = 0;
         view.fill.alpha = 0;
         view.border.alpha = 0;
         continue;
@@ -470,16 +566,59 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
       const positionX = node.x ?? 0;
       const positionY = node.y ?? 0;
 
+      if (eraseLinks) {
+        const occlusion = this.ensureOcclusionParticle(
+          nodeId,
+          this.nodeOcclusionViews,
+          this.nodeOcclusionLayer
+        );
+        occlusion.x = positionX;
+        occlusion.y = positionY;
+        occlusion.scaleX = radius / NODE_TEXTURE_RADIUS;
+        occlusion.scaleY = radius / NODE_TEXTURE_RADIUS;
+        occlusion.tint = 0xffffff;
+        occlusion.alpha = lensAlpha;
+
+        if (restoreTranslucentBackdrop) {
+          const backdrop = this.ensureOcclusionParticle(
+            nodeId,
+            this.nodeBackdropViews,
+            this.nodeBackdropLayer
+          );
+          backdrop.x = positionX;
+          backdrop.y = positionY;
+          backdrop.scaleX = radius / NODE_TEXTURE_RADIUS;
+          backdrop.scaleY = radius / NODE_TEXTURE_RADIUS;
+          backdrop.tint = backgroundColor.tint;
+          backdrop.alpha = backgroundColor.alpha * lensAlpha;
+        }
+      }
+
+      const fillTint = overlayColor
+        ? mixTint(baseColor, overlayColor, focusProgress)
+        : baseColor.tint;
+      const fillAlpha = (
+        overlayColor ? mixAlpha(baseColor, overlayColor, focusProgress) : baseColor.alpha
+      ) * nodeAlpha;
       view.fill.x = positionX;
       view.fill.y = positionY;
       view.fill.scaleX = radius / NODE_TEXTURE_RADIUS;
       view.fill.scaleY = radius / NODE_TEXTURE_RADIUS;
-      view.fill.tint = overlayColor
-        ? mixTint(baseColor, overlayColor, focusProgress)
-        : baseColor.tint;
-      view.fill.alpha = (
-        overlayColor ? mixAlpha(baseColor, overlayColor, focusProgress) : baseColor.alpha
-      ) * nodeAlpha * lensAlpha;
+      if (
+        backgroundColor.alpha >= 1 - ALPHA_EPSILON &&
+        fillAlpha > ALPHA_EPSILON &&
+        fillAlpha < 1 - ALPHA_EPSILON
+      ) {
+        view.fill.tint = compositeTintOverOpaqueBackground(
+          backgroundColor,
+          fillTint,
+          fillAlpha
+        );
+        view.fill.alpha = lensAlpha;
+      } else {
+        view.fill.tint = fillTint;
+        view.fill.alpha = fillAlpha * lensAlpha;
+      }
 
       const borderRadius = radius + (isFocusedNode ? 1.5 / frame.viewport.scale : 0);
       view.border.x = positionX;
@@ -719,8 +858,9 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
       this.dpr = frame.dpr;
       app.renderer.resize(frame.width, frame.height, frame.dpr);
     }
-    app.renderer.background.color = frame.theme.backgroundColor;
-    app.renderer.background.alpha = 1;
+    const backgroundColor = this.resolveColor(frame.theme.backgroundColor);
+    app.renderer.background.color = backgroundColor.tint;
+    app.renderer.background.alpha = backgroundColor.alpha;
 
     if (this.topologyNodes !== frame.nodes || this.topologyLinks !== frame.links) {
       if (!this.reuseEquivalentTopology(frame)) this.resetTopology(frame);
@@ -745,7 +885,7 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
     this.world.scale.set(frame.viewport.scale);
     const visibleLinks = this.updateLinkViews(frame, allNodesInViewport);
     const linksCompletedAt = performance.now();
-    const visibleNodeCount = this.updateNodeViews(frame, visibleNodeIds);
+    const visibleNodeCount = this.updateNodeViews(frame, visibleNodeIds, backgroundColor);
     const nodesCompletedAt = performance.now();
     const visibleLabels = this.updateLabelViews(frame, visibleNodes);
     const labelsCompletedAt = performance.now();
@@ -784,13 +924,14 @@ class PixiGraphRendererBackend implements GraphRendererBackend {
   destroy() {
     if (this.disposed) return;
     this.disposed = true;
+    const app = this.app;
+    this.app = null;
     this.clearTopology();
     this.nodeFillTexture?.destroy(true);
     this.nodeBorderTexture?.destroy(true);
     this.nodeFillTexture = null;
     this.nodeBorderTexture = null;
-    this.app?.destroy(false, { children: true, context: true });
-    this.app = null;
+    app?.destroy(false, { children: true, context: true });
   }
 }
 

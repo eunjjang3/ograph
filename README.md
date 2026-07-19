@@ -19,9 +19,10 @@ The package is designed for applications that need a large interactive node-link
 ## Project Status
 
 `@eunjjang/ograph` is an early pre-1.0 package. The latest stable release is
-`0.3.0`. It promotes the qualified Pixi WebGL/Worker runtime behind the same
-public API with automatic Canvas 2D/main-thread fallback. Expect API and
-behavior changes before `1.0.0`.
+`0.3.1`. It keeps the qualified Pixi WebGL/Worker runtime behind the same public
+API, fixes production-consumer Worker and strict-CSP activation, and preserves
+transparent graph backgrounds with automatic Canvas 2D/main-thread fallback.
+Expect API and behavior changes before `1.0.0`.
 
 ## Documentation
 

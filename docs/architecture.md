@@ -158,10 +158,14 @@ switches. Pause updates the existing Worker instead of recreating it, prevents
 drag/restart messages from waking force timers while paused, and retains the
 last alpha so resuming an already settled graph remains idle.
 
-The library entry constructs the Worker from a package-relative `import.meta.url`.
-Vite emits the module Worker under `dist/workers/`, and the package allowlist
-publishes that asset with the lazy client chunk. Worker construction, protocol,
-or asynchronous runtime failure is recovered once by selecting the existing
+The library imports the simulation through Vite's Worker-constructor module.
+Vite emits the module Worker under `dist/workers/` and generates one
+package-relative `import.meta.url` asset reference in the library entry. Keeping
+that reference single-layered lets downstream bundlers such as Vite and
+Next.js/Turbopack rebase the Worker to the consumer's HTTP origin instead of
+resolving an outer URL against the package file. The package allowlist publishes
+the Worker asset with the lazy client chunk. Worker construction, protocol, or
+asynchronous runtime failure is recovered once by selecting the existing
 main-thread simulation. A recovered environment limitation does not call the
 consumer's `onError`; an unrecovered graph failure still does.
 
@@ -175,11 +179,32 @@ Ograph's dirty-frame scheduler calls `app.render()` only for simulation output,
 input, easing, visual transitions, or pending materialization work. Resize and
 DPR changes go through `renderer.resize`; disposal preserves the React-owned
 canvas while releasing the WebGL context and retained children.
+Pixi creates the WebGL context as alpha-capable even when the first rendered
+theme is opaque, because WebGL context transparency cannot be enabled after
+creation. Each render then applies both the parsed RGB tint and alpha from
+`theme.backgroundColor`. Fully opaque themes therefore keep the same clear
+output, while transparent or translucent consumer themes preserve the content
+behind the React-owned canvas.
+Links render before nodes, but a focus-dimmed node must not reveal a link as if
+the edge passed through its fill. Canvas 2D erases the node silhouettes from the
+link result and restores the theme backdrop before painting node fills. Pixi
+precomposes dim node tints against fully opaque backgrounds without another
+batch. For alpha backgrounds, it lazily materializes an erase batch and, only
+for partially transparent backgrounds, a backdrop batch; returning to an opaque
+theme releases those particles. The page background can therefore remain
+visible through a translucent node while graph links remain occluded, and the
+default opaque lane keeps its previous object count and frame cost.
 The lazy renderer wrapper exposes the concrete Pixi backend to the draw loop
 only after `Application.init()` resolves. Render requests that arrive while
 WebGL is being created return without delegating, and the renderer hook requests
 a fresh frame after initialization completes. This prevents lane switches from
-observing an `Application` before Pixi has installed its renderer.
+observing an `Application` before Pixi has installed its renderer. The lazy
+chunk loads Pixi's CSP compatibility module before creating the application and
+keeps that subpath external beside `pixi.js`, so both imports share one Pixi
+extension registry in consumer bundles. Production consumers therefore do not
+need to add `unsafe-eval` to `script-src`. If initialization fails, cleanup is
+best-effort and the original initialization error remains authoritative even
+when a partially initialized Pixi application also throws during disposal.
 Changing graph fixtures or switching Main/Worker simulation keeps the renderer
 and its WebGL context alive; only switching between Canvas 2D and Pixi replaces
 the HTML canvas, because a canvas cannot change context type after acquisition.
@@ -215,9 +240,10 @@ materialization are all idle, the dirty-frame scheduler stops completely. The
 debug telemetry exposes the active frame reasons so an apparently settled graph
 cannot silently keep calling either Canvas draw or `app.render()`.
 
-`pixi.js` is an exact runtime dependency and remains external to Ograph's own
-library chunks so consumer bundlers can deduplicate it. The package entry loads
-the backend lazily, publishes package-owned chunks under `dist/chunks/`, and
+`pixi.js` and its CSP compatibility subpath remain external to Ograph's own
+library chunks so consumer bundlers can deduplicate one exact runtime
+dependency. The package entry loads the backend lazily, publishes package-owned
+chunks under `dist/chunks/`, and
 keeps cold initialization visually background-only without adding a spinner or
 public loading state. If WebGL creation or renderer initialization fails,
 `GraphView` remounts exactly one replacement canvas with the Canvas 2D backend.

@@ -11,7 +11,7 @@ import type {
 } from '../graphRuntime';
 import { RotateCcw, Maximize2, Sliders, Info } from 'lucide-react';
 
-const debugSuiteVersion = import.meta.env.VITE_OGRAPH_VERSION ?? '0.3.0';
+const debugSuiteVersion = import.meta.env.VITE_OGRAPH_VERSION ?? '0.3.1';
 const NODE_COUNT_OPTIONS = [100, 500, 1000, 2500, 5000, 10000];
 const GRAPH_COLOR_NOTE = 'Each node type corresponds to the actual **Ograph Colors**. Large nodes represent hubs or index notes. Small green nodes represent local attachments.';
 

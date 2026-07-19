@@ -144,7 +144,12 @@ export class LazyPixiGraphRendererBackend implements GraphRendererBackend {
     try {
       await backend.initialize(canvas);
     } catch (caught) {
-      backend.destroy();
+      try {
+        backend.destroy();
+      } catch {
+        // Initialization errors are the actionable failure. A partially
+        // initialized backend must not replace them with a cleanup error.
+      }
       throw caught;
     }
 

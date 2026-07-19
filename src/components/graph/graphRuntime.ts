@@ -1,3 +1,5 @@
+import GraphSimulationWorker from './graphSimulation.worker.ts?worker';
+
 export type GraphRendererMode = 'canvas2d' | 'pixi';
 export type GraphSimulationMode = 'main' | 'worker';
 
@@ -138,8 +140,7 @@ export function recordActiveGraphRenderSample(
 }
 
 export function createProductionGraphSimulationWorker() {
-  return new Worker(new URL('./graphSimulation.worker.ts', import.meta.url), {
-    type: 'module',
+  return new GraphSimulationWorker({
     name: 'ograph-simulation'
   });
 }

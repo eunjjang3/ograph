@@ -4,6 +4,52 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## 0.3.1 - 2026-07-19
+
+This patch keeps the existing `GraphView` props, ref methods, callbacks,
+runtime exports, interaction model, and automatic fallback policy. It hardens
+the packaged Pixi WebGL/Worker runtime in strict-CSP Next.js consumers and
+restores transparent-theme composition.
+
+### Added
+
+- Added a packed Next.js production-consumer lane using Turbopack, React 19,
+  strict CSP without `unsafe-eval`, external Worker/context probes, transparent
+  pixel checks, 1,000/5,000-node primitive smoke, and StrictMode lifecycle
+  coverage.
+
+### Changed
+
+- Made the Pixi WebGL context alpha-capable at initialization and apply the
+  parsed background tint and alpha on every frame.
+- Kept focus-dimmed nodes translucent while occluding graph links behind their
+  fills in both Pixi and Canvas 2D. Alpha-theme Pixi occlusion particles are
+  allocated lazily; the default opaque 10,000-node lane retains its previous
+  frame and heap profile.
+
+### Fixed
+
+- Replaced the nested packaged Worker URL with Vite's Worker-constructor module
+  so Next.js rebases the module Worker to the consumer HTTP origin.
+- Loaded Pixi's CSP compatibility extension on the same externalized Pixi
+  instance, allowing strict-CSP WebGL initialization without weakening the
+  consumer's `script-src` policy.
+- Preserved the original Pixi initialization error when best-effort partial
+  cleanup also throws, and made application disposal safe during incomplete
+  initialization.
+- Restored fully transparent and translucent theme backgrounds without changing
+  opaque background output, and prevented focus-dimmed nodes from revealing
+  links as if edges passed through their fills.
+
+### Verified
+
+- Preserved the public declarations and runtime exports with 79 unit, API,
+  release, and budget tests; 11 packed Vite consumer browser tests; and 6
+  packed Next.js production-consumer browser tests.
+- Reconfirmed one-canvas StrictMode behavior, both automatic fallbacks,
+  hover/click/drag/pan/zoom/camera interactions, existing visual snapshots,
+  strict CSP, HTTP Worker `ready`/`tick`, and zero consumer/browser errors.
+
 ## 0.3.0 - 2026-07-18
 
 This release keeps the existing `GraphView` props, ref methods,
