@@ -614,7 +614,7 @@ Base: `main` at `9a5ee1fa03f5d0ea0c31cfec4a4b3fd2c0123302`
   - Docs: `docs/architecture.md`, `todo.md`
   - Commit: `a74c6c6`
 
-- [ ] Stage 4: Separate transparent-background parity from missing primitives
+- [x] Stage 4: Separate transparent-background parity from missing primitives
   - Branch: `fix/next-production-consumer-runtime`
   - Deliverable: transparent pixels remain transparent and packed 1k/5k
     fixtures report and visibly render nonzero nodes/links; any remaining
@@ -622,8 +622,9 @@ Base: `main` at `9a5ee1fa03f5d0ea0c31cfec4a4b3fd2c0123302`
   - Verification: pixel smoke, selected/root and unselected fixtures, pan,
     zoom, hover, selection, and camera focus
   - Docs: `docs/architecture.md`, `todo.md`
-  - Human UX checkpoint: required before accepting visual-output changes
+  - Human UX checkpoint: accepted on 2026-07-19
   - Commit: `<pending>`
+  - Status: complete; direct transparent 10k A/B profiling deferred as follow-up
 
 - [ ] Stage 5: Re-prove compatibility and prepare a patch release
   - Branch: `fix/next-production-consumer-runtime`
@@ -695,6 +696,77 @@ Stage verification:
 - `npx playwright test --config playwright.next.config.ts` — 2 passed, 1 failed
   only on transparent alpha, with the Pixi/Worker strict-CSP success lane green.
 - `npm run lint` and `git diff --check` — passed before commit.
+
+## Stage 4 transparency and primitive evidence (2026-07-19)
+
+Pixi previously created its WebGL context with `backgroundAlpha: 1`. Pixi's
+background system can change the clear color later, but the browser context
+cannot gain an alpha channel after creation. The renderer now creates an
+alpha-capable context and applies both tint and alpha parsed from each frame's
+`theme.backgroundColor`. This does not add or change a public prop, ref method,
+callback, export, interaction, or fallback rule.
+
+Before the renderer change, the stricter pixel probe already found more than
+50 colored graph pixels while the transparent-pixel count remained `48`. That
+separates present graph primitives from the opaque-background failure: missing
+nodes or links did not reproduce independently in the packed Next fixture.
+The completed test fixture adds test-only switches for an opaque background,
+5,000 nodes, focus removal, and a diagnostic magenta link theme. External PNG
+sampling proves transparent and opaque background output separately and proves
+nonzero node and link pixels at 5,000 nodes with and without selected/root
+focus. Worker ticks continue after the topology change.
+
+Automated verification after the human-feedback pass:
+
+- `npm test` — 79 passed; package and performance budgets passed.
+- `npm run test:browser` — 11 passed, including hover, click, drag, pan, zoom,
+  camera focus, StrictMode, fallback, and existing visual snapshots.
+- `npm run test:browser:next` — 6 passed with WebGL2, strict CSP, HTTP Worker,
+  transparent and opaque pixel assertions, 1,000/5,000-node primitive smoke,
+  selected/root and unselected states, deterministic link occlusion, and one
+  canvas.
+- In-app Chromium on `4435` — Pixi/Worker displayed 5,000 nodes and 8,750
+  links on one canvas; hover, selection, and anchored wheel zoom updated as
+  expected with no visible blank state.
+- Packed Next production consumer on `4310` — the checkerboard remained visible
+  through the transparent canvas and disappeared only after the test-only
+  opaque-theme toggle.
+
+The required human UX checkpoint accepted the transparent/opaque background
+output and the later node/link occlusion adjustment.
+
+The first human checkpoint found three fixture states worth separating. Turning
+focus off removes the selected/root state for `node-0`, so directly connected
+`node-31` correctly loses its neighbor highlight without leaving the graph.
+With a transparent theme, focus-dimmed nodes reveal the page behind their lower
+alpha; this matches the existing Canvas 2D composition rather than introducing
+a Pixi-only visual change. The diagnostic link theme did contain a fixture bug:
+it replaced the complete theme and therefore forced a transparent background
+even after the status switched to opaque. The probe now overlays only link
+colors on the current background theme, and the opaque test asserts both opaque
+background pixels and magenta link pixels in the combined state.
+
+The second human checkpoint accepted page-background visibility through dimmed
+nodes but rejected graph links showing through the same node fills. A fixed
+three-node transparent probe places a magenta link beneath a dimmed endpoint
+and centers that endpoint through the existing public camera ref. Before the
+renderer change, the center sample contained six link-tinted pixels. Canvas 2D
+now erases node silhouettes from the link pass and restores the theme backdrop;
+Pixi uses precomposed fills for opaque themes and lazily allocated erase/backdrop
+particles only for alpha themes. The post-change sample contains zero
+link-tinted pixels while retaining the node alpha and checkerboard visibility.
+
+The first direct Pixi implementation kept two extra particles per node and was
+rejected after its 10,000-node profile raised steady draw CPU p95 from the
+existing `7.8-8.0ms` range to `9.6ms` and forced-GC heap growth to `19.46MiB`.
+The retained lazy/precomposed version measured `60 FPS`, `8.0ms` CPU p95,
+`15.74MiB` heap growth, `64.9ms` first visible, `1,251ms` complete
+materialization, and a `93ms` cold long-task maximum. These values are within
+the recorded pre-change ranges apart from a non-material five-millisecond
+materialization delta. The revised focus appearance was accepted. The
+maintainer explicitly deferred a direct transparent-versus-opaque 10,000-node
+A/B trace to a later performance follow-up; it is recorded as a remaining
+qualification item rather than a Stage 4 or patch-release blocker.
 
 ## Stage 2 Worker evidence (2026-07-19)
 

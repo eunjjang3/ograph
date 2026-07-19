@@ -32,6 +32,11 @@ main {
   gap: 8px;
 }
 
+.consumer-controls {
+  display: flex;
+  gap: 8px;
+}
+
 .graph-panel {
   border: 1px solid #64748b;
   border-radius: 12px;

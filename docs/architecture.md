@@ -179,6 +179,21 @@ Ograph's dirty-frame scheduler calls `app.render()` only for simulation output,
 input, easing, visual transitions, or pending materialization work. Resize and
 DPR changes go through `renderer.resize`; disposal preserves the React-owned
 canvas while releasing the WebGL context and retained children.
+Pixi creates the WebGL context as alpha-capable even when the first rendered
+theme is opaque, because WebGL context transparency cannot be enabled after
+creation. Each render then applies both the parsed RGB tint and alpha from
+`theme.backgroundColor`. Fully opaque themes therefore keep the same clear
+output, while transparent or translucent consumer themes preserve the content
+behind the React-owned canvas.
+Links render before nodes, but a focus-dimmed node must not reveal a link as if
+the edge passed through its fill. Canvas 2D erases the node silhouettes from the
+link result and restores the theme backdrop before painting node fills. Pixi
+precomposes dim node tints against fully opaque backgrounds without another
+batch. For alpha backgrounds, it lazily materializes an erase batch and, only
+for partially transparent backgrounds, a backdrop batch; returning to an opaque
+theme releases those particles. The page background can therefore remain
+visible through a translucent node while graph links remain occluded, and the
+default opaque lane keeps its previous object count and frame cost.
 The lazy renderer wrapper exposes the concrete Pixi backend to the draw loop
 only after `Application.init()` resolves. Render requests that arrive while
 WebGL is being created return without delegating, and the renderer hook requests

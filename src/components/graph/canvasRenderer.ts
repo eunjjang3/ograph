@@ -408,6 +408,47 @@ function drawNodes(
   flushCircleBatches(ctx, borderBatches, true);
 }
 
+function occludeLinksBehindNodes(
+  ctx: CanvasRenderingContext2D,
+  nodes: GraphNode[],
+  viewport: Viewport,
+  theme: GraphTheme,
+  preset: GraphPreset,
+  bounds: WorldBounds,
+  lensVisibilityByNodeId?: Map<string, number>
+) {
+  const occlusionBatches = new Map<
+    string,
+    { color: string; alpha: number; lineWidth: number; circles: Circle[] }
+  >();
+
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    const radius = getNodeRadius(
+      preset.nodeRadius,
+      preset.nodeSizeScale ?? 1,
+      node.size,
+      node.degree
+    );
+    if (!isNodeInBounds(node, bounds, radius)) continue;
+
+    const lensAlpha = resolveLensNodeAlpha(node.id, lensVisibilityByNodeId);
+    if (lensAlpha <= 0.001) continue;
+    addCircleBatch(occlusionBatches, node, radius, '#000000', lensAlpha);
+  }
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-out';
+  flushCircleBatches(ctx, occlusionBatches);
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  for (const batch of occlusionBatches.values()) batch.color = theme.backgroundColor;
+  flushCircleBatches(ctx, occlusionBatches);
+  ctx.restore();
+}
+
 function resolveLabelColor(node: GraphNode, theme: GraphTheme, focus: FocusRenderState, isNodeNeighbor: boolean) {
   if (focus.isRoot(node.id)) {
     return theme.labelRootColor;
@@ -562,6 +603,15 @@ export function drawGraph(
     : new Map(nodes.map((node, index) => [node.id, index]));
 
   drawLinks(ctx, links, viewport, theme, preset, focus, bounds, lensVisibilityByNodeId);
+  occludeLinksBehindNodes(
+    ctx,
+    visibleNodes,
+    viewport,
+    theme,
+    preset,
+    bounds,
+    lensVisibilityByNodeId
+  );
   drawNodes(ctx, visibleNodes, viewport, theme, preset, focus, bounds, lensVisibilityByNodeId);
   drawLabels(
     ctx,

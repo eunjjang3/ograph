@@ -1656,6 +1656,50 @@ test('canvas label paint calls are capped before strokeText and fillText', async
   assert.deepEqual(filledLabels, ['High', 'Medium']);
 });
 
+test('canvas nodes erase and restore their backdrop before drawing translucent fills', async () => {
+  const { drawGraph } = await importSourceModule('src/components/graph/canvasRenderer.ts');
+  const { defaultGraphPreset, defaultGraphTheme } = await importSourceModule('src/components/graph/presets.ts');
+  const compositeModes = [];
+  const ctx = {
+    arc() {},
+    beginPath() {},
+    fill() {},
+    fillRect() {},
+    fillText() {},
+    lineTo() {},
+    moveTo() {},
+    restore() {},
+    save() {},
+    scale() {},
+    stroke() {},
+    strokeText() {},
+    translate() {},
+    set globalCompositeOperation(value) {
+      compositeModes.push(value);
+    }
+  };
+  const source = { id: 'source', label: 'Source', x: 20, y: 50, degree: 1 };
+  const target = { id: 'target', label: 'Target', x: 80, y: 50, degree: 1 };
+
+  drawGraph(
+    ctx,
+    100,
+    100,
+    [source, target],
+    [{ source, target }],
+    { x: 0, y: 0, scale: 1 },
+    { ...defaultGraphTheme, backgroundColor: 'rgba(0, 0, 0, 0)' },
+    defaultGraphPreset,
+    'source',
+    null,
+    null,
+    new Set(['target']),
+    1
+  );
+
+  assert.deepEqual(compositeModes, ['destination-out', 'source-over']);
+});
+
 test('canvas label budget keeps source-order tie breaks when spatial index order differs', async () => {
   const { drawGraph } = await importSourceModule('src/components/graph/canvasRenderer.ts');
   const { defaultGraphPreset, defaultGraphTheme } = await importSourceModule('src/components/graph/presets.ts');

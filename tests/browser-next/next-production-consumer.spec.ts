@@ -5,7 +5,7 @@ const require = createRequire(import.meta.url);
 const { PNG } = require('playwright-core/lib/utilsBundle') as {
   PNG: {
     sync: {
-      read(buffer: Buffer): { data: Uint8Array };
+      read(buffer: Buffer): { data: Uint8Array; height: number; width: number };
     };
   };
 };
@@ -123,7 +123,10 @@ async function readEffectiveRuntimeState(page: Page) {
   };
 }
 
-async function readTransparentCanvasPixels(page: Page) {
+async function readCanvasPixels(
+  page: Page,
+  expectedBackground: [number, number, number] | null = null
+) {
   await page.evaluate(() => {
     document.documentElement.style.background = 'transparent';
     document.body.style.background = 'transparent';
@@ -138,16 +141,91 @@ async function readTransparentCanvasPixels(page: Page) {
     omitBackground: true
   });
   const pixels = PNG.sync.read(screenshot).data;
+  let backgroundPixels = 0;
+  let magentaLinkPixels = 0;
+  let magentaTintPixels = 0;
+  let nonMagentaGraphPixels = 0;
+  let opaquePixels = 0;
   let transparentPixels = 0;
-  let graphPixels = 0;
+  let visibleGraphPixels = 0;
 
   for (let index = 0; index < pixels.length; index += 4) {
+    const red = pixels[index] ?? 0;
+    const green = pixels[index + 1] ?? 0;
+    const blue = pixels[index + 2] ?? 0;
     const alpha = pixels[index + 3] ?? 0;
+    const backgroundDistance = expectedBackground
+      ? Math.abs(red - expectedBackground[0]) +
+        Math.abs(green - expectedBackground[1]) +
+        Math.abs(blue - expectedBackground[2])
+      : null;
+    const isMagentaLink = alpha >= 16 && red >= 180 && green <= 80 && blue >= 180;
+    const hasMagentaTint = alpha >= 16 && red - green >= 12 && blue - green >= 12;
+    const isVisibleGraph =
+      alpha >= 16 &&
+      (backgroundDistance === null ? red + green + blue >= 24 : backgroundDistance >= 24);
     if (alpha <= 4) transparentPixels += 1;
-    if (alpha >= 16) graphPixels += 1;
+    if (alpha >= 250) opaquePixels += 1;
+    if (backgroundDistance !== null && alpha >= 250 && backgroundDistance <= 6) {
+      backgroundPixels += 1;
+    }
+    if (isMagentaLink) magentaLinkPixels += 1;
+    if (hasMagentaTint) magentaTintPixels += 1;
+    if (isVisibleGraph) {
+      visibleGraphPixels += 1;
+      if (!isMagentaLink) nonMagentaGraphPixels += 1;
+    }
   }
 
-  return { graphPixels, transparentPixels };
+  return {
+    backgroundPixels,
+    magentaLinkPixels,
+    magentaTintPixels,
+    nonMagentaGraphPixels,
+    opaquePixels,
+    transparentPixels,
+    visibleGraphPixels
+  };
+}
+
+async function readCanvasCenterPixels(page: Page) {
+  await page.evaluate(() => {
+    document.documentElement.style.background = 'transparent';
+    document.body.style.background = 'transparent';
+  });
+  const canvas = await graphCanvas(page);
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('Graph canvas has no bounding box.');
+
+  const screenshot = await page.screenshot({
+    animations: 'disabled',
+    clip: box,
+    omitBackground: true
+  });
+  const png = PNG.sync.read(screenshot);
+  const centerX = Math.floor(png.width / 2);
+  const centerY = Math.floor(png.height / 2);
+  const centerIndex = (centerY * png.width + centerX) * 4;
+  const centerAlpha = png.data[centerIndex + 3] ?? 0;
+  let linkTintPixels = 0;
+  let neutralPixels = 0;
+
+  for (let y = centerY - 5; y <= centerY + 5; y += 1) {
+    for (let x = centerX - 5; x <= centerX + 5; x += 1) {
+      const index = (y * png.width + x) * 4;
+      const red = png.data[index] ?? 0;
+      const green = png.data[index + 1] ?? 0;
+      const blue = png.data[index + 2] ?? 0;
+      const alpha = png.data[index + 3] ?? 0;
+      if (alpha < 16) continue;
+      if (red - green >= 12 && blue - green >= 12) linkTintPixels += 1;
+      if (Math.max(red, green, blue) - Math.min(red, green, blue) <= 12) {
+        neutralPixels += 1;
+      }
+    }
+  }
+
+  return { centerAlpha, linkTintPixels, neutralPixels };
 }
 
 test.beforeEach(async ({ page }) => {
@@ -185,9 +263,69 @@ test('keeps the packed Next production runtime on Pixi and Worker under strict C
 });
 
 test('keeps a transparent theme transparent with visible graph pixels', async ({ page }) => {
-  const pixels = await readTransparentCanvasPixels(page);
+  const pixels = await readCanvasPixels(page);
+  expect(pixels.visibleGraphPixels).toBeGreaterThan(50);
   expect(pixels.transparentPixels).toBeGreaterThan(1_000);
-  expect(pixels.graphPixels).toBeGreaterThan(50);
+});
+
+test('keeps an opaque theme opaque without hiding graph pixels', async ({ page }) => {
+  await page.getByTestId('toggle-link-probe').click();
+  await expect(page.getByTestId('link-probe')).toHaveText('on');
+  await page.getByTestId('toggle-background').click();
+  await expect(page.getByTestId('background-mode')).toHaveText('opaque');
+
+  const pixels = await readCanvasPixels(page, [22, 22, 26]);
+  expect(pixels.opaquePixels).toBeGreaterThan(1_000);
+  expect(pixels.backgroundPixels).toBeGreaterThan(1_000);
+  expect(pixels.magentaTintPixels).toBeGreaterThan(50);
+  expect(pixels.visibleGraphPixels).toBeGreaterThan(50);
+  expect(pixels.transparentPixels).toBeLessThan(100);
+});
+
+test('renders the 5k fixture with and without selected/root focus', async ({ page }) => {
+  const tickCountBefore = (await readRuntimeProbe(page)).workerMessageTypes
+    .filter(type => type === 'tick').length;
+
+  await page.getByTestId('fixture-5000').click();
+  await expect(page.getByTestId('fixture-size')).toHaveText('5000');
+  await expect.poll(async () => (
+    (await readRuntimeProbe(page)).workerMessageTypes.filter(type => type === 'tick').length
+  )).toBeGreaterThan(tickCountBefore);
+  await expect.poll(async () => (await readCanvasPixels(page)).visibleGraphPixels)
+    .toBeGreaterThan(50);
+
+  await page.getByTestId('toggle-link-probe').click();
+  await expect(page.getByTestId('link-probe')).toHaveText('on');
+  await expect.poll(async () => (await readCanvasPixels(page)).magentaLinkPixels)
+    .toBeGreaterThan(50);
+  await expect.poll(async () => (await readCanvasPixels(page)).nonMagentaGraphPixels)
+    .toBeGreaterThan(50);
+
+  await page.getByTestId('toggle-focus').click();
+  await expect(page.getByTestId('focus-mode')).toHaveText('none');
+  await expect.poll(async () => (await readCanvasPixels(page)).visibleGraphPixels)
+    .toBeGreaterThan(50);
+  await expect.poll(async () => (await readCanvasPixels(page)).magentaLinkPixels)
+    .toBeGreaterThan(50);
+  await expect.poll(async () => (await readCanvasPixels(page)).nonMagentaGraphPixels)
+    .toBeGreaterThan(50);
+  await expect(page.locator('canvas')).toHaveCount(1);
+});
+
+test('occludes links behind focus-dimmed nodes on a transparent canvas', async ({ page }) => {
+  await page.getByTestId('toggle-occlusion-probe').click();
+  await expect(page.getByTestId('occlusion-probe')).toHaveText('on');
+  await expect.poll(async () => {
+    await page.getByTestId('center-occlusion-probe').click();
+    return page.getByTestId('camera-focused').textContent();
+  }).toBe('true');
+
+  await expect.poll(async () => (await readCanvasCenterPixels(page)).neutralPixels)
+    .toBeGreaterThan(20);
+  await expect.poll(async () => (await readCanvasCenterPixels(page)).centerAlpha)
+    .toBeLessThan(220);
+  const pixels = await readCanvasCenterPixels(page);
+  expect(pixels.linkTintPixels).toBe(0);
 });
 
 test('retains exactly one consumer canvas through the StrictMode mount', async ({ page }) => {
