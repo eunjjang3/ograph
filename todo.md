@@ -632,7 +632,7 @@ Base: `main` at `9a5ee1fa03f5d0ea0c31cfec4a4b3fd2c0123302`
     pinned and floating React 18/19 consumers, Vite packed browser suite, Next
     production consumer suite, package dry run, and release identity dry run
   - Docs: architecture, README, changelog, this plan
-  - Commit: `<pending>`
+  - Commit: `1b850a2`
   - Status: `0.3.1` release candidate prepared locally; no push, PR, tag, or
     publish performed
 
