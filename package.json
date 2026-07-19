@@ -1,6 +1,6 @@
 {
   "name": "@eunjjang/ograph",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Reusable interactive force-directed canvas graph component for React applications.",
   "type": "module",
   "main": "./dist/index.js",

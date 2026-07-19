@@ -626,13 +626,15 @@ Base: `main` at `9a5ee1fa03f5d0ea0c31cfec4a4b3fd2c0123302`
   - Commit: `3fa0294`
   - Status: complete; direct transparent 10k A/B profiling deferred as follow-up
 
-- [ ] Stage 5: Re-prove compatibility and prepare a patch release
+- [x] Stage 5: Re-prove compatibility and prepare a patch release
   - Branch: `fix/next-production-consumer-runtime`
   - Verification: lint, unit/API/budget tests, demo/library builds, examples,
     pinned and floating React 18/19 consumers, Vite packed browser suite, Next
     production consumer suite, package dry run, and release identity dry run
-  - Docs: architecture, debug harness, changelog, this plan
+  - Docs: architecture, README, changelog, this plan
   - Commit: `<pending>`
+  - Status: `0.3.1` release candidate prepared locally; no push, PR, tag, or
+    publish performed
 
 ## Stop conditions
 
@@ -767,6 +769,39 @@ materialization delta. The revised focus appearance was accepted. The
 maintainer explicitly deferred a direct transparent-versus-opaque 10,000-node
 A/B trace to a later performance follow-up; it is recorded as a remaining
 qualification item rather than a Stage 4 or patch-release blocker.
+
+## Stage 5 patch-release evidence (2026-07-19)
+
+The package, lockfile root, debug fallback label, packed Next template, README,
+and changelog now identify `0.3.1`. Historical documents that report the live
+`0.3.0` registry release and tag remain unchanged until an actual release is
+published. The changelog keeps `## Unreleased` empty and contains exactly one
+dated `0.3.1` release heading.
+
+Release-candidate verification:
+
+- `npm run lint` — passed.
+- `npm test` — 79 passed; package and performance budgets passed.
+- `npm run build` — demo and library builds passed.
+- `npm run check:examples` — library build and example typecheck passed.
+- `npm run verify:consumer` — React 18/19 lock-pinned and floating tarball
+  installs, runtime imports, and strict TypeScript checks passed.
+- `npm run test:browser` — all 11 packed Vite Chromium tests passed.
+- `npm run test:browser:next` — all 6 packed Next production Chromium tests
+  passed after stopping the separately retained review server on port `4310`.
+- `npm audit --omit=dev` — zero production vulnerabilities.
+- `npm publish --dry-run --access public` — passed with 21 files, a `72.7kB`
+  tarball, and public `latest` publication intent; no publish occurred.
+- Workflow-dispatch release identity dry run — passed for the canonical
+  repository and `refs/heads/main` identity.
+- `npm view @eunjjang/ograph@0.3.1 version --json` — expected `E404`, proving
+  the patch version is not currently published.
+
+The release-event identity gate still must prove the eventual `v0.3.1` tag
+commit is reachable from protected `origin/main`; that check is intentionally
+deferred until after an approved merge. Direct transparent/opaque 10,000-node
+A/B profiling is also an explicitly deferred performance follow-up and is not
+represented as completed here.
 
 ## Stage 2 Worker evidence (2026-07-19)
 
