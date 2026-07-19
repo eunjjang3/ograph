@@ -313,17 +313,18 @@ test('renders the 5k fixture with and without selected/root focus', async ({ pag
 });
 
 test('occludes links behind focus-dimmed nodes on a transparent canvas', async ({ page }) => {
+  await expect.poll(() => readVisibleCanvasContext(page)).toMatch(/^webgl/);
   await page.getByTestId('toggle-occlusion-probe').click();
   await expect(page.getByTestId('occlusion-probe')).toHaveText('on');
-  await expect.poll(async () => {
-    await page.getByTestId('center-occlusion-probe').click();
-    return page.getByTestId('camera-focused').textContent();
-  }).toBe('true');
 
   await expect.poll(async () => (await readCanvasCenterPixels(page)).neutralPixels)
     .toBeGreaterThan(20);
-  await expect.poll(async () => (await readCanvasCenterPixels(page)).centerAlpha)
+  await expect.poll(async () => {
+    await page.getByTestId('center-occlusion-probe').click();
+    return (await readCanvasCenterPixels(page)).centerAlpha;
+  })
     .toBeLessThan(220);
+  await expect(page.getByTestId('camera-focused')).toHaveText('true');
   const pixels = await readCanvasCenterPixels(page);
   expect(pixels.linkTintPixels).toBe(0);
 });
