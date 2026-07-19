@@ -623,7 +623,7 @@ Base: `main` at `9a5ee1fa03f5d0ea0c31cfec4a4b3fd2c0123302`
     zoom, hover, selection, and camera focus
   - Docs: `docs/architecture.md`, `todo.md`
   - Human UX checkpoint: accepted on 2026-07-19
-  - Commit: `<pending>`
+  - Commit: `3fa0294`
   - Status: complete; direct transparent 10k A/B profiling deferred as follow-up
 
 - [ ] Stage 5: Re-prove compatibility and prepare a patch release
