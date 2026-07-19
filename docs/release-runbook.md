@@ -16,23 +16,24 @@ Do not rename the repository, package, or product during release hardening.
 ## Current Release State
 
 The `@eunjjang/ograph` package is published on npm as a public preview package.
-The registry's `latest` release is `0.3.0`. Versions `0.1.0` and `0.2.0` remain
-consumed historical releases, and current releases use npm Trusted Publishing
-through the GitHub release workflow.
+The registry's `latest` release is `0.3.1`. Versions `0.1.0`, `0.2.0`, and
+`0.3.0` remain consumed historical releases, and current releases use npm
+Trusted Publishing through the GitHub release workflow.
 
-Current registry and release evidence from 2026-07-18 KST:
+Current registry and release evidence from 2026-07-19 KST:
 
-- `npm view @eunjjang/ograph version --json` returns `0.3.0`.
-- `npm view @eunjjang/ograph dist-tags --json` points `latest` at `0.3.0`.
-- GitHub release `v0.3.0` and protected tag `v0.3.0` resolve to commit
-  `b511c791a3d5fbc6672178b13bd3c319aaa64517` on `main`.
-- Release workflow run `29609893972` completed successfully after the required
+- `npm view @eunjjang/ograph version --json` returns `0.3.1`.
+- `npm view @eunjjang/ograph dist-tags --json` points `latest` at `0.3.1`.
+- GitHub release `v0.3.1` and protected tag `v0.3.1` resolve to commit
+  `a7132390a37c65b3b017982033a0905fc0bbb138` on `main`.
+- Release workflow run `29667811399` completed successfully after the required
   `npm` environment approval and published through OIDC Trusted Publishing.
 - `npm access get status @eunjjang/ograph --json` returns `public`.
-- `npm view @eunjjang/ograph@0.3.0 dist --json` reports 21 files, a registry
+- `npm view @eunjjang/ograph@0.3.1 dist --json` reports 21 files, a registry
   signature, and an SLSA provenance attestation.
-- `npm audit signatures` verifies all 75 installed registry signatures and 29
-  attestations in the final release install.
+- A clean `@eunjjang/ograph@0.3.1` consumer install preserves the three runtime
+  exports and `npm audit signatures` verifies all 20 installed registry
+  signatures and 4 attestations.
 - GitHub repository ruleset `Protect release tags` (`17266129`) is active for
   `refs/tags/v*` and blocks deletion and non-fast-forward updates without
   bypass actors.
