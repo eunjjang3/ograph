@@ -173,19 +173,20 @@ Current external setting evidence, checked on 2026-06-05 KST:
   Best Practices badge, fuzzing, signed releases, and maintainer-approved code
   review rules.
 
-Published package evidence, refreshed on 2026-07-18 KST:
+Published package evidence, refreshed on 2026-07-19 KST:
 
-- `npm view @eunjjang/ograph version --json` returns `0.3.0`, and the `latest`
-  dist-tag points at `0.3.0`.
+- `npm view @eunjjang/ograph version --json` returns `0.3.1`, and the `latest`
+  dist-tag points at `0.3.1`.
 - `npm access get status @eunjjang/ograph --json` returns `public`.
-- GitHub release `v0.3.0` and its protected tag resolve to commit
-  `b511c791a3d5fbc6672178b13bd3c319aaa64517` on `main`.
-- Release workflow run `29609893972` completed successfully after the required
+- GitHub release `v0.3.1` and its protected tag resolve to commit
+  `a7132390a37c65b3b017982033a0905fc0bbb138` on `main`.
+- Release workflow run `29667811399` completed successfully after the required
   `npm` environment approval and published through OIDC Trusted Publishing.
-- `npm view @eunjjang/ograph@0.3.0 dist --json` reports a registry signature
+- `npm view @eunjjang/ograph@0.3.1 dist --json` reports a registry signature
   and SLSA provenance attestation for the 21-file package tarball.
-- `npm audit signatures` verifies all 75 installed registry signatures and 29
-  attestations in the final release install.
+- A clean `@eunjjang/ograph@0.3.1` consumer install preserves `GraphView`,
+  `defaultGraphPreset`, and `defaultGraphTheme`; `npm audit signatures`
+  verifies all 20 installed registry signatures and 4 attestations.
 
 ## Completion Evidence
 
