@@ -117,7 +117,7 @@ test('package metadata publishes public scoped tarballs with referenced docs', a
   assert.equal(packageJson.repository?.url, 'git+https://github.com/eunjjang3/ograph.git');
   assert.equal(packageJson.homepage, 'https://github.com/eunjjang3/ograph#readme');
   assert.equal(packageJson.bugs?.url, 'https://github.com/eunjjang3/ograph/issues');
-  assert.equal(packageJson.dependencies?.['pixi.js'], '8.19.0');
+  assert.match(packageJson.dependencies?.['pixi.js'] ?? '', /^\d+\.\d+\.\d+$/, 'Pixi must remain pinned to an exact runtime dependency version');
   assert.equal(packageJson.devDependencies?.['pixi.js'], undefined);
   assert.ok(packageJson.files.includes('dist/chunks/*.js'));
   assert.ok(packageJson.files.includes('dist/workers/*.js'));
