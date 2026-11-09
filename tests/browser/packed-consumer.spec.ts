@@ -132,11 +132,16 @@ async function readRuntimeProbe(page: Page): Promise<RuntimeProbe> {
 }
 
 async function expectCanvasHasGraphPixels(page: Page) {
-  await expect.poll(() => changedCanvasPixels(page)).toBeGreaterThan(20);
+  // Renderer fallback replaces the canvas while a screenshot can be in flight.
+  await expect(async () => {
+    expect(await changedCanvasPixels(page)).toBeGreaterThan(20);
+  }).toPass({ timeout: 5_000 });
 }
 
 async function expectCanvasIsBackgroundOnly(page: Page) {
-  await expect.poll(() => changedCanvasPixels(page)).toBeLessThanOrEqual(2);
+  await expect(async () => {
+    expect(await changedCanvasPixels(page)).toBeLessThanOrEqual(2);
+  }).toPass({ timeout: 5_000 });
 }
 
 async function setFixture(page: Page, name: string) {
