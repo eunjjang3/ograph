@@ -14,10 +14,11 @@ import {
   type GraphRuntimeTelemetryRef
 } from './graphRuntime';
 import type { GraphSimulationActivity } from './useGraphSimulation';
+import { advancePanMomentum, type PanVelocity } from './panMomentum';
 
 declare const __OGRAPH_DEBUG_RUNTIME__: boolean;
 
-const VIEWPORT_SMOOTHING = 18;
+const VIEWPORT_SMOOTHING = 10;
 const DIMMING_SMOOTHING = 14;
 const LABEL_SMOOTHING = 12;
 const LENS_VISIBILITY_SMOOTHING = 14;
@@ -47,6 +48,8 @@ interface UseGraphRenderLoopParams {
   viewportRef: CurrentRef<Viewport>;
   targetViewportRef: CurrentRef<Viewport>;
   viewportAnimationActiveRef: CurrentRef<boolean>;
+  panVelocityRef: CurrentRef<PanVelocity>;
+  onViewportChange?: (viewport: Viewport) => void;
   hoveredNodeIdRef: CurrentRef<string | null>;
   interactionActiveRef: CurrentRef<boolean>;
   selectedNodeId: string | null | undefined;
@@ -104,6 +107,8 @@ export function useGraphRenderLoop({
   viewportRef,
   targetViewportRef,
   viewportAnimationActiveRef,
+  panVelocityRef,
+  onViewportChange,
   hoveredNodeIdRef,
   interactionActiveRef,
   selectedNodeId,
@@ -135,6 +140,8 @@ export function useGraphRenderLoop({
   });
   const onRendererUnavailableRef = useRef(onRendererUnavailable);
   const onErrorRef = useRef(onError);
+  const onViewportChangeRef = useRef(onViewportChange);
+  onViewportChangeRef.current = onViewportChange;
   onRendererUnavailableRef.current = onRendererUnavailable;
   onErrorRef.current = onError;
 
@@ -210,6 +217,21 @@ export function useGraphRenderLoop({
           dimProgressRef.current = dimTargetRef.current;
         } else {
           isDimmingActive = true;
+        }
+      }
+
+      let panChanged = false;
+      let isPanActive = false;
+      if (panVelocityRef.current.x !== 0 || panVelocityRef.current.y !== 0) {
+        if (reduceMotion) {
+          panVelocityRef.current = { x: 0, y: 0 };
+        } else {
+          const next = advancePanMomentum(viewportRef.current, panVelocityRef.current, deltaSeconds);
+          panChanged = next.viewport !== viewportRef.current;
+          isPanActive = next.active;
+          panVelocityRef.current = next.velocity;
+          viewportRef.current = targetViewportRef.current = next.viewport;
+          if (panChanged) onViewportChangeRef.current?.(next.viewport);
         }
       }
 
@@ -334,6 +356,7 @@ export function useGraphRenderLoop({
 
       const shouldDraw =
         renderRequestedRef.current ||
+        panChanged ||
         isSimulationActive ||
         dimmingChanged ||
         lensVisibilityChanged ||
@@ -344,6 +367,7 @@ export function useGraphRenderLoop({
         renderRequestedRef.current = false;
         const isInteractionFrame =
           interactionActiveRef.current ||
+          isPanActive ||
           isSimulationActive ||
           viewportAnimationActiveRef.current ||
           isDimmingActive ||
@@ -386,6 +410,7 @@ export function useGraphRenderLoop({
               lastFrameTimeRef.current = null;
               renderRequestedRef.current = false;
               viewportAnimationActiveRef.current = false;
+              panVelocityRef.current = { x: 0, y: 0 };
               simulationActivityRef.current?.stop();
               return;
             }
@@ -439,6 +464,7 @@ export function useGraphRenderLoop({
       const rendererWorkPending = !!rendererBackendRef.current?.hasPendingWork?.();
       const shouldContinue =
         isSimulationActive ||
+        isPanActive ||
         isDimmingActive ||
         isLensAnimationActive ||
         isLabelAnimationActive ||
@@ -448,6 +474,7 @@ export function useGraphRenderLoop({
       if (__OGRAPH_DEBUG_RUNTIME__ && runtimeTelemetryRef) {
         const reasons = [
           isSimulationActive ? 'simulation' : '',
+          isPanActive ? 'pan' : '',
           isDimmingActive ? 'dimming' : '',
           isLensAnimationActive ? 'lens' : '',
           isLabelAnimationActive ? 'labels' : '',
@@ -472,6 +499,7 @@ export function useGraphRenderLoop({
         }
         renderRequestedRef.current = false;
         viewportAnimationActiveRef.current = false;
+        panVelocityRef.current = { x: 0, y: 0 };
         simulationActivityRef.current?.stop();
 
         if (onErrorRef.current) {
@@ -501,6 +529,7 @@ export function useGraphRenderLoop({
     viewportRef,
     targetViewportRef,
     viewportAnimationActiveRef,
+    panVelocityRef,
     hoveredNodeIdRef,
     interactionActiveRef,
     selectedNodeId,

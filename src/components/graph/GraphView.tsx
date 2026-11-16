@@ -20,7 +20,7 @@ import type {
   GraphViewProps
 } from './types';
 import { defaultGraphPreset, defaultGraphTheme } from './presets';
-import { getGraphDragPhysicsForMode, useGraphSimulation } from './useGraphSimulation';
+import { useGraphSimulation } from './useGraphSimulation';
 import { useCanvasSize } from './useCanvasSize';
 import { useGraphFrameScheduler } from './useGraphFrameScheduler';
 import { useGraphPointerInteractions } from './useGraphPointerInteractions';
@@ -237,7 +237,6 @@ function GraphViewCanvasInner<
   const onTick = useCallback(() => {
     requestRender();
   }, [requestRender]);
-  const dragPhysics = getGraphDragPhysicsForMode(mode);
 
   const {
     simulationActivityRef,
@@ -262,7 +261,6 @@ function GraphViewCanvasInner<
       coolingMode: mode,
       preserveScopeCentroid: mode === 'local',
       gravityCenterNodeIds: lensScope.visibleNodeIds,
-      dragPhysics,
       paused,
       engine: runtimeOptions.simulation,
       runtimeTelemetryRef,
@@ -276,6 +274,7 @@ function GraphViewCanvasInner<
     viewportRef,
     targetViewportRef,
     viewportAnimationActiveRef,
+    panVelocityRef,
     setViewportImmediate,
     animateViewportTo,
     animateFitToView,
@@ -451,6 +450,8 @@ function GraphViewCanvasInner<
     viewportRef,
     targetViewportRef,
     viewportAnimationActiveRef,
+    panVelocityRef,
+    reduceMotion,
     preset: presetConf,
     hoveredNodeId: externalHoveredNodeId,
     requestRender,
@@ -488,6 +489,8 @@ function GraphViewCanvasInner<
     viewportRef,
     targetViewportRef,
     viewportAnimationActiveRef,
+    panVelocityRef,
+    onViewportChange,
     hoveredNodeIdRef,
     interactionActiveRef,
     selectedNodeId: externalSelectedNodeId,

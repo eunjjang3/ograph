@@ -38,6 +38,8 @@ export class WorkerGraphSimulationClient {
   private mappedNodes: GraphNode[] = [];
   private disposed = false;
   private latestAlpha = 1;
+  private dragSequence = 0;
+  private dragPins = new Map<string, { x: number; y: number; sequence: number; released: boolean }>();
   private readonly options: WorkerGraphSimulationClientOptions;
 
   constructor(options: WorkerGraphSimulationClientOptions) {
@@ -96,7 +98,10 @@ export class WorkerGraphSimulationClient {
         source: getLinkId(link.source),
         target: getLinkId(link.target)
       })),
-      config: this.options.config
+      config: {
+        ...this.options.config,
+        initialAlpha: this.options.cachedPositions.size > 0 ? this.options.config.graphRefreshAlpha : 1
+      }
     };
 
     worker.postMessage(request);
@@ -126,12 +131,20 @@ export class WorkerGraphSimulationClient {
 
         for (let index = 0; index < this.mappedNodes.length; index += 1) {
           const node = this.mappedNodes[index]!;
-          node.x = packed[index * 2];
-          node.y = packed[index * 2 + 1];
+          let pin = this.dragPins.get(node.id);
+          if (pin?.released && value.dragSequence >= pin.sequence) {
+            this.dragPins.delete(node.id);
+            pin = undefined;
+          }
+          // Local input wins, including zero coordinates and in-flight frames
+          // between pointer release and the Worker's release acknowledgement.
+          node.x = node.fx ?? pin?.x ?? packed[index * 2];
+          node.y = node.fy ?? pin?.y ?? packed[index * 2 + 1];
         }
 
         this.latestAlpha = value.alpha;
-        const active = value.alpha > this.options.config.alphaMin && !this.options.config.paused;
+        const active = this.mappedNodes.length > 0 &&
+          value.alpha > this.options.config.alphaMin && !this.options.config.paused;
         this.options.onActiveChange(active);
         this.options.onTick(performance.now());
         this.post({
@@ -185,9 +198,10 @@ export class WorkerGraphSimulationClient {
     nodeId: string,
     x: number,
     y: number,
-    alphaTarget: number,
-    wakeConnectedNodes: boolean
+    alphaTarget: number
   ) {
+    const dragSequence = ++this.dragSequence;
+    this.dragPins.set(nodeId, { x, y, sequence: dragSequence, released: false });
     this.post({
       type: 'drag-move',
       revision: this.options.revision,
@@ -195,17 +209,24 @@ export class WorkerGraphSimulationClient {
       x,
       y,
       alphaTarget,
-      wakeConnectedNodes
+      dragSequence
     });
   }
 
   dragEnd(nodeId: string) {
-    this.post({ type: 'drag-end', revision: this.options.revision, nodeId });
+    const dragSequence = ++this.dragSequence;
+    const pin = this.dragPins.get(nodeId);
+    if (pin) {
+      pin.released = true;
+      pin.sequence = dragSequence;
+    }
+    this.post({ type: 'drag-end', revision: this.options.revision, nodeId, dragSequence });
   }
 
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.dragPins.clear();
     this.options.onActiveChange(false);
 
     for (const node of this.mappedNodes) {

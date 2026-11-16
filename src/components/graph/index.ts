@@ -9,9 +9,11 @@ export type {
   GraphNodeMetadata,
   GraphNodeType,
   GraphPreset,
+  GraphPhysicsProfile,
+  GraphPhysicsPresetName,
   GraphTheme,
   GraphViewMode,
   GraphViewProps,
   GraphViewport
 } from './types';
-export { defaultGraphPreset, defaultGraphTheme } from './presets';
+export { defaultGraphPreset, defaultGraphTheme, graphPhysicsPresets, resolveGraphPhysicsPreset } from './presets';

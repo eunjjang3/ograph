@@ -36,6 +36,9 @@ It is not part of the production package API. Consumers should not import anythi
 
 ### Runtime Experiment Lane
 
+The initial lane is **Pixi WebGL / Worker**, matching the published package.
+Canvas 2D and Main Thread remain available for explicit baseline comparisons.
+
 The internal-only runtime selector offers the complete two-by-two renderer and
 simulation matrix. Switching a lane or deterministic fixture remounts the graph
 canvas and resets runtime counters while keeping the public package API
@@ -131,7 +134,7 @@ The harness displays:
 
 `Hovered Node ID` and `Selected Node ID` are diagnostic state only. `Selected Node ID` should become `none` after changing the local root or returning to global mode; `Focus Anchor Core` is the separate local-lens root.
 
-The drag telemetry is intentionally mode-sensitive. In global mode it reports the high-heat drag policy with connected-neighbor wake enabled. In local mode it reports the low-heat drag policy with connected-neighbor wake disabled, so local lens drags remain live in the d3 simulation without re-running the full global wake inside the scoped halo.
+The drag telemetry is intentionally mode-sensitive. In global mode it reports the selected profile's drag heat; local mode reports its lower movement target of `0.05`. Pointer down alone does not reheat either mode, except for Legacy's global start heat. Connected-neighbor wake is disabled in every profile: ordinary link and collision forces propagate movement.
 
 Frame telemetry is measured in one-second `requestAnimationFrame` windows. FPS,
 p50/p95 intervals, and long-frame counts are useful for fixed-seed A/B
@@ -481,3 +484,11 @@ Human review accepted the remaining cold-load and rasterization differences as
 not harmful to UX. That approval closed the Stage 7D checkpoint, and subsequent
 maintainer approval authorized the `0.3.0` version, merge, tag, and npm release
 flow without changing the public API or interaction contract.
+
+### Motion presets
+
+The **Motion preset** selector switches between Obsidian (default), Calm, Lively,
+and Legacy. It changes heat, cooling, damping, spring distribution and collision
+settling together, without replacing the graph or resetting the camera. Changing
+profiles clears manual link-distance, charge, collision-radius and viscosity
+overrides. Visual sliders remain independent. Re-heat Forces uses the selected profile's restart heat.

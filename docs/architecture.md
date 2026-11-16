@@ -151,12 +151,19 @@ packed as `x,y` pairs in a transferable
 transfers the buffer back for reuse. Every message carries a graph revision so
 late frames from a disposed topology are ignored.
 
-Pause, restart, drag pin/move/release, local drag heat, and connected-neighbor
-wake are represented in the Worker protocol. Cleanup sends `dispose` and then
+Pause, restart, drag pin/move/release, and local drag heat are represented in
+the Worker protocol. Cleanup sends `dispose` and then
 terminates the Worker, including React StrictMode remounts and runtime-lane
 switches. Pause updates the existing Worker instead of recreating it, prevents
 drag/restart messages from waking force timers while paused, and retains the
 last alpha so resuming an already settled graph remains idle.
+
+The Worker advances a stopped d3 simulation explicitly on a 60Hz deadline.
+Force computation counts toward that deadline; an over-budget tick schedules
+the next step without accumulating catch-up steps. Protocol v2 includes a drag
+sequence acknowledgement. The client preserves the local pinned position,
+including coordinates equal to zero, until the release command is reflected in
+a Worker frame. Paused workers acknowledge release without restarting physics.
 
 The library imports the simulation through Vite's Worker-constructor module.
 Vite emits the module Worker under `dist/workers/` and generates one
@@ -301,38 +308,46 @@ Signature calculation sorts node IDs and normalized links, making it `O(n log n 
 
 `paused` stops the d3-force timer without unmounting the canvas or discarding cached coordinates. Graph refreshes while paused still update refs, forces, and render data, but they do not restart the timer until `paused` returns to `false`. The render loop also treats a paused simulation as inactive, even if its alpha remains above `alphaMin`, so a frozen layout cannot keep requestAnimationFrame alive by itself.
 
-Cooling is mode-based, not node-count based. Global mode keeps d3-force's default alpha curve (`alphaMin = 0.001`, `alphaDecay ~= 0.0228`) so large graphs continue to settle conservatively. Local mode uses `alphaMin = 0.005` and default `alphaDecay = 0.08` to stop the short invisible tail that otherwise keeps small focus lenses ticking and redrawing after note changes. Consumers can override only `alphaDecay` through `GraphPreset`; `alphaMin` stays internal because it is a termination threshold rather than a design-facing physics control.
+Cooling depends on the selected profile and mode, not node count. Global mode
+uses `alphaMin = 0.001`; local mode uses `alphaMin = 0.005` and faster reference
+cooling (`alphaDecay = 0.08`) unless explicitly overridden.
 
-The simulation uses:
+Both runtimes integrate at 60Hz. `resolvePhysicsTiming` converts the profile's
+reference cadence to that clock: retention and cooling use exponential time
+scaling, and force impulse preserves the steady damped response. The Obsidian
+profile uses the observed 51Hz reference cadence; Legacy uses 60Hz. The main
+fallback uses `withFixedSimulationClock`, so 120/144Hz display refresh does not
+speed up the physics.
 
-- `forceManyBody().strength(preset.chargeStrength)`
-- `forceLink(...).distance(preset.linkDistance).strength(0.85)`
-- `forceCollide(...).radius(physics node radius + preset.collisionRadius).strength(0.9)`. Physics node radius includes `nodeRadius`, sanitized node `size`, and `degree`, but ignores `nodeSizeScale` so visual size changes do not re-layout the graph.
-- `forceX(0)` and `forceY(0)` scaled by `gravityStrength * 0.4`
-- `velocityDecay(preset.velocityDecay ?? 0.4)` for stable layout settling. Values are clamped to d3-force's `0` through `1` range; lower values preserve velocity longer for a floatier feel, while higher values damp motion faster for a heavier feel.
-- `alphaDecay(preset.alphaDecay ?? modeDefault)` for cooling speed. Values are clamped to `(0, 1]`; invalid or non-positive values fall back to the mode default.
-- `alphaMin(modeDefault)` as the internal cooling stop threshold.
+`applyPhysicsForces` is shared by both runtimes. The calibrated profiles apply
+center forces, degree-normalized links, bounded-distance charge, and uniform
+radius collision in that order. Existing force entries are removed before
+reinsertion because d3 retains Map insertion order. Legacy keeps the former
+charge/link/collision/center order and degree-dependent collision radius.
 
 ## Drag Physics
 
 Global-mode node dragging:
 
-1. Reheats the simulation with `alphaTarget(0.78)`.
+1. Pins on pointer down without reheating (Legacy retains its `0.3` start heat); pointer movement reheats to the profile’s drag target (`0.3` by default).
 2. Pins the dragged node through `fx` and `fy`.
 3. Updates the node position in world coordinates.
-4. Applies a bounded wake to first- and second-degree neighbors.
+4. Lets ordinary link and collision forces move neighboring nodes.
 5. Releases `fx` and `fy` on drag end and lets the simulation cool.
 
-Neighbor wake is intentionally bounded so high-degree nodes do not pull the entire graph too aggressively. Direct neighbors receive stronger position and velocity influence than second-degree neighbors.
+Direct position/velocity injection into neighbors has been removed. A pinned
+node renders at the latest pointer position immediately, but springs read its
+previous integrated anchor for the next step, matching the reference's worker
+input order. Release clears that anchor cache as well as the pin.
 
 Local-lens node dragging uses the same pin/update/release path, but applies the local lens drag policy instead of the global one:
 
-- drag start reheats at `alphaTarget(0.08)`,
+- pointer down alone does not reheat,
 - drag movement keeps the simulation active at `alphaTarget(0.05)`,
 - connected-neighbor wake is disabled,
 - drag end still clears `fx`/`fy` and returns `alphaTarget` to `0` so the lens cools normally.
 
-This keeps local lens physics alive during drag without letting a single local interaction re-run the full global-style neighbor wake inside the scoped halo. The debug harness displays the current drag phase, dragged node ID, drag event count, active alpha targets, and connected-wake policy so local/global drag behavior is observable while tuning.
+This keeps local lens physics alive during drag with less heat than global mode. Both modes propagate motion through ordinary forces. The debug harness displays the current drag phase, dragged node ID, drag event count, active alpha targets, and the disabled connected-wake diagnostic so local/global drag behavior is observable while tuning.
 
 When `paused` is true, dragging can still update the dragged node's fixed coordinates through the normal pointer path, but drag start and movement do not reheat or restart d3-force. Releasing the drag still clears `fx` and `fy`.
 
@@ -418,6 +433,18 @@ worldY = (screenY - y) / scale;
 
 Wheel and pinch zoom share one anchored-zoom helper that preserves the world coordinate under the pointer or pinch center, clamps the next scale, then updates a target viewport. Invalid pointer or viewport inputs return no update instead of creating a non-finite target viewport. The render loop eases the displayed viewport toward that target so repeated wheel and pinch input feels anchored without snapping.
 
+Wheel input uses normalized distance (40 pixels per line, 800 per page) and an
+exponential scale response: 120 pixels zooms by a factor of 1.5. Zero vertical
+delta is a no-op. A native non-passive wheel listener consumes graph gestures
+so the enclosing document does not move at the same time.
+
+Background pan estimates screen-space velocity during pointer movement. A quick
+release continues in the shared graph render loop with exponential damping;
+the travel is independent of zoom and display refresh rate. A held release,
+pointer cancellation, new pointer input, camera command, or reduced-motion
+preference prevents or stops momentum. Momentum emits viewport callbacks and
+stops scheduling frames once its velocity falls below the stop threshold.
+
 Fit-to-view ignores nodes with explicit non-finite coordinates and treats absent `x`/`y` values as the existing origin fallback. Empty graphs, all-invalid coordinate sets, and non-positive or non-finite container dimensions do not produce a viewport update.
 
 ## Label Culling
@@ -481,3 +508,14 @@ The demo build goes to `dist/demo`. The package build emits:
 cleanup removes only the previous library entry/chunk/Worker outputs, preserving
 the independently generated demo and declarations. Package budgets track the
 synchronous entry, aggregate lazy chunks, and Worker asset separately.
+
+### Coordinated motion profiles
+
+`presets.ts` resolves profile force defaults plus numeric overrides. The default
+Obsidian profile was calibrated against a running local Obsidian graph with
+non-default link/center settings. Its uniform collision strength stays constant,
+as observed in the reference. Calm and Lively retain heat-scaled collision for
+quieter or more expressive alternatives. Legacy retains the earlier force model.
+Explicit restart uses profile heat and is ignored while paused on both engines.
+Worker rebuilds with cached positions use refresh heat instead of alpha 1.
+See `docs/physics-comparison.md` for the calibration method and measured limits.

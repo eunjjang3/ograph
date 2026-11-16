@@ -6,9 +6,10 @@ import type { Viewport } from './graphMath';
 import { findNodeAtPosition } from './hitTest';
 import { MAX_ZOOM_SCALE, MIN_ZOOM_SCALE } from './useViewportControls';
 import type { GraphSpatialIndex } from './spatialIndex';
+import type { PanVelocity } from './panMomentum';
 
 const POINTER_DRAG_THRESHOLD_PX = 4;
-const WHEEL_ZOOM_STRENGTH = 0.07;
+const WHEEL_ZOOM_PER_PIXEL = Math.log(1.5) / 120;
 
 type CurrentRef<T> = { current: T };
 
@@ -54,11 +55,12 @@ export function resolveWheelZoomViewport(
   originX: number,
   originY: number,
   viewport: Viewport,
-  deltaY: number
+  deltaY: number,
+  deltaMode = 0
 ): Viewport | null {
-  const zoomMultiplier = deltaY < 0
-    ? 1 + WHEEL_ZOOM_STRENGTH
-    : 1 / (1 + WHEEL_ZOOM_STRENGTH);
+  if (!Number.isFinite(deltaY) || deltaY === 0) return null;
+  const pixels = deltaY * (deltaMode === 1 ? 40 : deltaMode === 2 ? 800 : 1);
+  const zoomMultiplier = Math.exp(Math.max(-20, Math.min(20, -pixels * WHEEL_ZOOM_PER_PIXEL)));
 
   return resolveAnchoredZoomViewport(
     originX,
@@ -77,6 +79,8 @@ interface UseGraphPointerInteractionsParams {
   viewportRef: CurrentRef<Viewport>;
   targetViewportRef: CurrentRef<Viewport>;
   viewportAnimationActiveRef: CurrentRef<boolean>;
+  panVelocityRef: CurrentRef<PanVelocity>;
+  reduceMotion: boolean;
   preset: GraphPreset;
   hoveredNodeId?: string | null;
   requestRender: () => void;
@@ -102,6 +106,8 @@ export function useGraphPointerInteractions({
   viewportRef,
   targetViewportRef,
   viewportAnimationActiveRef,
+  panVelocityRef,
+  reduceMotion,
   preset,
   hoveredNodeId,
   requestRender,
@@ -131,6 +137,7 @@ export function useGraphPointerInteractions({
   const lastClickTimeRef = useRef<number>(0);
   const lastTouchDistRef = useRef<number | null>(null);
   const interactionActiveRef = useRef<boolean>(false);
+  const panSampleRef = useRef({ x: 0, y: 0, time: 0, vx: 0, vy: 0 });
 
   useEffect(() => {
     if (hoveredNodeId !== undefined) {
@@ -227,6 +234,9 @@ export function useGraphPointerInteractions({
     if (!canvas) return;
 
     canvas.setPointerCapture(e.pointerId);
+    panVelocityRef.current = { x: 0, y: 0 };
+    viewportAnimationActiveRef.current = false;
+    targetViewportRef.current = viewportRef.current;
     const { node: clickedNode } = getNodeAtEventPosition(e.clientX, e.clientY);
 
     isPointerMovedRef.current = false;
@@ -241,9 +251,10 @@ export function useGraphPointerInteractions({
       isPanningRef.current = true;
       startPanRef.current = { x: e.clientX, y: e.clientY };
       startPanViewportRef.current = { ...viewportRef.current };
+      panSampleRef.current = { x: e.clientX, y: e.clientY, time: e.timeStamp, vx: 0, vy: 0 };
     }
     requestRender();
-  }, [canvasRef, getNodeAtEventPosition, requestRender, viewportRef]);
+  }, [canvasRef, getNodeAtEventPosition, panVelocityRef, requestRender, targetViewportRef, viewportAnimationActiveRef, viewportRef]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -280,6 +291,18 @@ export function useGraphPointerInteractions({
     }
 
     if (isPanningRef.current) {
+      const previous = panSampleRef.current;
+      const dt = e.timeStamp - previous.time;
+      if (dt > 0) {
+        const blend = 1 - Math.exp(-dt / 40);
+        const vx = Math.max(-4000, Math.min(4000, (e.clientX - previous.x) * 1000 / dt));
+        const vy = Math.max(-4000, Math.min(4000, (e.clientY - previous.y) * 1000 / dt));
+        panSampleRef.current = {
+          x: e.clientX, y: e.clientY, time: e.timeStamp,
+          vx: previous.vx + (vx - previous.vx) * blend,
+          vy: previous.vy + (vy - previous.vy) * blend
+        };
+      }
       const dx = e.clientX - startPanRef.current.x;
       const dy = e.clientY - startPanRef.current.y;
 
@@ -342,6 +365,10 @@ export function useGraphPointerInteractions({
 
     const { node: clickedNode } = getNodeAtEventPosition(e.clientX, e.clientY);
 
+    const pan = panSampleRef.current;
+    if (isPanningRef.current && isPointerMovedRef.current && !reduceMotion && e.timeStamp - pan.time < 100) {
+      panVelocityRef.current = { x: pan.vx, y: pan.vy };
+    }
     releaseActiveDrag();
     isPanningRef.current = false;
     isPointerDownRef.current = false;
@@ -362,9 +389,10 @@ export function useGraphPointerInteractions({
 
     isPointerMovedRef.current = false;
     requestRender();
-  }, [canvasRef, getNodeAtEventPosition, onNodeClick, onNodeDoubleClick, releaseActiveDrag, requestRender]);
+  }, [canvasRef, getNodeAtEventPosition, onNodeClick, onNodeDoubleClick, panVelocityRef, reduceMotion, releaseActiveDrag, requestRender]);
 
   const resetPointerState = useCallback((notifyConsumer = true) => {
+    panVelocityRef.current = { x: 0, y: 0 };
     releaseActiveDrag(notifyConsumer);
     isPanningRef.current = false;
     isPointerDownRef.current = false;
@@ -372,7 +400,7 @@ export function useGraphPointerInteractions({
     activePointerIdRef.current = null;
     isPointerMovedRef.current = false;
     lastTouchDistRef.current = null;
-  }, [releaseActiveDrag]);
+  }, [panVelocityRef, releaseActiveDrag]);
   const resetPointerStateRef = useRef(resetPointerState);
   resetPointerStateRef.current = resetPointerState;
 
@@ -432,7 +460,7 @@ export function useGraphPointerInteractions({
     }
   }, [clearHoveredNode]);
 
-  const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
+  const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -444,7 +472,8 @@ export function useGraphPointerInteractions({
       mouseX,
       mouseY,
       targetViewportRef.current,
-      e.deltaY
+      e.deltaY,
+      e.deltaMode
     );
 
     if (nextViewport) {
@@ -452,9 +481,19 @@ export function useGraphPointerInteractions({
     }
   }, [animateViewportTo, canvasRef, targetViewportRef]);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    // A graph gesture must not also scroll the surrounding document. React's
+    // delegated wheel listener is passive and cannot enforce preventDefault.
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', handleWheel);
+  }, [canvasRef, handleWheel]);
+
   const handleTouchMove = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
     if (e.touches.length === 2 && canvasRef.current) {
       e.preventDefault();
+      panVelocityRef.current = { x: 0, y: 0 };
       interactionActiveRef.current = true;
       const rect = canvasRef.current.getBoundingClientRect();
       const t1 = e.touches[0]!;
@@ -479,7 +518,7 @@ export function useGraphPointerInteractions({
       }
       lastTouchDistRef.current = dist;
     }
-  }, [animateViewportTo, canvasRef, targetViewportRef]);
+  }, [animateViewportTo, canvasRef, panVelocityRef, targetViewportRef]);
 
   const handleTouchEnd = useCallback(() => {
     lastTouchDistRef.current = null;
@@ -501,7 +540,6 @@ export function useGraphPointerInteractions({
       onPointerLeave: handlePointerLeave,
       onMouseLeave: handlePointerLeave,
       onPointerCancel: handlePointerCancel,
-      onWheel: handleWheel,
       onTouchMove: handleTouchMove,
       onTouchEnd: handleTouchEnd
     }

@@ -1,17 +1,14 @@
+import { withFixedSimulationClock } from './fixedSimulationClock';
+import { applyPhysicsForces, createConfiguredCollision, resolvePhysicsTiming } from './graphPhysics';
+import { resolveGraphPhysicsPreset } from './presets';
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   forceSimulation,
-  forceManyBody,
-  forceLink,
-  forceCollide,
-  forceX,
-  forceY,
   Simulation,
   SimulationNodeDatum,
   SimulationLinkDatum
 } from 'd3-force';
 import type { GraphNode, GraphLink, GraphPreset, GraphViewMode } from './types';
-import { getNodeRadius } from './graphMath';
 import { getLinkId } from './localGraph';
 import { buildGraphIndexes } from './graphIndexes';
 import type { GraphRuntimeTelemetryRef, GraphSimulationMode } from './graphRuntime';
@@ -20,7 +17,7 @@ import type { WorkerGraphSimulationClient } from './workerGraphSimulationClient'
 
 declare const __OGRAPH_DEBUG_RUNTIME__: boolean;
 
-interface ExtendedSimulationNode extends SimulationNodeDatum, GraphNode {}
+interface ExtendedSimulationNode extends SimulationNodeDatum, GraphNode { dragX?: number; dragY?: number }
 interface ExtendedSimulationLink extends SimulationLinkDatum<ExtendedSimulationNode> {
   source: string | ExtendedSimulationNode;
   target: string | ExtendedSimulationNode;
@@ -29,14 +26,6 @@ interface ExtendedSimulationLink extends SimulationLinkDatum<ExtendedSimulationN
   label?: string;
 }
 
-const DIRECT_NEIGHBOR_INFLUENCE = 0.42;
-const SECOND_DEGREE_INFLUENCE = 0.16;
-const MAX_NEIGHBOR_SHIFT = 22;
-const MIN_CONNECTED_DRAG_INFLUENCE = 0.16;
-const DIRECT_NEIGHBOR_POSITION_FOLLOW = 0.16;
-const SECOND_DEGREE_POSITION_FOLLOW = 0.05;
-const MAX_WAKE_DEPTH = 2;
-const PHYSICS_NODE_SIZE_SCALE = 1.0;
 const DEFAULT_GRAPH_REFRESH_ALPHA = 0.22;
 const DEFAULT_GRAVITY_CENTER = { x: 0, y: 0 };
 const DEFAULT_VELOCITY_DECAY = 0.4;
@@ -57,7 +46,7 @@ export interface SimulationGravityCenter {
 export interface GraphDragPhysicsOptions {
   startAlphaTarget: number;
   moveAlphaTarget: number;
-  wakeConnectedNodes: boolean;
+  wakeConnectedNodes: false;
 }
 
 export interface GraphCoolingOptions {
@@ -66,13 +55,13 @@ export interface GraphCoolingOptions {
 }
 
 export const DEFAULT_GRAPH_DRAG_PHYSICS: GraphDragPhysicsOptions = {
-  startAlphaTarget: 0.78,
-  moveAlphaTarget: 0.72,
-  wakeConnectedNodes: true
+  startAlphaTarget: 0,
+  moveAlphaTarget: 0.3,
+  wakeConnectedNodes: false
 };
 
 export const LOCAL_LENS_DRAG_PHYSICS: GraphDragPhysicsOptions = {
-  startAlphaTarget: 0.08,
+  startAlphaTarget: 0,
   moveAlphaTarget: 0.05,
   wakeConnectedNodes: false
 };
@@ -127,15 +116,6 @@ export function resolveGraphCoolingOptions(
   };
 }
 
-function resolveGraphDragPhysicsOptions(
-  options?: Partial<GraphDragPhysicsOptions>
-): GraphDragPhysicsOptions {
-  return {
-    ...DEFAULT_GRAPH_DRAG_PHYSICS,
-    ...options
-  };
-}
-
 export function resolveSimulationGravityCenter(
   nodes: Array<Pick<GraphNode, 'x' | 'y'>>,
   preserveScopeCentroid: boolean
@@ -168,26 +148,6 @@ export function resolveSimulationGravityCenter(
   return {
     x: sumX / count,
     y: sumY / count
-  };
-}
-
-function clampShift(value: number) {
-  return Math.max(-MAX_NEIGHBOR_SHIFT, Math.min(MAX_NEIGHBOR_SHIFT, value));
-}
-
-function getDegreeWeightedDragInfluence(nodeDegree: number, baseInfluence: number, minInfluence = MIN_CONNECTED_DRAG_INFLUENCE) {
-  if (nodeDegree <= 1) {
-    return 1;
-  }
-
-  return Math.max(minInfluence, baseInfluence / Math.pow(nodeDegree - 1, 0.34));
-}
-
-function getWakeForDepth(depth: number) {
-  return {
-    minInfluence: MIN_CONNECTED_DRAG_INFLUENCE,
-    positionFollow: depth === 1 ? DIRECT_NEIGHBOR_POSITION_FOLLOW : SECOND_DEGREE_POSITION_FOLLOW,
-    strength: depth === 1 ? DIRECT_NEIGHBOR_INFLUENCE : SECOND_DEGREE_INFLUENCE
   };
 }
 
@@ -230,15 +190,6 @@ export function getGraphTopologySignature(nodes: GraphNode[], links: GraphLink[]
   ));
 
   return JSON.stringify([nodeIds, normalizedLinks]);
-}
-
-function createCollisionForce(nodeRadius: number, collisionRadius: number) {
-  return forceCollide<ExtendedSimulationNode>()
-    .radius(d => {
-      const r = getNodeRadius(nodeRadius, PHYSICS_NODE_SIZE_SCALE, d.size, d.degree);
-      return r + collisionRadius;
-    })
-    .strength(0.9);
 }
 
 function syncSimulationNodePayload(
@@ -397,19 +348,28 @@ export function useGraphSimulation(
     syncRenderGraphRefs(latestRenderNodesRef.current, latestRenderLinksRef.current);
   }, [syncRenderGraphRefs]);
 
-  const chargeStrength = preset.chargeStrength ?? -50;
-  const linkDistance = preset.linkDistance ?? 45;
   const nodeRadius = preset.nodeRadius ?? 4.5;
-  const collisionRadius = preset.collisionRadius ?? 5;
-  const gravityStrength = preset.gravityStrength ?? 0.1;
-  const velocityDecay = resolveVelocityDecay(preset.velocityDecay);
-  const coolingOptions = useMemo(
-    () => resolveGraphCoolingOptions(coolingMode, preset.alphaDecay),
-    [coolingMode, preset.alphaDecay]
+  const physics = useMemo(() => resolveGraphPhysicsPreset(preset),
+    [preset.physicsPreset, preset.velocityDecay, preset.alphaDecay, preset.dragAlpha, preset.reheatAlpha,
+      preset.linkDistance, preset.chargeStrength, preset.collisionRadius, preset.gravityStrength]);
+  const { chargeStrength, linkDistance, collisionRadius, gravityStrength, linkStrength,
+    degreeNormalizedLinks, collisionStrength, coolCollision, reheatAlpha } = physics;
+  const coolingBase = useMemo(
+    () => resolveGraphCoolingOptions(coolingMode, coolingMode === 'local' && preset.alphaDecay === undefined ? undefined : physics.alphaDecay),
+    [coolingMode, preset.alphaDecay, physics.alphaDecay]
   );
+  const timing = useMemo(() => resolvePhysicsTiming({ ...physics, alphaDecay: coolingBase.alphaDecay }), [physics, coolingBase.alphaDecay]);
+  const velocityDecay = timing.velocityDecay;
+  const coolingOptions = { alphaDecay: timing.alphaDecay, alphaMin: coolingBase.alphaMin };
+  const forceConfig = useMemo(() => ({ ...physics, nodeRadius, forceScale: timing.forceScale }), [physics, nodeRadius, timing.forceScale]);
   const dragPhysics = useMemo(
-    () => resolveGraphDragPhysicsOptions(dragPhysicsOptions),
-    [dragPhysicsOptions]
+    () => ({
+      ...getGraphDragPhysicsForMode(coolingMode),
+      ...(coolingMode === 'global' || preset.dragAlpha !== undefined
+        ? { startAlphaTarget: preset.physicsPreset === 'legacy' ? physics.dragAlpha : 0, moveAlphaTarget: physics.dragAlpha } : {}),
+      ...dragPhysicsOptions
+    }),
+    [dragPhysicsOptions, coolingMode, physics.dragAlpha, preset.dragAlpha, preset.physicsPreset]
   );
   const topologySignature = useMemo(
     () => getGraphTopologySignature(simulationNodes, simulationLinks),
@@ -545,23 +505,13 @@ export function useGraphSimulation(
       updateGraphIndexes(mappedNodes, adjacencyById, degreeById);
 
       // 4. Update the existing simulation so lens scope changes keep their layout continuity.
-      const sim = simulationRef.current ?? forceSimulation<ExtendedSimulationNode>(mappedNodes);
-      const linkForce = forceLink<ExtendedSimulationNode, ExtendedSimulationLink>()
-        .id(d => d.id)
-        .distance(linkDistance)
-        .strength(0.85);
+      const sim = simulationRef.current ?? withFixedSimulationClock(forceSimulation<ExtendedSimulationNode>(mappedNodes));
       sim.force('link', null).nodes(mappedNodes);
-
+      applyPhysicsForces(sim, mappedLinks, forceConfig, gravityCenter);
       sim
         .alphaDecay(coolingOptions.alphaDecay)
         .alphaMin(coolingOptions.alphaMin)
         .velocityDecay(velocityDecay)
-        .force('charge', forceManyBody().strength(chargeStrength))
-        .force('link', linkForce.links(mappedLinks))
-        .force('collide', createCollisionForce(nodeRadius, collisionRadius))
-        // Gentle gravity around the visible scope center stops sparse lenses drifting back to origin.
-        .force('x', forceX<ExtendedSimulationNode>(gravityCenter.x).strength(gravityStrength * 0.4))
-        .force('y', forceY<ExtendedSimulationNode>(gravityCenter.y).strength(gravityStrength * 0.4))
         .alpha(Math.max(sim.alpha(), simulationRef.current ? graphRefreshAlpha : 1));
 
       if (pausedRef.current) {
@@ -603,6 +553,7 @@ export function useGraphSimulation(
     collisionRadius,
     gravityStrength,
     velocityDecay,
+    linkStrength, degreeNormalizedLinks, collisionStrength, coolCollision, forceConfig,
     coolingOptions.alphaDecay,
     coolingOptions.alphaMin,
     gravityCenterNodeIdsSignature,
@@ -633,12 +584,14 @@ export function useGraphSimulation(
     const revision = workerRevisionRef.current + 1;
     workerRevisionRef.current = revision;
     const workerConfig: WorkerSimulationConfig = {
+      ...forceConfig,
       chargeStrength,
       linkDistance,
       nodeRadius,
       collisionRadius,
       gravityStrength,
       velocityDecay,
+      linkStrength, degreeNormalizedLinks, collisionStrength, coolCollision,
       alphaDecay: coolingOptions.alphaDecay,
       alphaMin: coolingOptions.alphaMin,
       graphRefreshAlpha,
@@ -721,6 +674,7 @@ export function useGraphSimulation(
     collisionRadius,
     gravityStrength,
     velocityDecay,
+    linkStrength, degreeNormalizedLinks, collisionStrength, coolCollision, forceConfig,
     coolingOptions.alphaDecay,
     coolingOptions.alphaMin,
     graphRefreshAlpha,
@@ -756,7 +710,7 @@ export function useGraphSimulation(
 
       const simulation = simulationRef.current;
       if (sizeChanged && simulation) {
-        simulation.force('collide', createCollisionForce(nodeRadius, collisionRadius));
+        simulation.force('collide', createConfiguredCollision<ExtendedSimulationNode>(forceConfig));
         simulation.alpha(Math.max(simulation.alpha(), simulation.alphaMin() + 0.01));
 
         if (pausedRef.current) {
@@ -775,6 +729,7 @@ export function useGraphSimulation(
     renderLinks,
     nodeRadius,
     collisionRadius,
+    forceConfig,
     markPayloadSyncedForLatestInputs,
     reportSimulationError,
     syncActiveNodePayloads,
@@ -812,6 +767,8 @@ export function useGraphSimulation(
     if (engineRef.current === 'worker') {
       const targetNode = nodeByIdRef.current.get(nodeId);
       if (targetNode) {
+        targetNode.dragX = targetNode.x;
+        targetNode.dragY = targetNode.y;
         targetNode.fx = targetNode.x;
         targetNode.fy = targetNode.y;
       }
@@ -821,11 +778,15 @@ export function useGraphSimulation(
     if (!simulationRef.current) return;
 
     if (!pausedRef.current && dragPhysics.startAlphaTarget > 0) {
-      simulationRef.current.alphaTarget(dragPhysics.startAlphaTarget).restart();
+      simulationRef.current
+        .alpha(Math.max(simulationRef.current.alpha(), dragPhysics.startAlphaTarget))
+        .alphaTarget(dragPhysics.startAlphaTarget).restart();
     }
     
     const targetNode = nodeByIdRef.current.get(nodeId);
     if (targetNode) {
+      targetNode.dragX = targetNode.x;
+      targetNode.dragY = targetNode.y;
       targetNode.fx = targetNode.x;
       targetNode.fy = targetNode.y;
     }
@@ -845,86 +806,30 @@ export function useGraphSimulation(
         nodeId,
         worldX,
         worldY,
-        dragPhysics.moveAlphaTarget,
-        dragPhysics.wakeConnectedNodes
+        dragPhysics.moveAlphaTarget
       );
       return;
     }
     const targetNode = nodeByIdRef.current.get(nodeId);
     if (!targetNode) return;
 
-    const previousX = targetNode.fx ?? targetNode.x ?? worldX;
-    const previousY = targetNode.fy ?? targetNode.y ?? worldY;
-    const dx = worldX - previousX;
-    const dy = worldY - previousY;
-    
     targetNode.fx = worldX;
     targetNode.fy = worldY;
     targetNode.x = worldX;
     targetNode.y = worldY;
 
-    if (dragPhysics.wakeConnectedNodes) {
-      const nodeById = nodeByIdRef.current;
-      const neighborsMap = neighborsMapRef.current;
-      const applyInfluence = (neighId: string, strength: number, positionFollow: number, minInfluence: number) => {
-        const neighbor = nodeById.get(neighId);
-        if (!neighbor || neighbor.fx != null || neighbor.id === nodeId) {
-          return;
-        }
-
-        const nodeDegree = degreeByIdRef.current.get(neighId) ?? neighbor.degree ?? 1;
-        const weightedStrength = getDegreeWeightedDragInfluence(nodeDegree, strength, minInfluence);
-        const shiftX = clampShift(dx * weightedStrength);
-        const shiftY = clampShift(dy * weightedStrength);
-        const neighborX = neighbor.x ?? 0;
-        const neighborY = neighbor.y ?? 0;
-        const offsetX = neighborX - worldX;
-        const offsetY = neighborY - worldY;
-        const distance = Math.hypot(offsetX, offsetY) || 1;
-        const wakeFalloff = Math.max(0.18, 1 - distance / 420);
-        const positionShiftX = shiftX * positionFollow * wakeFalloff;
-        const positionShiftY = shiftY * positionFollow * wakeFalloff;
-
-        neighbor.x = neighborX + positionShiftX;
-        neighbor.y = neighborY + positionShiftY;
-        neighbor.vx = ((neighbor.vx ?? 0) + shiftX * wakeFalloff) * 0.82;
-        neighbor.vy = ((neighbor.vy ?? 0) + shiftY * wakeFalloff) * 0.82;
-      };
-
-      const visited = new Set<string>([nodeId]);
-      const queue: { id: string; depth: number }[] = [{ id: nodeId, depth: 0 }];
-
-      for (let index = 0; index < queue.length; index++) {
-        const current = queue[index]!;
-        if (current.depth >= MAX_WAKE_DEPTH) continue;
-
-        const neighbors = neighborsMap.get(current.id);
-        if (!neighbors) continue;
-
-        neighbors.forEach(neighborId => {
-          if (visited.has(neighborId)) return;
-
-          visited.add(neighborId);
-          const depth = current.depth + 1;
-          const wake = getWakeForDepth(depth);
-          applyInfluence(neighborId, wake.strength, wake.positionFollow, wake.minInfluence);
-
-          if (depth < MAX_WAKE_DEPTH) {
-            queue.push({ id: neighborId, depth });
-          }
-        });
-      }
-    }
-
     if (simulationRef.current && !pausedRef.current && dragPhysics.moveAlphaTarget > 0) {
-      simulationRef.current.alphaTarget(dragPhysics.moveAlphaTarget).restart();
+      simulationRef.current
+        .alpha(Math.max(simulationRef.current.alpha(), dragPhysics.moveAlphaTarget))
+        .alphaTarget(dragPhysics.moveAlphaTarget).restart();
     }
-  }, [dragPhysics.moveAlphaTarget, dragPhysics.wakeConnectedNodes]);
+  }, [dragPhysics.moveAlphaTarget]);
 
   const dragEnd = useCallback((nodeId: string) => {
     if (engineRef.current === 'worker') {
       const targetNode = nodeByIdRef.current.get(nodeId);
       if (targetNode) {
+        targetNode.dragX = targetNode.dragY = undefined;
         targetNode.fx = null;
         targetNode.fy = null;
       }
@@ -936,26 +841,20 @@ export function useGraphSimulation(
     
     const targetNode = nodeByIdRef.current.get(nodeId);
     if (targetNode) {
+      targetNode.dragX = targetNode.dragY = undefined;
       targetNode.fx = null;
       targetNode.fy = null;
     }
   }, []);
 
   const restartSimulation = useCallback(() => {
+    if (pausedRef.current) return;
     if (engineRef.current === 'worker') {
-      workerClientRef.current?.restart(1);
+      workerClientRef.current?.restart(reheatAlpha);
       return;
     }
-    if (simulationRef.current) {
-      simulationRef.current.alpha(1);
-
-      if (pausedRef.current) {
-        simulationRef.current.stop();
-      } else {
-        simulationRef.current.restart();
-      }
-    }
-  }, []);
+    simulationRef.current?.alpha(reheatAlpha).restart();
+  }, [reheatAlpha]);
 
   return {
     simulationRef,
