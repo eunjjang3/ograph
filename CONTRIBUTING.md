@@ -11,8 +11,8 @@ npm install
 npm run dev
 ```
 
-The development app is a Vite debug harness for inspecting global graphs,
-local focus lenses, pointer interactions, and stress-test data.
+The development app opens the public graph playground. Use **Debug lab**
+(`/#debug`) for runtime controls, local focus lenses, and stress-test data.
 
 ## Before Opening A Pull Request
 
@@ -26,6 +26,7 @@ npm run check:examples
 npm run verify:consumer
 npx playwright install chromium
 npm run test:browser
+npm run test:demo
 ```
 
 Keep changes focused and describe the user-visible behavior or maintainer
