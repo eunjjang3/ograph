@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## 0.4.0 - 2026-11-16
+
+This release refines graph motion: dragging spreads movement through connected
+nodes, release settles gradually, and pan/zoom respond more smoothly. Coordinated
+motion presets make heat, damping, and cooling easier to tune together.
+
 ### Changed
 
 - Add coordinated smooth (default), Calm, Lively and Legacy motion presets, with a debug
@@ -34,6 +40,20 @@ All notable changes to this project will be documented in this file.
 - Include force computation in the Worker's 60Hz scheduling budget instead of
   adding a fresh timer delay after each tick. Pause, settling, and disposal stop
   the clock without catch-up bursts.
+
+### Upgrade Notes
+
+- The default force parameters and resulting layout change. Select
+  `preset={{ physicsPreset: 'legacy' }}` to retain the older force parameters;
+  direct neighbor displacement during dragging is not restored.
+- `GraphView` accepts partial preset overrides. Physical fields in `GraphPreset`
+  are now optional and inherit the selected profile. Use
+  `resolveGraphPhysicsPreset(defaultGraphPreset)` when reading resolved force
+  values instead of assuming they are present on `defaultGraphPreset`.
+- `collisionRadius` is a uniform physical radius in the new profiles. Legacy
+  retains its previous meaning as padding added to the physics node radius.
+- Wheel gestures over the graph now consume page scrolling. Reduced-motion
+  preferences disable the new pan momentum.
 
 ## 0.3.1 - 2026-07-19
 
