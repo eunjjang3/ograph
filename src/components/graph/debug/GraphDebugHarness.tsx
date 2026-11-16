@@ -7,6 +7,7 @@ import { DebugControlPanel } from './DebugControlPanel';
 import { useDebugGraphPreset } from './useDebugGraphPreset';
 import { useDebugGraphState } from './useDebugGraphState';
 import { useFpsCounter } from './useFpsCounter';
+import { resolveGraphPhysicsPreset } from '../presets';
 import { getGraphDragPhysicsForMode } from '../useGraphSimulation';
 import { createGraphRuntimeTelemetry } from '../graphRuntime';
 import type { GraphRuntimeOptions, GraphRuntimeTelemetryRef } from '../graphRuntime';
@@ -46,8 +47,8 @@ export function GraphDebugHarness() {
   const graphState = useDebugGraphState();
   const graphPreset = useDebugGraphPreset(graphState.localDepth);
   const frameTelemetry = useFpsCounter();
-  const [rendererMode, setRendererMode] = useState<GraphRendererMode>('canvas2d');
-  const [simulationMode, setSimulationMode] = useState<GraphSimulationMode>('main');
+  const [rendererMode, setRendererMode] = useState<GraphRendererMode>('pixi');
+  const [simulationMode, setSimulationMode] = useState<GraphSimulationMode>('worker');
   const runtimeTelemetryRef = useMemo<GraphRuntimeTelemetryRef>(() => ({
     current: createGraphRuntimeTelemetry(rendererMode, simulationMode)
   }), [
@@ -84,7 +85,10 @@ export function GraphDebugHarness() {
   const dragEventCounterRef = useRef<number>(0);
   const dragFrameRef = useRef<number | null>(null);
   reactRenderCounterRef.current += 1;
-  const dragPhysics = getGraphDragPhysicsForMode(graphState.mode);
+  const profile = resolveGraphPhysicsPreset(graphPreset.finalPreset);
+  const dragPhysics = graphState.mode === 'local' ? getGraphDragPhysicsForMode('local') : {
+    startAlphaTarget: graphPreset.physicsPreset === 'legacy' ? profile.dragAlpha : 0, moveAlphaTarget: profile.dragAlpha, wakeConnectedNodes: false as const
+  };
 
   const handleRestart = useCallback(() => {
     graphViewRef.current?.restartSimulation();
@@ -238,6 +242,8 @@ export function GraphDebugHarness() {
         setChargeStrength={graphPreset.setChargeStrength}
         collisionRadius={graphPreset.collisionRadius}
         setCollisionRadius={graphPreset.setCollisionRadius}
+        physicsPreset={graphPreset.physicsPreset}
+        selectPhysicsPreset={graphPreset.selectPhysicsPreset}
         velocityDecay={graphPreset.velocityDecay}
         setVelocityDecay={graphPreset.setVelocityDecay}
         dimmingStrength={graphPreset.dimmingStrength}

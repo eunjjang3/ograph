@@ -403,6 +403,7 @@ test('worker simulation protocol validates and unpacks transferable positions', 
     type: 'tick',
     revision: 3,
     alpha: 0.5,
+    dragSequence: 0,
     positions: positions.buffer
   }), true);
   assert.deepEqual([...unpackWorkerPositions(positions.buffer, 2)], [1, 2, 3, 4]);
@@ -442,7 +443,7 @@ test('worker simulation client covers lifecycle, pause, restart, drag, and buffe
   const snapshots = [];
   const activeStates = [];
   let tickCount = 0;
-  const client = createWorkerGraphSimulationClient({
+  const clientOptions = {
     createWorker: () => worker,
     revision: 7,
     nodes: [
@@ -470,10 +471,12 @@ test('worker simulation client covers lifecycle, pause, restart, drag, and buffe
     onTick: () => { tickCount += 1; },
     onReady: () => {},
     onError: error => { throw error; }
-  });
+  };
+  const client = createWorkerGraphSimulationClient(clientOptions);
 
   client.start();
   assert.equal(worker.messages[0].message.type, 'initialize');
+  assert.equal(worker.messages[0].message.config.initialAlpha, 1);
   assert.equal(worker.messages[0].message.protocolVersion, GRAPH_SIMULATION_PROTOCOL_VERSION);
   assert.equal(snapshots[0].nodes.length, 2);
 
@@ -484,7 +487,7 @@ test('worker simulation client covers lifecycle, pause, restart, drag, and buffe
     nodeCount: 2
   });
   const positions = new Float32Array([5, 6, 7, 8]);
-  worker.emit({ type: 'tick', revision: 7, alpha: 0.5, positions: positions.buffer });
+  worker.emit({ type: 'tick', revision: 7, alpha: 0.5, dragSequence: 0, positions: positions.buffer });
   assert.deepEqual(snapshots[0].nodes.map(node => [node.x, node.y]), [[5, 6], [7, 8]]);
   assert.equal(tickCount, 1);
   assert.equal(worker.messages.at(-1).message.type, 'recycle');
@@ -505,10 +508,32 @@ test('worker simulation client covers lifecycle, pause, restart, drag, and buffe
     'drag-end'
   ]);
 
+  // An older response may arrive after the pointer has already been released.
+  const releaseSequence = worker.messages.at(-1).message.dragSequence;
+  worker.emit({ type: 'tick', revision: 7, alpha: 0.5, dragSequence: releaseSequence - 1, positions: new Float32Array([0, 0, 8, 9]).buffer });
+  assert.deepEqual(snapshots[0].nodes.map(node => [node.x, node.y]), [[11, 12], [8, 9]]);
+  worker.emit({ type: 'tick', revision: 7, alpha: 0.5, dragSequence: releaseSequence, positions: new Float32Array([13, 14, 9, 10]).buffer });
+  assert.deepEqual(snapshots[0].nodes.map(node => [node.x, node.y]), [[13, 14], [9, 10]]);
+
+  const dragged = snapshots[0].nodes[0];
+  dragged.fx = 0;
+  dragged.fy = -20;
+  client.dragMove('a', 0, -20, 0.3, false);
+  worker.emit({ type: 'tick', revision: 7, alpha: 0.5, dragSequence: releaseSequence, positions: new Float32Array([100, 100, 9, 10]).buffer });
+  assert.deepEqual([dragged.x, dragged.y], [0, -20]);
+
   client.dispose();
   assert.equal(worker.messages.at(-1).message.type, 'dispose');
   assert.equal(worker.terminated, true);
   assert.equal(activeStates.at(-1), false);
+
+  const rebuiltWorker = new FakeWorker();
+  const rebuilt = createWorkerGraphSimulationClient({ ...clientOptions, createWorker: () => rebuiltWorker });
+  rebuilt.start();
+  assert.equal(rebuiltWorker.messages[0].message.config.initialAlpha, 0.22,
+    'changing a profile on a cached graph must not restart at maximum heat');
+  assert.deepEqual(snapshots.at(-1).nodes.map(node => [node.x, node.y]), snapshots[0].nodes.map(node => [node.x, node.y]));
+  rebuilt.dispose();
 });
 
 test('Pixi planning prioritizes viewport nodes and keeps forced labels over budget', async () => {
@@ -1766,15 +1791,14 @@ test('local lens drag physics keeps low simulation heat without connected-node w
   const localDragPhysics = getGraphDragPhysicsForMode('local');
 
   assert.deepEqual(globalDragPhysics, DEFAULT_GRAPH_DRAG_PHYSICS);
-  assert.equal(globalDragPhysics.wakeConnectedNodes, true);
-  assert.ok(globalDragPhysics.startAlphaTarget > 0);
+  assert.equal(globalDragPhysics.wakeConnectedNodes, false);
+  assert.equal(globalDragPhysics.startAlphaTarget, 0, 'pointer down alone must not reheat');
   assert.ok(globalDragPhysics.moveAlphaTarget > 0);
 
   assert.deepEqual(localDragPhysics, LOCAL_LENS_DRAG_PHYSICS);
   assert.equal(localDragPhysics.wakeConnectedNodes, false);
-  assert.ok(localDragPhysics.startAlphaTarget > 0);
+  assert.equal(localDragPhysics.startAlphaTarget, 0);
   assert.ok(localDragPhysics.moveAlphaTarget > 0);
-  assert.ok(localDragPhysics.startAlphaTarget < globalDragPhysics.startAlphaTarget);
   assert.ok(localDragPhysics.moveAlphaTarget < globalDragPhysics.moveAlphaTarget);
 });
 
@@ -2093,9 +2117,120 @@ test('anchored zoom helpers preserve pointer world position and reject invalid i
   assert.equal((originY - zoomed.y) / zoomed.scale, worldBefore.y);
 
   const wheelZoomed = resolveWheelZoomViewport(originX, originY, viewport, -1);
-  assert.equal(wheelZoomed.scale, 2.14);
+  assert.ok(wheelZoomed.scale > 2 && wheelZoomed.scale < 2.01);
   assert.equal((originX - wheelZoomed.x) / wheelZoomed.scale, worldBefore.x);
   assert.equal((originY - wheelZoomed.y) / wheelZoomed.scale, worldBefore.y);
   assert.equal(resolveAnchoredZoomViewport(originX, originY, { ...viewport, scale: 0 }, 3), null);
   assert.equal(resolveAnchoredZoomViewport(Number.POSITIVE_INFINITY, originY, viewport, 3), null);
+});
+
+test('wheel zoom follows distance and units, ignores horizontal-only input, and composes small gestures', async () => {
+  const { resolveWheelZoomViewport } = await importSourceModule('src/components/graph/useGraphPointerInteractions.ts');
+  const start = { x: 0, y: 0, scale: 1 };
+  const zoom = (viewport, delta, mode = 0) => resolveWheelZoomViewport(90, 70, viewport, delta, mode);
+  assert.equal(zoom(start, -120).scale, 1.5);
+  assert.deepEqual(zoom(start, -3, 1), zoom(start, -120));
+  assert.deepEqual(zoom(start, -1, 2), zoom(start, -800));
+  assert.equal(zoom(start, 0), null);
+  assert.equal(zoom(start, Number.NaN), null);
+  assert.equal(zoom(start, Infinity), null);
+  let incremental = start;
+  for (let i = 0; i < 120; i++) incremental = zoom(incremental, -1);
+  const single = zoom(start, -120);
+  assert.ok(Math.abs(incremental.scale - single.scale) < 1e-12);
+  assert.ok(Math.abs(incremental.x - single.x) < 1e-10);
+  assert.ok(Math.abs(zoom(single, 120).scale - 1) < 1e-12);
+});
+
+test('pan momentum has the same travel at 60Hz and 120Hz, decays, and stops', async () => {
+  const { advancePanMomentum } = await importSourceModule('src/components/graph/panMomentum.ts');
+  const simulate = hz => {
+    let viewport = { x: 0, y: 0, scale: 2 };
+    let velocity = { x: 600, y: -300 };
+    let previousSpeed = Infinity;
+    for (let i = 0; i < hz * 3; i++) {
+      const next = advancePanMomentum(viewport, velocity, 1 / hz);
+      const speed = Math.hypot(next.velocity.x, next.velocity.y);
+      assert.ok(speed <= previousSpeed);
+      previousSpeed = speed;
+      ({viewport, velocity} = next);
+    }
+    assert.deepEqual(velocity, {x: 0, y: 0});
+    assert.ok(viewport.x > 80 && viewport.x < 100);
+    assert.equal(viewport.scale, 2);
+    return viewport;
+  };
+  const a = simulate(60), b = simulate(120);
+  assert.ok(Math.abs(a.x - b.x) < 1e-9);
+  assert.ok(Math.abs(a.y - b.y) < 1e-9);
+});
+
+test('motion presets coordinate heat and damping while honoring safe numeric overrides', async () => {
+  const { resolveGraphPhysicsPreset, graphPhysicsPresets } = await importSourceModule('src/components/graph/presets.ts');
+  assert.equal(resolveGraphPhysicsPreset({}).degreeNormalizedLinks, true);
+  assert.equal(resolveGraphPhysicsPreset({}).reheatAlpha, 0.3);
+  assert.ok(graphPhysicsPresets.calm.dragAlpha < graphPhysicsPresets.obsidian.dragAlpha);
+  assert.ok(graphPhysicsPresets.calm.velocityDecay > graphPhysicsPresets.obsidian.velocityDecay);
+  assert.ok(graphPhysicsPresets.lively.dragAlpha > graphPhysicsPresets.obsidian.dragAlpha);
+  const custom = resolveGraphPhysicsPreset({ physicsPreset: 'calm', dragAlpha: 0, velocityDecay: 0.2, alphaDecay: NaN, reheatAlpha: -1 });
+  assert.equal(custom.dragAlpha, 0);
+  assert.equal(custom.velocityDecay, 0.2);
+  assert.equal(custom.alphaDecay, graphPhysicsPresets.calm.alphaDecay);
+  assert.equal(custom.reheatAlpha, graphPhysicsPresets.calm.reheatAlpha);
+});
+
+test('cold collision corrections fade instead of continuing at full strength until abrupt shutdown', async () => {
+  const { createPhysicsCollisionForce } = await importSourceModule('src/components/graph/graphPhysics.ts');
+  function impulse(alpha, coolCollision) {
+    const nodes = [{ index: 0, x: 0, y: 0, vx: 0, vy: 0 }, { index: 1, x: 10, y: 0, vx: 0, vy: 0 }];
+    const force = createPhysicsCollisionForce(() => 12, { collisionStrength: 0.5, coolCollision });
+    force.initialize(nodes, () => 0.7);
+    force(alpha);
+    return Math.hypot(nodes[0].vx, nodes[0].vy);
+  }
+  const warm = impulse(0.3, true);
+  assert.ok(warm > 0);
+  assert.ok(impulse(0.001, true) < warm / 200);
+  assert.equal(impulse(0, true), 0);
+  assert.ok(impulse(0.001, false) > warm * 0.99);
+});
+
+test('degree-normalized springs soften dense hubs without weakening leaf connections', async () => {
+  const { createPhysicsLinkForce } = await importSourceModule('src/components/graph/graphPhysics.ts');
+  const nodes = Array.from({ length: 6 }, (_, i) => ({ id: String(i), index: i, x: i * 10, y: 0, vx: 0, vy: 0 }));
+  const links = [{ source: '0', target: '1' }, { source: '0', target: '2' }, { source: '0', target: '3' }, { source: '1', target: '4' }, { source: '1', target: '5' }];
+  const force = createPhysicsLinkForce(45, { linkStrength: 1, degreeNormalizedLinks: true });
+  force.links(links);
+  force.initialize(nodes, () => 0.7);
+  assert.equal(force.strength()(links[0], 0, links), 1 / 3);
+  assert.equal(force.strength()(links[1], 1, links), 1);
+});
+
+test('physics timing preserves the reference cooling and damping over wall-clock time', async () => {
+  const { resolvePhysicsTiming } = await importSourceModule('src/components/graph/graphPhysics.ts');
+  const { graphPhysicsPresets } = await importSourceModule('src/components/graph/presets.ts');
+  const p = graphPhysicsPresets.obsidian;
+  const t = resolvePhysicsTiming(p);
+  assert.ok(Math.abs((1 - t.alphaDecay) ** 300 - (1 - p.alphaDecay) ** (p.referenceHz * 5)) < 1e-12);
+  assert.ok(Math.abs((1 - t.velocityDecay) ** 60 - (1 - p.velocityDecay) ** p.referenceHz) < 1e-12);
+  assert.ok(t.forceScale > 0 && t.forceScale < 1);
+  for (const velocityDecay of [0, 1]) assert.ok(Number.isFinite(resolvePhysicsTiming({ ...p, velocityDecay }).forceScale));
+  assert.equal(resolvePhysicsTiming(graphPhysicsPresets.legacy).forceScale, 1);
+});
+
+test('a published drag coordinate does not pull neighboring springs one physics step early', async () => {
+  const { applyPhysicsForces } = await importSourceModule('src/components/graph/graphPhysics.ts');
+  const { forceSimulation } = await import('d3-force');
+  const nodes = [{ id: 'a', x: 200, y: 0, fx: 200, fy: 0, dragX: 0, dragY: 0 }, { id: 'b', x: 50, y: 0 }];
+  const sim = forceSimulation(nodes).stop().alphaDecay(0).velocityDecay(0.4);
+  applyPhysicsForces(sim, [{ source: 'a', target: 'b' }], {
+    nodeRadius: 4.5, linkDistance: 50, linkStrength: 1, degreeNormalizedLinks: true,
+    chargeStrength: 0, chargeDistanceMin: 6, collisionRadius: 0, collisionStrength: 0,
+    coolCollision: false, gravityStrength: 0, sizeBasedCollision: false, centerFirst: true, forceScale: 1
+  }, { x: 0, y: 0 });
+  sim.tick();
+  assert.equal(nodes[0].x, 200, 'the dragged node stays at the pointer');
+  assert.ok(Math.abs(nodes[1].x - 50) < 1e-8, 'neighbors see the previous integrated anchor on this step');
+  sim.tick();
+  assert.ok(nodes[1].x > 50, 'spring propagation begins on the following step');
 });

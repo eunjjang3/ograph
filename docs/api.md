@@ -9,11 +9,15 @@ import {
   GraphView,
   defaultGraphPreset,
   defaultGraphTheme,
+  graphPhysicsPresets,
+  resolveGraphPhysicsPreset,
   type GraphLink,
   type GraphNode,
   type GraphNodeMetadata,
   type GraphNodeType,
   type GraphPreset,
+  type GraphPhysicsProfile,
+  type GraphPhysicsPresetName,
   type GraphTheme,
   type GraphViewMode,
   type GraphViewProps,
@@ -80,7 +84,7 @@ type GraphViewProps<
 | Prop | Type | Default | Description |
 | --- | --- | --- | --- |
 | `theme` | `Partial<GraphTheme>` | `defaultGraphTheme` | Partial theme override merged over the default theme. |
-| `preset` | `'default' \| GraphPreset` | `'default'` | Force/layout/rendering preset. Custom presets are merged over `defaultGraphPreset`. |
+| `preset` | `'default' \| Partial<GraphPreset>` | `'default'` | Force/layout/rendering preset. Custom presets are merged over `defaultGraphPreset`. |
 | `className` | `string` | `''` | Additional class names applied to the outer container. |
 | `style` | `CSSProperties` | `undefined` | Inline styles applied to the outer container after `backgroundColor`. |
 | `ariaLabel` | `string` | `undefined` | Accessible name applied to the graph canvas. |
@@ -157,7 +161,7 @@ ref.current?.restartSimulation();
 | `fitToView()` | Computes the visible global or local-lens bounds and sets the viewport so nodes fit with padding. |
 | `focusCameraOnNode(nodeId, options?)` | Centers the camera on a visible node and returns `true` when the request can be applied. Returns `false` without moving the camera when the node is missing or not visible in the current graph scope. |
 | `resetViewport()` | Centers the viewport and resets zoom scale to `1.0`. |
-| `restartSimulation()` | Sets simulation alpha to `1` and restarts d3-force unless `paused` is `true`. If paused, the alpha is retained and resumes when `paused` returns to `false`. |
+| `restartSimulation()` | Reheats with the selected profile’s `reheatAlpha` (`0.3` by default). Ignored while paused; an already settled paused graph stays settled. |
 
 ```ts
 interface GraphCameraFocusOptions {
@@ -384,14 +388,44 @@ Colors may be hex strings, named colors, or canvas-compatible CSS color strings 
 
 ## Preset
 
-`GraphPreset` controls force layout and rendering heuristics.
+`GraphPreset` controls force layout and rendering heuristics. Pass only the fields you need; omitted fields inherit the defaults.
+
+### Motion presets
+
+```tsx
+<GraphView nodes={nodes} links={links} preset={{ physicsPreset: 'obsidian' }} />
+<GraphView nodes={nodes} links={links} preset={{ physicsPreset: 'calm' }} />
+// Numeric tuning remains available and takes precedence over the named profile.
+<GraphView nodes={nodes} links={links} preset={{ physicsPreset: 'calm', dragAlpha: 0.12 }} />
+```
+
+| Profile | Feel | Drag / restart heat | Velocity decay |
+| --- | --- | --- | --- |
+| `obsidian` (default) | Smooth, connected movement with a diminishing tail | 0.3 / 0.3 | 0.4 |
+| `calm` | Gentler response and stronger damping | 0.16 / 0.18 | 0.55 |
+| `lively` | More movement and a longer tail | 0.4 / 0.45 | 0.3 |
+| `legacy` | Previous uniform springs and constant collision correction | 0.3 / 1 | 0.4 |
+
+The default `obsidian` profile matches the measured local reference configuration, not Obsidian's factory settings or an identical engine. Its world coordinates use a 0.2 scale: link distance `6`, charge `-40`, uniform physical radius `12`, and charge minimum distance `6`. Springs use degree normalization with strength approximately `0.07695`; center forces run before springs, charge, and collision. Larger rendered nodes do not create larger physical collision obstacles in this profile.
+
+`calm` and `lively` share that force geometry and add heat-scaled collision corrections. `legacy` preserves the old geometry, degree-sized collision padding and stronger uniform springs. Selecting a profile supplies all force defaults; explicit `linkDistance`, `chargeStrength`, `collisionRadius` and `gravityStrength` still override it. Rendering settings stay independent.
+
+Physics advances on a fixed 60Hz clock in both runtimes. The new profiles express cooling and viscosity at a 51Hz reference cadence, measured in the running reference app; exponential decay and force impulse are converted to 60Hz. This preserves the settling duration without reducing the rendering cadence. `legacy` uses a 60Hz reference. `defaultGraphPreset` contains rendering defaults and the profile name; use `resolveGraphPhysicsPreset(defaultGraphPreset)` to inspect resolved force defaults.
+
+`graphPhysicsPresets` exposes the profile values. `resolveGraphPhysicsPreset(preset)` resolves a profile plus finite, clamped numeric overrides. `dragAlpha` accepts `[0, 1]`; `reheatAlpha` and `alphaDecay` accept `(0, 1]`; `velocityDecay` accepts `[0, 1]`. Invalid values fall back to the profile. A zero drag heat disables reheating without disabling direct node dragging.
+
+Pointer down alone does not reheat the modern profiles; moving the pointer starts the drag heat. Local lenses keep their quieter drag targets and faster cooling by default; explicit `dragAlpha` / `alphaDecay` overrides apply there too. Restart heat and viscosity still follow the selected profile.
+
 
 ```ts
 interface GraphPreset {
+  physicsPreset?: GraphPhysicsPresetName;
+  dragAlpha?: number;
+  reheatAlpha?: number;
   nodeRadius: number;
-  linkDistance: number;
-  chargeStrength: number;
-  collisionRadius: number;
+  linkDistance?: number;
+  chargeStrength?: number;
+  collisionRadius?: number;
   labelDensity: number;
   labelRenderBudget?: {
     maxLabels?: number;
@@ -412,7 +446,7 @@ interface GraphPreset {
 | `nodeRadius` | Base node radius before sanitized `size` and `degree` are applied. `nodeSizeScale` is applied only while rendering and hit-testing. |
 | `linkDistance` | d3-force link distance. |
 | `chargeStrength` | d3-force many-body strength. Negative values repel nodes. |
-| `collisionRadius` | Extra radius added to node collision bounds. Collision uses `nodeRadius`, sanitized `size`, and `degree`, but intentionally ignores `nodeSizeScale`. |
+| `collisionRadius` | Uniform physical radius in the new profiles. In `legacy`, padding added to the radius derived from `nodeRadius`, `size`, and `degree`. `nodeSizeScale` never affects physics. |
 | `labelDensity` | `0` to `1` density control. Higher values show more labels earlier. Non-focused labels use this as the center of a soft zoom/degree reveal band, producing target opacity values from `0` to `1` instead of a hard show/hide cutoff. |
 | `labelRenderBudget` | Optional per-frame label caps. `maxLabels` applies to settled frames; `maxLabelsDuringInteraction` applies during pan, drag, pinch, viewport animation, active simulation, and focus/lens/label transitions. The interaction cap falls back to `maxLabels` when omitted. Invalid or negative values disable that cap. Hovered, selected, and root labels remain visible even when they exceed the cap; focused neighbors rank ahead of ordinary labels while still counting toward it. |
 | `hoverDimming` | Opacity multiplier for unrelated nodes/links during hover focus. The transition is eased in the canvas render loop; hover highlights fade as an overlay when hover clears. |
@@ -420,8 +454,8 @@ interface GraphPreset {
 | `localGraphDepthBehavior` | Reserved preset field mirroring local-depth behavior. The component currently uses the `localDepth` prop for traversal. |
 | `nodeSizeScale` | Global multiplier for rendered and hit-tested node size. This does not restart or influence the d3-force simulation. |
 | `gravityStrength` | Gentle force pulling the layout toward the origin. |
-| `velocityDecay` | d3-force velocity decay value clamped to `0` through `1`. The default is `0.4`; lower values feel more floaty and keep motion longer, while higher values feel heavier and settle faster. |
-| `alphaDecay` | Optional d3-force alpha decay override clamped to `(0, 1]`. Omit it to use mode defaults: global mode keeps d3's 300-tick cooling curve at about `0.0228`, while local mode uses `0.08` so small focus lenses settle quickly. `alphaMin` remains internal: `0.001` globally and `0.005` in local mode. |
+| `velocityDecay` | Velocity decay at the profile’s reference cadence, clamped to `0` through `1`. The default is `0.4`; lower values feel more floaty and keep motion longer, while higher values feel heavier and settle faster. |
+| `alphaDecay` | Optional d3-force alpha decay override clamped to `(0, 1]`. Omit it to use profile/mode defaults: the global `obsidian` profile uses a 300-reference-step curve (about `0.0228` at 51Hz, converted to about `0.01938` at 60Hz), while local mode uses `0.08` so small focus lenses settle quickly. `alphaMin` remains internal: `0.001` globally and `0.005` in local mode. |
 
 Example:
 
@@ -444,7 +478,7 @@ Example:
     localGraphDepthBehavior: 2,
     nodeSizeScale: 1.2,
     gravityStrength: 0.1,
-    velocityDecay: 0.4,
+    physicsPreset: 'obsidian',
     // Omit alphaDecay to keep mode-specific cooling defaults.
   }}
 />

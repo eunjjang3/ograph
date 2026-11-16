@@ -9,7 +9,9 @@ test('built package exposes only the expected runtime exports', async () => {
   assert.deepEqual(runtimeExports, [
     'GraphView',
     'defaultGraphPreset',
-    'defaultGraphTheme'
+    'defaultGraphTheme',
+    'graphPhysicsPresets',
+    'resolveGraphPhysicsPreset'
   ]);
 });
 
@@ -58,6 +60,8 @@ test('built type entry preserves the public type surface without internal helper
     'GraphNodeMetadata',
     'GraphNodeType',
     'GraphPreset',
+    'GraphPhysicsProfile',
+    'GraphPhysicsPresetName',
     'GraphTheme',
     'GraphViewMode',
     'GraphViewProps',

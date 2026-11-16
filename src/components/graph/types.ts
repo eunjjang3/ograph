@@ -145,16 +145,44 @@ export interface GraphTheme {
   fontFamily: string;
 }
 
+/** Coordinated heat, damping, spring and collision behavior. */
+export type GraphPhysicsPresetName = 'obsidian' | 'calm' | 'lively' | 'legacy';
+
+export interface GraphPhysicsProfile {
+  linkDistance: number;
+  chargeStrength: number;
+  collisionRadius: number;
+  gravityStrength: number;
+  chargeDistanceMin: number;
+  sizeBasedCollision: boolean;
+  centerFirst: boolean;
+  referenceHz: number;
+  velocityDecay: number;
+  alphaDecay: number;
+  dragAlpha: number;
+  reheatAlpha: number;
+  linkStrength: number;
+  degreeNormalizedLinks: boolean;
+  collisionStrength: number;
+  coolCollision: boolean;
+}
+
 /** Force-layout and rendering heuristics used by `GraphView`. */
 export interface GraphPreset {
+  /** Named motion profile. Defaults to obsidian; numeric overrides below win. */
+  physicsPreset?: GraphPhysicsPresetName;
+  /** Optional drag heat override in [0, 1]. */
+  dragAlpha?: number;
+  /** Optional explicit restart heat override in (0, 1]. */
+  reheatAlpha?: number;
   /** Base rendered node radius in CSS pixels. */
   nodeRadius: number;
   /** d3-force link distance in world units. */
-  linkDistance: number;
+  linkDistance?: number;
   /** d3-force many-body charge strength. */
-  chargeStrength: number;
-  /** Extra collision padding added around each physics node. */
-  collisionRadius: number;
+  chargeStrength?: number;
+  /** Physical radius; legacy adds this as padding to the rendered node radius. */
+  collisionRadius?: number;
   /** Label reveal density from `0` to `1`; higher values reveal labels earlier. */
   labelDensity: number;
   /**
@@ -227,7 +255,7 @@ export interface GraphViewProps<
   /** Partial theme override merged over `defaultGraphTheme`. */
   theme?: Partial<GraphTheme>;
   /** Force/layout/rendering preset or the built-in default preset. */
-  preset?: "default" | GraphPreset;
+  preset?: "default" | Partial<GraphPreset>;
   /** Additional class names applied to the outer graph container. */
   className?: string;
   /** Inline styles applied to the outer graph container after the background color. */

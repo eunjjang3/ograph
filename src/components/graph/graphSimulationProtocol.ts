@@ -1,4 +1,5 @@
-export const GRAPH_SIMULATION_PROTOCOL_VERSION = 1 as const;
+import type { GraphPhysicsProfile } from './types';
+export const GRAPH_SIMULATION_PROTOCOL_VERSION = 2 as const;
 
 export interface WorkerSimulationNodeInput {
   id: string;
@@ -15,7 +16,8 @@ export interface WorkerSimulationLinkInput {
   target: string;
 }
 
-export interface WorkerSimulationConfig {
+export interface WorkerSimulationConfig extends Pick<GraphPhysicsProfile, 'linkStrength' | 'degreeNormalizedLinks' | 'collisionStrength' | 'coolCollision' | 'chargeDistanceMin' | 'sizeBasedCollision' | 'centerFirst'> {
+  forceScale: number;
   chargeStrength: number;
   linkDistance: number;
   nodeRadius: number;
@@ -25,6 +27,7 @@ export interface WorkerSimulationConfig {
   alphaDecay: number;
   alphaMin: number;
   graphRefreshAlpha: number;
+  initialAlpha?: number;
   preserveScopeCentroid: boolean;
   gravityCenterNodeIds: string[] | null;
   paused: boolean;
@@ -49,9 +52,9 @@ export type GraphSimulationWorkerRequest =
       x: number;
       y: number;
       alphaTarget: number;
-      wakeConnectedNodes: boolean;
+      dragSequence: number;
     }
-  | { type: 'drag-end'; revision: number; nodeId: string }
+  | { type: 'drag-end'; revision: number; nodeId: string; dragSequence: number }
   | { type: 'recycle'; revision: number; positions: ArrayBuffer }
   | { type: 'dispose'; revision: number };
 
@@ -66,6 +69,7 @@ export type GraphSimulationWorkerResponse =
       type: 'tick';
       revision: number;
       alpha: number;
+      dragSequence: number;
       positions: ArrayBuffer;
     }
   | { type: 'settled'; revision: number; alpha: number }
@@ -86,7 +90,8 @@ export function isGraphSimulationWorkerResponse(
       return candidate.protocolVersion === GRAPH_SIMULATION_PROTOCOL_VERSION &&
         typeof candidate.nodeCount === 'number';
     case 'tick':
-      return typeof candidate.alpha === 'number' && candidate.positions instanceof ArrayBuffer;
+      return typeof candidate.alpha === 'number' &&
+        typeof candidate.dragSequence === 'number' && candidate.positions instanceof ArrayBuffer;
     case 'settled':
       return typeof candidate.alpha === 'number';
     case 'error':

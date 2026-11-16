@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { GraphCameraFocusOptions, GraphNode, GraphViewport } from './types';
 import type { Viewport } from './graphMath';
+import type { PanVelocity } from './panMomentum';
 
 const MIN_ZOOM_SCALE = 0.02;
 const MAX_ZOOM_SCALE = 32.0;
@@ -163,12 +164,14 @@ export function useViewportControls({
   const viewportRef = useRef<Viewport>({ x: 300, y: 200, scale: 0.8 });
   const targetViewportRef = useRef<Viewport>({ x: 300, y: 200, scale: 0.8 });
   const viewportAnimationActiveRef = useRef<boolean>(false);
+  const panVelocityRef = useRef<PanVelocity>({ x: 0, y: 0 });
   const lastAutoFitDependencyRef = useRef(autoFitDependency);
   const hasAutoFitRef = useRef(false);
   const onViewportChangeRef = useRef(onViewportChange);
   onViewportChangeRef.current = onViewportChange;
 
   const setViewportImmediate = useCallback((viewport: Viewport) => {
+    panVelocityRef.current = { x: 0, y: 0 };
     viewportRef.current = viewport;
     targetViewportRef.current = viewport;
     viewportAnimationActiveRef.current = false;
@@ -177,6 +180,7 @@ export function useViewportControls({
   }, [requestRender]);
 
   const animateViewportTo = useCallback((viewport: Viewport) => {
+    panVelocityRef.current = { x: 0, y: 0 };
     targetViewportRef.current = viewport;
     viewportAnimationActiveRef.current = true;
     requestRender();
@@ -230,6 +234,7 @@ export function useViewportControls({
     viewportRef,
     targetViewportRef,
     viewportAnimationActiveRef,
+    panVelocityRef,
     setViewportImmediate,
     animateViewportTo,
     animateFitToView,

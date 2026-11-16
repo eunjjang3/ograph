@@ -122,6 +122,13 @@ background is rendered.
 
 Decision date: 2026-06-05 KST.
 
+**Superseded on 2026-11-16 KST:** the requested Obsidian-style interaction pass
+explicitly adopts scroll suppression for wheel gestures over the graph. The
+implementation now uses a native non-passive wheel listener, normalizes wheel
+distance and units, and ignores horizontal-only input. Packed-consumer tests
+verify page-scroll suppression and no longer allow the passive-listener warning.
+The following records the earlier release decision.
+
 Do not replace the current React `onWheel` path with a native non-passive
 wheel listener for the public preview or first stable release. The current
 product contract is that wheel input over the canvas zooms the graph with

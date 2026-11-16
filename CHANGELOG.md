@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- Add coordinated smooth (default), Calm, Lively and Legacy motion presets, with a debug
+  selector and public partial-preset configuration. Numeric heat/damping overrides
+  remain available.
+- Refine drag propagation and settling against a measured local reference: weaker
+  degree-normalized springs, uniform collision radii, bounded charge and matching
+  force order. Calm and Lively retain heat-scaled collision as alternatives.
+- Convert reference-time damping and cooling to fixed 60Hz integration on both
+  Worker and main runtimes, including high-refresh-rate displays.
+- Reheat modern profiles only on drag movement. Springs observe the previous
+  integrated pin position while the rendered node follows the pointer immediately.
+- Restart with the profile's heat (`0.3` by default); ignore restart while paused
+  consistently across main and Worker runtimes.
+- Wheel zoom now follows pixel, line, or page scroll distance; horizontal-only
+  gestures do not zoom. Wheel gestures over the graph no longer scroll the page.
+- Background pan glides to a stop after release, with frame-rate-independent
+  damping. New pointer input, camera commands, and reduced-motion preferences
+  stop or disable momentum.
+- Global node dragging uses a moderate `0.3` heat target and ordinary link
+  forces instead of directly shifting neighboring nodes.
+- The debug app starts with Pixi WebGL and Worker simulation, matching the package.
+
+### Fixed
+
+- Keep local drag positions authoritative until the Worker acknowledges release,
+  preventing queued position frames from moving a dragged node backwards.
+- Include force computation in the Worker's 60Hz scheduling budget instead of
+  adding a fresh timer delay after each tick. Pause, settling, and disposal stop
+  the clock without catch-up bursts.
+
 ## 0.3.1 - 2026-07-19
 
 This patch keeps the existing `GraphView` props, ref methods, callbacks,

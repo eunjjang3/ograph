@@ -19,11 +19,6 @@ const NON_EMPTY_FIXTURES = [
   'disconnected',
   'invalid'
 ] as const;
-// Removing this warning requires a native non-passive wheel listener and an
-// explicit decision about whether graph zoom should suppress page scrolling.
-const ALLOWED_CONSOLE_ERRORS = [
-  'Unable to preventDefault inside passive event listener invocation.'
-] as const;
 // Canvas2D and WebGL rasterize curved borders with slightly different edge
 // antialiasing. The dense fixture differs on 0.58% of pixels while preserving
 // geometry, color, and layout, so retain the Canvas baseline with a narrow
@@ -212,10 +207,7 @@ test.beforeEach(async ({ page }) => {
   unexpectedBrowserErrors.set(page, errors);
   page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
   page.on('console', message => {
-    if (
-      message.type() === 'error' &&
-      !ALLOWED_CONSOLE_ERRORS.some(allowed => message.text().includes(allowed))
-    ) {
+    if (message.type() === 'error') {
       errors.push(`console: ${message.text()}`);
     }
   });
@@ -334,6 +326,8 @@ test('keeps pan usable and preserves the wheel pointer anchor within tolerance',
   await page.mouse.move(box.x + 80, box.y + 80);
   await page.mouse.down();
   await page.mouse.move(box.x + 150, box.y + 120, { steps: 4 });
+  // A held release intentionally has no fling, isolating wheel anchoring.
+  await page.waitForTimeout(140);
   await page.mouse.up();
 
   await expect.poll(async () => Number(await page.getByTestId('event-viewport-count').textContent()))
@@ -360,6 +354,58 @@ test('keeps pan usable and preserves the wheel pointer anchor within tolerance',
   expect(Math.abs(afterWorld.x - beforeWorld.x)).toBeLessThan(1.5);
   expect(Math.abs(afterWorld.y - beforeWorld.y)).toBeLessThan(1.5);
   await expectNoGraphErrors(page);
+});
+
+test('pan glides after release, stops on new input, and respects reduced motion', async ({ page }) => {
+  await setFixture(page, 'empty');
+  const box = await canvasBox(page);
+  const pan = async () => {
+    await page.mouse.move(box.x + 80, box.y + 80);
+    await page.mouse.down();
+    for (let i = 1; i <= 6; i++) {
+      await page.mouse.move(box.x + 80 + i * 15, box.y + 80);
+      await page.waitForTimeout(16);
+    }
+    await page.mouse.up();
+  };
+  await pan();
+  const released = await readViewport(page);
+  await expect.poll(async () => (await readViewport(page)).x).toBeGreaterThan(released.x + 5);
+  await page.mouse.down();
+  const interrupted = await readViewport(page);
+  await page.waitForTimeout(150);
+  expect((await readViewport(page)).x).toBeCloseTo(interrupted.x, 1);
+  await page.mouse.up();
+
+  await pan();
+  await page.waitForTimeout(1500);
+  const settled = await readViewport(page);
+  await page.waitForTimeout(150);
+  expect((await readViewport(page)).x).toBeCloseTo(settled.x, 1);
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.waitForTimeout(50);
+  await pan();
+  const reduced = await readViewport(page);
+  await page.waitForTimeout(200);
+  expect((await readViewport(page)).x).toBeCloseTo(reduced.x, 1);
+});
+
+test('wheel zoom consumes page scroll and ignores horizontal-only wheel input', async ({ page }) => {
+  await setFixture(page, 'empty');
+  await page.evaluate(() => { document.body.style.paddingBottom = '1200px'; });
+  const box = await canvasBox(page);
+  await page.mouse.move(box.x + 200, box.y + 150);
+  const before = await readViewport(page);
+  await page.mouse.wheel(0, 120);
+  await expect.poll(async () => (await readViewport(page)).scale).toBeLessThan(before.scale);
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  const after = await readViewport(page);
+  await page.mouse.wheel(120, 0);
+  await page.waitForTimeout(200);
+  expect((await readViewport(page)).scale).toBe(after.scale);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });
 
 test('focuses the camera by controlled prop and ref without erroring on unavailable nodes', async ({ page }) => {
@@ -402,6 +448,7 @@ test('redraws after resize without resetting the user viewport', async ({ page }
   await page.mouse.move(beforeBox.x + 80, beforeBox.y + 80);
   await page.mouse.down();
   await page.mouse.move(beforeBox.x + 140, beforeBox.y + 115, { steps: 5 });
+  await page.waitForTimeout(140);
   await page.mouse.up();
   const beforeResize = await readViewport(page);
 

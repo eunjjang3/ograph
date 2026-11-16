@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { GraphNode } from '../types';
+import type { GraphNode, GraphPhysicsPresetName } from '../types';
 import type { GraphDragPhysicsOptions } from '../useGraphSimulation';
 import type { DebugGraphMode } from './useDebugGraphState';
 import type { DebugPresetConfig } from './mockGraphPresets';
@@ -47,13 +47,15 @@ interface DebugControlPanelProps {
   nodeSizeScale: number;
   setNodeSizeScale: Dispatch<SetStateAction<number>>;
   linkDistance: number;
-  setLinkDistance: Dispatch<SetStateAction<number>>;
+  setLinkDistance: (value: number) => void;
   chargeStrength: number;
-  setChargeStrength: Dispatch<SetStateAction<number>>;
+  setChargeStrength: (value: number) => void;
   collisionRadius: number;
-  setCollisionRadius: Dispatch<SetStateAction<number>>;
+  setCollisionRadius: (value: number) => void;
+  physicsPreset: GraphPhysicsPresetName;
+  selectPhysicsPreset: (preset: GraphPhysicsPresetName) => void;
   velocityDecay: number;
-  setVelocityDecay: Dispatch<SetStateAction<number>>;
+  setVelocityDecay: (value: number) => void;
   dimmingStrength: number;
   setDimmingStrength: Dispatch<SetStateAction<number>>;
   filteredElements: {
@@ -107,6 +109,8 @@ export function DebugControlPanel({
   setChargeStrength,
   collisionRadius,
   setCollisionRadius,
+  physicsPreset,
+  selectPhysicsPreset,
   velocityDecay,
   setVelocityDecay,
   dimmingStrength,
@@ -352,6 +356,16 @@ export function DebugControlPanel({
 
             <div className="space-y-3.5 pt-2.5 border-t border-gray-800/60">
               <div>
+                <label htmlFor="physics-preset" className="block text-[11px] text-gray-400 uppercase mb-1">Motion preset</label>
+                <select id="physics-preset" value={physicsPreset} onChange={e => selectPhysicsPreset(e.target.value as GraphPhysicsPresetName)} className="w-full bg-gray-950 border border-gray-800 rounded px-2.5 py-1.5 text-xs text-gray-100">
+                  <option value="obsidian">Obsidian · Smooth settling</option>
+                  <option value="calm">Calm · Gentle response</option>
+                  <option value="lively">Lively · More movement</option>
+                  <option value="legacy">Legacy · Previous behavior</option>
+                </select>
+                <p className="text-[10px] text-gray-500 mt-1.5">Sets drag energy, damping and settling together. Changing presets resets force tuning.</p>
+              </div>
+              <div>
                 <div className="flex justify-between text-[11px] font-mono mb-1">
                   <span className="text-gray-400 uppercase">Label Culling Limit</span>
                   <span className="text-pink-400 font-bold">{labelDensity.toFixed(2)}</span>
@@ -392,7 +406,7 @@ export function DebugControlPanel({
                   type="range"
                   min="5"
                   max="300"
-                  step="5"
+                  step="1"
                   value={linkDistance}
                   onChange={(e) => setLinkDistance(parseInt(e.target.value))}
                   className="w-full accent-pink-500 h-1 bg-gray-900 rounded-lg cursor-pointer"
@@ -417,7 +431,7 @@ export function DebugControlPanel({
 
               <div>
                 <div className="flex justify-between text-[11px] font-mono mb-1">
-                  <span className="text-gray-400 uppercase">Collision Boundary Buffer</span>
+                  <span className="text-gray-400 uppercase">Collision Radius / Legacy Buffer</span>
                   <span className="text-pink-400 font-bold">{collisionRadius}px</span>
                 </div>
                 <input
@@ -440,7 +454,7 @@ export function DebugControlPanel({
                   type="range"
                   min="0"
                   max="0.9"
-                  step="0.02"
+                  step="0.01"
                   value={velocityDecay}
                   onChange={(e) => setVelocityDecay(parseFloat(e.target.value))}
                   className="w-full accent-pink-500 h-1 bg-gray-900 rounded-lg cursor-pointer"
