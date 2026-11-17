@@ -57,6 +57,9 @@ jobs:
       - name: Verify packed Next.js production consumer
         run: npm run test:browser:next
 
+      - name: Verify public playground on the Pages subpath
+        run: npm run test:demo
+
       - name: Verify package budgets
         run: npm run check:budgets
 
