@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-## 0.5.0 - 2026-11-28
+## 0.4.1 - 2026-11-28
+
+Backward-compatible under the project's [pre-1.0 versioning policy](CONTRIBUTING.md#versioning-policy).
+Existing consumers need no code changes: automatic fitting stays enabled and
+camera following stays disabled unless explicitly requested.
 
 ### Added
 

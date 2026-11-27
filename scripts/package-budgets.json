@@ -3,7 +3,7 @@
     "baseline": 19097,
     "allowedRegressionRatio": 0.1,
     "unit": " bytes",
-    "note": "0.5.0 camera-control and Worker lifecycle entry: 19097 gzip bytes (235ef52 baseline: 18751; +346 bytes), retaining the 10% release guard."
+    "note": "0.4.1 camera-control and Worker lifecycle entry: 19097 gzip bytes (235ef52 baseline: 18751; +346 bytes), retaining the 10% release guard."
   },
   "distLazyChunksGzipBytes": {
     "baseline": 9138,
