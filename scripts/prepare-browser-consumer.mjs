@@ -166,6 +166,7 @@ import {
   GraphView,
   type GraphLink,
   type GraphNode,
+  type GraphViewProps,
   type GraphViewRef,
   type GraphViewport
 } from '@eunjjang/ograph';
@@ -356,7 +357,7 @@ function getFixture(name: FixtureName): { nodes: GraphNode[]; links: GraphLink[]
   if (name === 'single') {
     return {
       nodes: [
-        { id: 'center', label: 'Center', type: 'hub', x: 0, y: 0, size: 2.6 }
+        { id: 'center', label: 'Center', type: 'hub', x: 0, y: 0, size: 2.6, metadata: { summary: 'Consumer metadata' } }
       ],
       links: []
     };
@@ -431,6 +432,21 @@ function App() {
   const [graphMounted, setGraphMounted] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [tooltipMode, setTooltipMode] = useState('default');
+  const tooltipControls = new URLSearchParams(window.location.search).has('tooltip-test');
+  const tooltip: GraphViewProps['tooltip'] = tooltipMode === 'disabled' ? false
+    : tooltipMode === 'styled' ? {
+      className: 'consumer-tooltip',
+      style: { left: 'auto', right: 24, bottom: 24, backgroundColor: '#fff7ed', color: '#7c2d12', border: '2px solid #fb923c', borderRadius: 18, padding: '10px 16px' },
+      dotStyle: { backgroundColor: '#ea580c', borderRadius: 2, width: 12, height: 12 },
+      labelStyle: { fontWeight: 700 },
+      typeStyle: { color: '#9a3412' }
+    } : tooltipMode === 'custom' ? {
+      render: node => <article data-testid="custom-tooltip" style={{ background: '#0f172a', color: '#a5f3fc', borderRadius: 20, padding: 16 }}>
+        <strong>{node.label}</strong><p>{String(node.metadata?.summary)}</p>
+      </article>
+    } : tooltipMode === 'null' ? { render: () => null }
+      : tooltipMode === 'true' ? true : undefined;
   const fixture = useMemo(() => getFixture(fixtureName), [fixtureName]);
   const rootNodeId = mode === 'local' ? fixture.rootNodeId ?? fixture.nodes[0]?.id ?? null : null;
   const graphPaused = paused || fixtureName === 'single';
@@ -498,6 +514,7 @@ function App() {
             rootNodeId={rootNodeId}
             localDepth={1}
             paused={graphPaused}
+            tooltip={tooltip}
             ariaLabel="Packed browser graph"
             canvasRole="img"
             onNodeClick={(node) => {
@@ -531,6 +548,12 @@ function App() {
           />
         )}
       </div>
+
+      {tooltipControls && <div className="toolbar">
+        {['default', 'true', 'styled', 'disabled', 'custom', 'null'].map(value =>
+          <button key={value} data-testid={'tooltip-' + value} onClick={() => setTooltipMode(value)}>{value}</button>
+        )}
+      </div>}
 
       <div className="status">
         <span data-testid="fixture-name">{fixtureName}</span>

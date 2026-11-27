@@ -31,6 +31,7 @@ import { useGraphGrowthAnimation } from './useGraphGrowthAnimation';
 import { buildSpatialIndex } from './spatialIndex';
 import type { Viewport } from './graphMath';
 import { GraphErrorBoundary } from './GraphErrorBoundary';
+import { GraphTooltip } from './GraphTooltip';
 import { normalizeGraphInput } from './inputValidation';
 import { useGraphRendererBackend } from './useGraphRendererBackend';
 import {
@@ -89,48 +90,6 @@ const graphCanvasStyle: React.CSSProperties = {
   cursor: 'grab'
 };
 
-const hoverTooltipStyle: React.CSSProperties = {
-  position: 'absolute',
-  bottom: 16,
-  left: 16,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  maxWidth: 280,
-  overflow: 'hidden',
-  border: '1px solid #2b2b36',
-  borderRadius: 4,
-  backgroundColor: '#1e1e24',
-  boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.35), 0 8px 10px -6px rgb(0 0 0 / 0.35)',
-  color: 'rgb(255 255 255 / 0.8)',
-  fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  fontSize: 12,
-  lineHeight: 1.35,
-  padding: '6px 12px',
-  pointerEvents: 'none',
-  whiteSpace: 'nowrap'
-};
-
-const hoverTooltipDotStyle: React.CSSProperties = {
-  flex: '0 0 auto',
-  width: 8,
-  height: 8,
-  borderRadius: 9999,
-  backgroundColor: '#38bdf8'
-};
-
-const hoverTooltipLabelStyle: React.CSSProperties = {
-  minWidth: 0,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis'
-};
-
-const hoverTooltipTypeStyle: React.CSSProperties = {
-  flex: '0 0 auto',
-  color: 'rgb(255 255 255 / 0.4)',
-  marginLeft: 4
-};
-
 interface GraphViewCanvasProps<
   NodeMetadata extends GraphNodeMetadata = GraphNodeMetadata,
   LinkMetadata extends GraphNodeMetadata = GraphNodeMetadata
@@ -170,6 +129,7 @@ function GraphViewCanvasInner<
     links,
     selectedNodeId: externalSelectedNodeId,
     hoveredNodeId: externalHoveredNodeId,
+    tooltip,
     rootNodeId,
     mode = 'global',
     localDepth,
@@ -454,7 +414,6 @@ function GraphViewCanvasInner<
   const {
     hoveredNodeIdRef,
     interactionActiveRef,
-    localHoveredNodeId,
     hoveredNode,
     handlers
   } = useGraphPointerInteractions({
@@ -546,21 +505,7 @@ function GraphViewCanvasInner<
         {...handlers}
       />
 
-      {localHoveredNodeId && (
-        <div
-          id="hover-tooltip"
-          role="tooltip"
-          style={hoverTooltipStyle}
-        >
-          <span style={hoverTooltipDotStyle} />
-          <span style={hoverTooltipLabelStyle}>
-            {hoveredNode?.label || localHoveredNodeId}
-          </span>
-          <span style={hoverTooltipTypeStyle}>
-            ({hoveredNode?.type || 'note'})
-          </span>
-        </div>
-      )}
+      <GraphTooltip node={hoveredNode as GraphNode<NodeMetadata> | null | undefined} tooltip={tooltip} />
     </>
   );
 }

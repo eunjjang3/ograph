@@ -63,6 +63,7 @@ test('built type entry preserves the public type surface without internal helper
     'GraphPhysicsProfile',
     'GraphPhysicsPresetName',
     'GraphTheme',
+    'GraphTooltipOptions',
     'GraphViewMode',
     'GraphViewProps',
     'GraphViewport',
@@ -95,6 +96,7 @@ test('built declarations preserve consumer metadata through GraphView callbacks'
   assert.match(typeEntry, /links: GraphLink<LinkMetadata, NodeMetadata>\[\];/);
   assert.match(typeEntry, /onNodeClick\?: \(node: GraphNode<NodeMetadata>\) => void;/);
   assert.match(typeEntry, /onNodeHover\?: \(node: GraphNode<NodeMetadata> \| null\) => void;/);
+  assert.match(typeEntry, /tooltip\?: boolean \| GraphTooltipOptions<NodeMetadata>;/);
   assert.match(typeEntry, /growthAnimation\?: boolean \| GraphGrowthAnimationOptions<NodeMetadata>;/);
   assert.match(typeEntry, /autoFit\?: boolean;/);
   assert.match(graphViewEntry, /setCameraFollowNodeId: \(nodeId: string \| null\) => void;/);
