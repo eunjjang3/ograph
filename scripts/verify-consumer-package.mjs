@@ -83,6 +83,7 @@ import {
   GraphView,
   type GraphLink,
   type GraphNode,
+  type GraphTooltipOptions,
   type GraphViewRef
 } from '@eunjjang/ograph';
 
@@ -95,18 +96,36 @@ const nodes: GraphNode<NoteMetadata>[] = [
 ];
 const links: GraphLink<{ relation: string }, NoteMetadata>[] = [];
 const graphRef = createRef<GraphViewRef>();
+const tooltip: GraphTooltipOptions<NoteMetadata> = {
+  style: { borderRadius: 12, backgroundColor: '#fff', color: '#123' },
+  dotStyle: { display: 'none' },
+  render: node => {
+    const slug: string | undefined = node.metadata?.slug;
+    // @ts-expect-error Metadata must retain the consumer's string type.
+    const wrong: number | undefined = node.metadata?.slug;
+    void wrong;
+    return <strong>{slug}</strong>;
+  }
+};
 
 const element = (
   <GraphView
     ref={graphRef}
     nodes={nodes}
     links={links}
+    tooltip={tooltip}
     onNodeClick={(node) => node.metadata?.slug.toUpperCase()}
   />
 );
 
 graphRef.current?.fitToView();
 void element;
+const hiddenTooltip = <GraphView nodes={nodes} links={links} tooltip={false} />;
+const inferredTooltip = <GraphView nodes={nodes} links={links} tooltip={{
+  render: node => <span>{node.metadata?.slug.toUpperCase()}</span>
+}} />;
+void hiddenTooltip;
+void inferredTooltip;
 `
   );
 

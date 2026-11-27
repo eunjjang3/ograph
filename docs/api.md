@@ -85,10 +85,81 @@ type GraphViewProps<
 | --- | --- | --- | --- |
 | `theme` | `Partial<GraphTheme>` | `defaultGraphTheme` | Partial theme override merged over the default theme. |
 | `preset` | `'default' \| Partial<GraphPreset>` | `'default'` | Force/layout/rendering preset. Custom presets are merged over `defaultGraphPreset`. |
+| `tooltip` | `boolean \| GraphTooltipOptions<NodeMetadata>` | `true` | Keep, hide, style, or replace the hover tooltip. Does not change hover events or physics. |
 | `className` | `string` | `''` | Additional class names applied to the outer container. |
 | `style` | `CSSProperties` | `undefined` | Inline styles applied to the outer container after `backgroundColor`. |
 | `ariaLabel` | `string` | `undefined` | Accessible name applied to the graph canvas. |
 | `canvasRole` | `AriaRole` | `undefined` | Optional ARIA role applied to the graph canvas when the consumer needs a specific semantic role. |
+
+### Hover Tooltip
+
+Omitting `tooltip` or passing `true` preserves the built-in bottom-left tooltip.
+Pass `false` to hide it while keeping hover highlighting and `onNodeHover` events.
+An options object customizes presentation independently of the canvas `theme`:
+
+```tsx
+<GraphView
+  nodes={nodes}
+  links={links}
+  tooltip={{
+    className: 'note-tooltip',
+    style: {
+      backgroundColor: '#fff7ed',
+      color: '#7c2d12',
+      border: '1px solid #fb923c',
+      borderRadius: 16,
+      padding: '10px 16px',
+      left: 'auto',
+      right: 16,
+    },
+    dotStyle: { backgroundColor: '#ea580c', borderRadius: 2 },
+    labelStyle: { fontWeight: 600 },
+    typeStyle: { color: '#9a3412' },
+  }}
+/>
+```
+
+`style` overrides the wrapper's default inline styles. `className` is applied
+to that wrapper; ordinary stylesheet rules do not override existing inline
+declarations, so use `style` for those properties. `dotStyle`, `labelStyle`, and
+`typeStyle` override the corresponding built-in spans. For example,
+`dotStyle: { display: 'none' }` removes the dot. Set `left: 'auto'` when anchoring
+to the right, or `bottom: 'auto'` when anchoring to the top.
+
+To replace the UI, supply a render callback:
+
+```tsx
+<GraphView
+  nodes={nodes}
+  links={links}
+  tooltip={{
+    style: { left: 'auto', right: 16 },
+    render: node => (
+      <article style={{ background: '#0f172a', color: '#a5f3fc', padding: 16, borderRadius: 20 }}>
+        <strong>{node.label}</strong>
+        <p>{node.type ?? 'note'}</p>
+      </article>
+    ),
+  }}
+/>
+```
+
+`render(node)` receives the resolved hovered `GraphNode<NodeMetadata>`, retaining
+the consumer's metadata type. It replaces the default dot, label and type, and
+removes the built-in background, border, padding and typography. Only an
+absolutely positioned `role="tooltip"` wrapper remains (bottom/left `16px`,
+`pointerEvents: 'none'`), with the supplied `className` and `style`. The span
+style options are ignored for custom rendering. Return `null` or `false` to
+hide the tooltip for a particular node. The callback is not called without a
+resolved hovered node. It runs during React rendering, not on each physics tick;
+return a component such as `<NodeInfo node={node} />` if the custom UI needs hooks.
+
+Both tooltip variants are passive hover UI by default and remain inside the
+graph container's clipping bounds. For an independently positioned or interactive
+inspector, use `tooltip={false}` and render your own UI from `onNodeHover` or
+`onNodeClick`. Changing tooltip options does not reheat physics, reset the
+camera, or change selection. The exported `GraphTooltipOptions<Metadata>` type
+can be used for reusable configuration objects.
 
 ### Event Props
 

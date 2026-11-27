@@ -1,4 +1,4 @@
-import type { AriaRole, CSSProperties } from 'react';
+import type { AriaRole, CSSProperties, ReactNode } from 'react';
 
 /** Visual category used to resolve the default node color. */
 export type GraphNodeType =
@@ -88,6 +88,25 @@ export interface GraphCameraFocusOptions {
   minScale?: number;
   /** Whether to animate the camera request. Defaults to `true`; reduced motion applies immediately. */
   animated?: boolean;
+}
+
+/** Hover tooltip presentation, independent of the canvas theme and physics. */
+export interface GraphTooltipOptions<Metadata extends GraphNodeMetadata = GraphNodeMetadata> {
+  /** Additional class names on the tooltip wrapper. */
+  className?: string;
+  /** Wrapper overrides, including colors, shape, typography and position. */
+  style?: CSSProperties;
+  /** Overrides for the built-in color dot; ignored by custom rendering. */
+  dotStyle?: CSSProperties;
+  /** Overrides for the built-in node label; ignored by custom rendering. */
+  labelStyle?: CSSProperties;
+  /** Overrides for the built-in node type; ignored by custom rendering. */
+  typeStyle?: CSSProperties;
+  /** Replaces the built-in UI inside an undecorated, positioned tooltip wrapper.
+   * Return null or false to hide it for this node. Called only for a resolved
+   * hovered node. Return JSX rather than calling hooks inside this callback.
+   */
+  render?: (node: GraphNode<Metadata>) => ReactNode;
 }
 
 /** Canvas color and typography tokens used by the graph renderer. */
@@ -238,6 +257,8 @@ export interface GraphViewProps<
   selectedNodeId?: string | null;
   /** Externally controlled hovered node ID; when omitted, hover is tracked locally. */
   hoveredNodeId?: string | null;
+  /** Hover tooltip: true/omitted keeps the default, false hides it, an object customizes it. */
+  tooltip?: boolean | GraphTooltipOptions<NodeMetadata>;
   /** Root node ID used for local focus-lens mode and root highlighting. */
   rootNodeId?: string | null;
   /** Whether to display the full graph or the local focus lens. */

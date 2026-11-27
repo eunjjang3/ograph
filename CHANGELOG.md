@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- Expose `GraphView.tooltip` to disable the hover tooltip, customize its wrapper
+  and built-in dot/label/type styles, or replace its UI with a typed render
+  callback. The existing presentation remains the default; tooltip configuration
+  does not change hover events, selection, the camera, or physics.
+
 ## 0.4.0 - 2026-11-16
 
 This release refines graph motion: dragging spreads movement through connected
