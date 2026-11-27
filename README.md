@@ -19,10 +19,12 @@ The package is designed for applications that need a large interactive node-link
 ## Project Status
 
 `@eunjjang/ograph` is an early pre-1.0 package. The latest stable release is
-`0.3.1`. It keeps the qualified Pixi WebGL/Worker runtime behind the same public
-API, fixes production-consumer Worker and strict-CSP activation, and preserves
-transparent graph backgrounds with automatic Canvas 2D/main-thread fallback.
-Expect API and behavior changes before `1.0.0`.
+`0.4.0`. This branch prepares `0.4.1` with optional automatic-fit control,
+zoom-preserving camera following, and stable Worker lifecycles across equivalent
+graph arrays. The new version has not been published yet.
+Before `1.0.0`, compatible fixes and optional API additions use patch releases;
+changes requiring consumer migration use minor releases. See the
+[versioning policy](CONTRIBUTING.md#versioning-policy).
 
 ## Documentation
 
@@ -161,6 +163,11 @@ The production package entry preserves the `"use client"` directive for React se
 Selection and hover are controlled externally through `selectedNodeId` and `hoveredNodeId`. If `hoveredNodeId` is omitted, the component maintains local hover state while still calling `onNodeHover`.
 Hover state clears immediately when the pointer leaves the active node; the renderer keeps the previous focus only as a fading overlay so highlighted links and nodes fall back smoothly instead of staying fully highlighted. Focus dimming and label visibility are animated in the canvas render loop, so unrelated nodes fade between focus states and non-focused labels reveal gradually from `0` to `1` as zoom, density, and node degree make them eligible.
 Selection and local root focus are separate concepts. Consumer apps that treat a selected node as the local root should clear or remap `selectedNodeId` when leaving that focused flow if selection highlighting should not persist.
+Use `autoFit={false}` to preserve an application-owned camera across node updates.
+Opt into draw-frame node tracking with `ref.current?.setCameraFollowNodeId(nodeId)`;
+pass `null` to stop synchronously. See the [camera API](docs/api.md) for interaction
+and camera-command precedence.
+
 Camera focus is separate from selection, hover, and local root state. A node-focus camera request only pans and optionally adjusts zoom; unavailable nodes are ignored because graph data or lens scope may legitimately be mid-transition.
 
 Use `paused` when the graph remains mounted but is hidden or inactive:
@@ -193,7 +200,7 @@ Local mode turns the global layout into a focus lens around `rootNodeId`:
 
 Local graph traversal treats links as undirected for display purposes and uses every valid link supplied through `links`. The package does not interpret `link.type` for local expansion; consumers that want local mode to ignore hierarchy or containment relationships should filter those links before passing them to `GraphView`. Lens-external nodes fade out while the viewport zooms toward the visible neighborhood and the local halo simulation settles concurrently. One hidden BFS halo ring remains in the active simulation to keep boundary nodes stable. Sparse local scopes keep their existing centroid as the simulation gravity center, so isolated or one-neighbor roots do not drift toward an unrelated origin while the camera zooms. Local mode also uses faster d3 cooling defaults than global mode, avoiding long redraw tails for small graph neighborhoods while leaving global graph settling conservative. Returning to global mode restores the previous global viewport.
 
-`GraphView` is defensive against reference-unstable input arrays. If a parent creates fresh `nodes` or `links` arrays with the same node IDs and valid undirected link structure, the canvas payload updates but the d3-force simulation is not rebuilt or reheated.
+`GraphView` is defensive against reference-unstable input arrays. If a parent creates fresh `nodes` or `links` arrays with the same node IDs and valid undirected link structure, the canvas payload updates but the simulation is not rebuilt or reheated in either runtime, unless node size or physics configuration also changes.
 
 ## Run Locally
 

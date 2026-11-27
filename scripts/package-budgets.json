@@ -1,9 +1,9 @@
 {
   "distIndexGzipBytes": {
-    "baseline": 17042,
+    "baseline": 19097,
     "allowedRegressionRatio": 0.1,
     "unit": " bytes",
-    "note": "Production Pixi/Worker selection entry gzip plus a 10% release guard."
+    "note": "0.4.1 camera-control and Worker lifecycle entry: 19097 gzip bytes (235ef52 baseline: 18751; +346 bytes), retaining the 10% release guard."
   },
   "distLazyChunksGzipBytes": {
     "baseline": 9138,

@@ -14,6 +14,7 @@ import {
   type GraphRuntimeTelemetryRef
 } from './graphRuntime';
 import type { GraphSimulationActivity } from './useGraphSimulation';
+import { resolveCameraFollowViewport } from './cameraFollow';
 import { advancePanMomentum, type PanVelocity } from './panMomentum';
 
 declare const __OGRAPH_DEBUG_RUNTIME__: boolean;
@@ -32,6 +33,7 @@ type D3SimulationActivitySnapshot = {
 type SimulationActivitySnapshot = D3SimulationActivitySnapshot | GraphSimulationActivity;
 
 interface UseGraphRenderLoopParams {
+  cameraFollowNodeIdRef: CurrentRef<string | null>;
   canvasRef: RefObject<HTMLCanvasElement | null>;
   canvasSizeRef: CurrentRef<{ width: number; height: number; dpr: number }>;
   renderRequestedRef: CurrentRef<boolean>;
@@ -91,6 +93,7 @@ export function isGraphSimulationActiveForFrame(
 }
 
 export function useGraphRenderLoop({
+  cameraFollowNodeIdRef,
   canvasRef,
   canvasSizeRef,
   renderRequestedRef,
@@ -354,7 +357,22 @@ export function useGraphRenderLoop({
         ? performance.now() - labelVisibilityStartedAt
         : 0;
 
+      const followViewport = resolveCameraFollowViewport({
+        nodeId: cameraFollowNodeIdRef.current,
+        nodes: renderNodes,
+        visibleNodeIds: lensVisibleNodeIds,
+        viewport: viewportRef.current,
+        width: dw,
+        height: dh,
+        suspended: simulationPaused || interactionActiveRef.current || isPanActive || viewportAnimationActiveRef.current
+      });
+      if (followViewport) {
+        viewportRef.current = targetViewportRef.current = followViewport;
+        onViewportChangeRef.current?.(followViewport);
+      }
+
       const shouldDraw =
+        followViewport !== null ||
         renderRequestedRef.current ||
         panChanged ||
         isSimulationActive ||
@@ -513,6 +531,7 @@ export function useGraphRenderLoop({
 
     requestRender();
   }, [
+    cameraFollowNodeIdRef,
     canvasRef,
     canvasSizeRef,
     renderRequestedRef,
