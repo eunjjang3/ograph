@@ -29,6 +29,10 @@ npm run test:browser
 npm run test:demo
 ```
 
+Browser tests start a dedicated consumer server and reject an occupied port.
+When another worktree uses port 4179, run
+`OGRAPH_BROWSER_PORT=4187 npm run test:browser`.
+
 Keep changes focused and describe the user-visible behavior or maintainer
 problem that the pull request solves.
 

@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## 0.5.0 - 2026-11-28
+
+### Added
+
+- Add `autoFit` to disable automatic global fitting while keeping explicit camera methods.
+- Add opt-in `setCameraFollowNodeId()` with zoom-preserving draw-frame tracking,
+  synchronous cancellation, and suspension during pause and manual camera motion.
+
+### Fixed
+
+- Keep the Worker simulation alive across equivalent graph arrays and cosmetic
+  payload updates, including viewport-driven React rerenders during camera follow.
+- Refresh render payloads without reheating physics; preserve Worker rebuilds for
+  real topology, node-size, and force-configuration changes.
+- Run packed-consumer browser gates against their own server, rejecting stale
+  servers and allowing an isolated port via `OGRAPH_BROWSER_PORT`.
+
 ## 0.4.0 - 2026-11-16
 
 This release refines graph motion: dragging spreads movement through connected
