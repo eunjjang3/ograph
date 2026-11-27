@@ -269,6 +269,8 @@ export interface GraphViewProps<
   growthAnimation?: boolean | GraphGrowthAnimationOptions<NodeMetadata>;
   /** Node ID for a camera-only focus request. Does not change selection, hover, or local root state. */
   cameraFocusNodeId?: string | null;
+  /** Enable automatic global fitting on node changes. Default true; local lens fitting is unaffected. */
+  autoFit?: boolean;
   /** Options used with `cameraFocusNodeId` camera requests. */
   cameraFocusOptions?: GraphCameraFocusOptions;
   /** Stops d3-force ticks while keeping the canvas mounted and renderable. */

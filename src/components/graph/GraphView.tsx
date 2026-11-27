@@ -50,6 +50,8 @@ declare const __OGRAPH_DEBUG_RUNTIME__: boolean;
 export interface GraphViewRef {
   /** Fits the current global graph or local lens scope into the container. */
   fitToView: () => void;
+  /** Follow a visible node at the current zoom. Null cancels synchronously. */
+  setCameraFollowNodeId: (nodeId: string | null) => void;
   /** Centers the camera on a visible node without changing selection, hover, or local root state. */
   focusCameraOnNode: (nodeId: string, options?: GraphCameraFocusOptions) => boolean;
   /** Resets pan and zoom to the centered default viewport. */
@@ -135,6 +137,7 @@ function GraphViewCanvasInner<
     cameraFocusNodeId,
     cameraFocusOptions,
     paused = false,
+    autoFit = true,
     presetConf,
     themeConf,
     containerRef,
@@ -245,10 +248,20 @@ function GraphViewCanvasInner<
     activeNodesRef,
     fitNodeIds: lensScope.visibleNodeIds,
     autoFitDependency: growthGraph.nodes,
-    autoFitEnabled: mode === 'global',
+    autoFitEnabled: autoFit && mode === 'global',
     requestRender,
     onViewportChange
   });
+  const cameraFollowNodeIdRef = useRef<string | null>(null);
+  const setCameraFollowNodeId = useCallback((nodeId: string | null) => {
+    cameraFollowNodeIdRef.current = nodeId;
+    if (nodeId !== null) {
+      panVelocityRef.current = { x: 0, y: 0 };
+      viewportAnimationActiveRef.current = false;
+      targetViewportRef.current = viewportRef.current;
+      requestRender();
+    }
+  }, [panVelocityRef, viewportAnimationActiveRef, targetViewportRef, viewportRef, requestRender]);
   const previousModeRef = useRef(mode);
   const globalViewportRef = useRef<Viewport | null>(null);
   const completedCameraFocusRequestRef = useRef<string | null>(null);
@@ -295,6 +308,7 @@ function GraphViewCanvasInner<
 
   useEffect(() => {
     const previousMode = previousModeRef.current;
+    if (previousMode !== mode) cameraFollowNodeIdRef.current = null;
 
     if (mode === 'local' && previousMode !== 'local') {
       globalViewportRef.current = { ...targetViewportRef.current };
@@ -320,6 +334,7 @@ function GraphViewCanvasInner<
       return;
     }
 
+    cameraFollowNodeIdRef.current = null;
     const minimumLensScale = (globalViewportRef.current?.scale ?? targetViewportRef.current.scale) * 1.18;
 
     if (reduceMotion) {
@@ -358,6 +373,7 @@ function GraphViewCanvasInner<
       return false;
     }
 
+    cameraFollowNodeIdRef.current = null;
     if (reduceMotion || options?.animated === false) {
       setViewportImmediate(viewport);
     } else {
@@ -432,6 +448,7 @@ function GraphViewCanvasInner<
   }, [externalSelectedNodeId, requestRender]);
 
   useGraphRenderLoop({
+    cameraFollowNodeIdRef,
     canvasRef,
     canvasSizeRef,
     renderRequestedRef,
@@ -465,11 +482,18 @@ function GraphViewCanvasInner<
   });
 
   useImperativeHandle(ref, () => ({
-    fitToView,
+    setCameraFollowNodeId,
+    fitToView: () => {
+      cameraFollowNodeIdRef.current = null;
+      fitToView();
+    },
     focusCameraOnNode,
-    resetViewport,
+    resetViewport: () => {
+      cameraFollowNodeIdRef.current = null;
+      resetViewport();
+    },
     restartSimulation
-  }), [fitToView, focusCameraOnNode, resetViewport, restartSimulation]);
+  }), [setCameraFollowNodeId, fitToView, focusCameraOnNode, resetViewport, restartSimulation]);
 
   return (
     <>

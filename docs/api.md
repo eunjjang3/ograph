@@ -75,6 +75,7 @@ type GraphViewProps<
 | `mode` | `'global' \| 'local'` | `'global'` | Whether to display the full graph or a local focus lens over the global layout. |
 | `localDepth` | `number` | `2` | Visible breadth-first traversal depth from `rootNodeId` in local lens mode. Values are clamped to integers from `1` through `10`. |
 | `growthAnimation` | `boolean \| GraphGrowthAnimationOptions<NodeMetadata>` | `undefined` | Optional chronological node reveal. `true` reads `node.metadata.createdAt`; an options object can provide a custom timestamp extractor, metadata key, step duration, and initial delay. |
+| `autoFit` | `boolean` | `true` | Automatically fit the global graph on node changes. False also cancels pending automatic fits; explicit camera methods and local lens fitting remain available. |
 | `cameraFocusNodeId` | `string \| null` | `undefined` | Camera-only focus request for a visible node. Does not change selection, hover, or local root state. |
 | `cameraFocusOptions` | `GraphCameraFocusOptions` | `undefined` | Options for `cameraFocusNodeId`, including optional target scale, minimum scale, and animation control. |
 | `paused` | `boolean` | `false` | Stops d3-force simulation ticks while keeping the canvas mounted and renderable. Use this when a consumer keeps the graph mounted inside a hidden or inactive panel. |
@@ -231,8 +232,40 @@ ref.current?.restartSimulation();
 | --- | --- |
 | `fitToView()` | Computes the visible global or local-lens bounds and sets the viewport so nodes fit with padding. |
 | `focusCameraOnNode(nodeId, options?)` | Centers the camera on a visible node and returns `true` when the request can be applied. Returns `false` without moving the camera when the node is missing or not visible in the current graph scope. |
+| `setCameraFollowNodeId(nodeId)` | Follow a visible node at the current zoom immediately before drawing. Pass `null` to cancel synchronously. |
 | `resetViewport()` | Centers the viewport and resets zoom scale to `1.0`. |
 | `restartSimulation()` | Reheats with the selected profile’s `reheatAlpha` (`0.3` by default). Ignored while paused; an already settled paused graph stays settled. |
+
+For application-owned navigation, use `autoFit={false}` and opt into following:
+
+```tsx
+<GraphView ref={ref} nodes={nodes} links={links} autoFit={false} />;
+ref.current?.setCameraFollowNodeId('node-a');
+// Before input should permanently take camera ownership:
+ref.current?.setCameraFollowNodeId(null);
+```
+
+Following uses the coordinates rendered in that frame and preserves the displayed
+zoom. It does not change selection, hover, local root, or simulation heat, and does
+not keep an idle graph drawing. Starting a non-null request cancels camera easing
+and pan momentum, then requests one frame. Cancellation takes effect synchronously
+without interrupting manual motion.
+
+Following suspends while paused, dragging/pinching, zooming, or coasting after a
+pan, and resumes on subsequent frames when those operations finish. Consumers
+that want manual input to permanently stop following should cancel on their
+container's pointer, touch, and wheel capture handlers. Missing, non-finite, or
+out-of-scope targets are safe: the request remains pending until the target is
+available on a later frame; IDs are never automatically remapped.
+
+Explicit `fitToView()`, `resetViewport()`, successful node focus, mode changes,
+and local-lens fitting clear the follow request. Pause/resume retains it.
+Automatic global fitting remains independently controlled by `autoFit`; disable
+it when the application owns the camera. No tracking timers are installed.
+
+Equivalent fresh node/link arrays and cosmetic payload updates do not recreate
+or reheat the Worker. Node size, topology, and physics configuration changes still
+refresh the Worker with cached coordinates. Consumer memoization is optional.
 
 ```ts
 interface GraphCameraFocusOptions {
