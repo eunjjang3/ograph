@@ -19,9 +19,9 @@ The package is designed for applications that need a large interactive node-link
 ## Project Status
 
 `@eunjjang/ograph` is an early pre-1.0 package. The latest stable release is
-`0.4.0`. This branch prepares `0.4.1` with optional automatic-fit control,
-zoom-preserving camera following, and stable Worker lifecycles across equivalent
-graph arrays. The new version has not been published yet.
+`0.4.1`, published on 2026-11-28 KST. It adds optional automatic-fit control,
+zoom-preserving camera following, configurable hover tooltips, and stable Worker
+lifecycles across equivalent graph arrays.
 Before `1.0.0`, compatible fixes and optional API additions use patch releases;
 changes requiring consumer migration use minor releases. See the
 [versioning policy](CONTRIBUTING.md#versioning-policy).

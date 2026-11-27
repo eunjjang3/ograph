@@ -180,7 +180,21 @@ Current external setting evidence, checked on 2026-06-05 KST:
   Best Practices badge, fuzzing, signed releases, and maintainer-approved code
   review rules.
 
-Published package evidence, refreshed on 2026-11-16 KST:
+Current published package evidence, verified on 2026-11-28 KST:
+
+- npm `latest` is `0.4.1`. The `v0.4.1` tag and registry `gitHead` match
+  main commit `94eae75166448a98dfc97ac289c873f895e4f992`.
+- Release workflow `46072049025` succeeded through the protected `npm`
+  environment and Trusted Publishing. The package has 21 files, two registry
+  signatures, and SLSA provenance.
+- A fresh React 19 / TypeScript 5 registry consumer verified exports, defaults,
+  camera-control types, and configurable/custom tooltip types. Signature audit
+  verified 24 installed package signatures and 11 attestations.
+- The release browser gate had one Canvas/main camera test pass on retry.
+  The exact observation and registry propagation delay are recorded in the
+  [release runbook](release-runbook.md#current-release-state).
+
+Historical published package evidence from 2026-11-16 KST:
 
 - `npm view @eunjjang/ograph version --json` returns `0.4.0`, and the `latest`
   dist-tag points at `0.4.0`.
