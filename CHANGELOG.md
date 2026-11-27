@@ -12,6 +12,11 @@ camera following stays disabled unless explicitly requested.
 
 ### Added
 
+- Expose `GraphView.tooltip` to disable the hover tooltip, customize its wrapper
+  and built-in dot/label/type styles, or replace its UI with a typed render
+  callback. The existing presentation remains the default; tooltip configuration
+  does not change hover events, selection, the camera, or physics.
+
 - Add `autoFit` to disable automatic global fitting while keeping explicit camera methods.
 - Add opt-in `setCameraFollowNodeId()` with zoom-preserving draw-frame tracking,
   synchronous cancellation, and suspension during pause and manual camera motion.

@@ -10,6 +10,7 @@ can be verified before the first npm publication.
 ## Examples
 
 - `basic/GraphPanel.tsx`: minimal graph panel with click handling.
+- `tooltip/GraphPanel.tsx`: styled, hidden, and custom tooltips with typed metadata.
 - `app-adapter/adapter.ts`: app-domain data converted into Ograph nodes and
   links outside the package boundary.
 - `app-adapter/GraphPanel.tsx`: adapter output rendered through `GraphView`.

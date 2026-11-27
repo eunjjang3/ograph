@@ -12,6 +12,7 @@ export type {
   GraphPhysicsProfile,
   GraphPhysicsPresetName,
   GraphTheme,
+  GraphTooltipOptions,
   GraphViewMode,
   GraphViewProps,
   GraphViewport
