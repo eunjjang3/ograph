@@ -180,20 +180,22 @@ Current external setting evidence, checked on 2026-06-05 KST:
   Best Practices badge, fuzzing, signed releases, and maintainer-approved code
   review rules.
 
-Published package evidence, refreshed on 2026-07-19 KST:
+Published package evidence, refreshed on 2026-11-16 KST:
 
-- `npm view @eunjjang/ograph version --json` returns `0.3.1`, and the `latest`
-  dist-tag points at `0.3.1`.
+- `npm view @eunjjang/ograph version --json` returns `0.4.0`, and the `latest`
+  dist-tag points at `0.4.0`.
 - `npm access get status @eunjjang/ograph --json` returns `public`.
-- GitHub release `v0.3.1` and its protected tag resolve to commit
-  `a7132390a37c65b3b017982033a0905fc0bbb138` on `main`.
-- Release workflow run `29667811399` completed successfully after the required
+- GitHub release `v0.4.0` and its protected tag resolve to commit
+  `1bd8659c11cbbe4d2ee28fac82f4961164445933` on `main`, matching npm `gitHead`.
+- Release workflow run `43878584204` completed successfully after the required
   `npm` environment approval and published through OIDC Trusted Publishing.
-- `npm view @eunjjang/ograph@0.3.1 dist --json` reports a registry signature
+- `npm view @eunjjang/ograph@0.4.0 dist --json` reports two registry signatures
   and SLSA provenance attestation for the 21-file package tarball.
-- A clean `@eunjjang/ograph@0.3.1` consumer install preserves `GraphView`,
-  `defaultGraphPreset`, and `defaultGraphTheme`; `npm audit signatures`
-  verifies all 20 installed registry signatures and 4 attestations.
+- A fresh React 19 / TypeScript 5 consumer verified runtime exports, motion
+  profiles, partial preset typing, and resolved defaults. `npm audit signatures`
+  verified 24 installed package signatures and 10 attestations in that fixture.
+- CI, CodeQL, and Scorecard passed on the release commit before tagging;
+  the registry's processing delay was resolved before installation verification.
 
 ## Completion Evidence
 
