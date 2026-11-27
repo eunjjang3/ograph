@@ -1,6 +1,7 @@
 # Debug Harness
 
-The local app is a Vite-powered stress-test harness for `GraphView`.
+The local app includes a public playground and a Vite-powered stress-test
+harness for `GraphView`.
 
 Run it with:
 
@@ -9,9 +10,27 @@ npm install
 npm run dev
 ```
 
-Then open the fixed debug URL at `http://localhost:4435`. The development
+Then open the fixed debug URL at `http://localhost:4435/#debug`. The development
 server uses strict port selection so a conflicting process fails loudly instead
 of silently moving the comparison run to another port.
+
+## Public Playground
+
+The root URL opens the public demo, also deployed to GitHub Pages. It starts
+with 53 fictional notebook nodes and provides 250- and 1,000-node generated
+samples, four motion presets, three graph themes, pause/replay/fit controls,
+and node selection with neighborhood exploration. The React example reflects
+the selected motion preset and can be copied with the install command.
+
+The default motion is presented as **Smooth**; its public preset key remains
+`obsidian`. The playground uses the public `GraphView` API and its automatic
+runtime fallback. Detailed runtime selection and telemetry remain in the
+lazy-loaded **Debug lab**, available through `#debug` on either host.
+
+`npm run test:demo` builds with the production `/ograph/` base and checks graph
+pixels, Worker loading, controls, clipboard content, debug navigation, and
+mobile overflow against that artifact. The public shell lives in `src/demo`;
+it is not exported by the npm library.
 
 ## Purpose
 
