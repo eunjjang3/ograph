@@ -16,24 +16,32 @@ Do not rename the repository, package, or product during release hardening.
 ## Current Release State
 
 The `@eunjjang/ograph` package is published on npm as a public preview package.
-The registry's `latest` release is `0.3.1`. Versions `0.1.0`, `0.2.0`, and
-`0.3.0` remain consumed historical releases, and current releases use npm
-Trusted Publishing through the GitHub release workflow.
+The registry's `latest` release is `0.4.0`, verified on 2026-11-28 KST.
+Versions `0.1.0`, `0.2.0`, `0.3.0`, and `0.3.1` remain consumed historical
+releases. This branch prepares `0.4.1`; it has not been published. Current
+releases use npm Trusted Publishing through the GitHub release workflow.
 
-Current registry and release evidence from 2026-07-19 KST:
+Registry and release evidence from 2026-11-16 KST:
 
-- `npm view @eunjjang/ograph version --json` returns `0.3.1`.
-- `npm view @eunjjang/ograph dist-tags --json` points `latest` at `0.3.1`.
-- GitHub release `v0.3.1` and protected tag `v0.3.1` resolve to commit
-  `a7132390a37c65b3b017982033a0905fc0bbb138` on `main`.
-- Release workflow run `29667811399` completed successfully after the required
+- `npm view @eunjjang/ograph version --json` returns `0.4.0`.
+- `npm view @eunjjang/ograph dist-tags --json` points `latest` at `0.4.0`.
+- GitHub release `v0.4.0` and protected tag `v0.4.0` resolve to commit
+  `1bd8659c11cbbe4d2ee28fac82f4961164445933` on `main`, matching npm `gitHead`.
+- Release workflow run `43878584204` completed successfully after the required
   `npm` environment approval and published through OIDC Trusted Publishing.
+- The release commit passed CI `43878066127`, CodeQL `43878066441`, and
+  Scorecard `43878066285` before tagging. Release preparation PR #91 and
+  graph motion PR #90 are merged.
 - `npm access get status @eunjjang/ograph --json` returns `public`.
-- `npm view @eunjjang/ograph@0.3.1 dist --json` reports 21 files, a registry
-  signature, and an SLSA provenance attestation.
-- A clean `@eunjjang/ograph@0.3.1` consumer install preserves the three runtime
-  exports and `npm audit signatures` verifies all 20 installed registry
-  signatures and 4 attestations.
+- `npm view @eunjjang/ograph@0.4.0 dist --json` reports 21 files, two registry
+  signatures, and an SLSA provenance attestation.
+- A fresh React 19 / TypeScript 5 consumer installed `@eunjjang/ograph@0.4.0`
+  from npm and verified runtime exports, all four motion profiles, partial
+  preset typing, and resolved physical defaults. `npm audit signatures`
+  verified 24 installed package signatures and 10 attestations in that fixture.
+- npm initially reported that the package was being processed. Registry version,
+  `latest`, installation, and provenance were checked after it became available;
+  the publish workflow was not rerun.
 - GitHub repository ruleset `Protect release tags` (`17266129`) is active for
   `refs/tags/v*` and blocks deletion and non-fast-forward updates without
   bypass actors.
@@ -73,6 +81,15 @@ that is reachable from protected `origin/main`.
 GitHub repository ruleset `Protect release tags` protects `v*` release tags
 from deletion and non-fast-forward updates. Keep it active because GitHub
 release events and `v*` tags are the publish trigger boundary.
+
+## Version Selection
+
+Use the [versioning policy](../CONTRIBUTING.md#versioning-policy) before preparing
+a release. For `0.x`, compatible fixes and optional API additions use a patch;
+consumer migration requires a minor release with migration notes. From `1.0.0`,
+use standard SemVer. Check consumer code, types, defaults, runtime requirements,
+and peer ranges before classifying the change. Keep historical release evidence
+unchanged when selecting the next version.
 
 ## Release Procedure
 

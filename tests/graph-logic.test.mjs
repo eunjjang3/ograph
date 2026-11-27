@@ -2234,3 +2234,20 @@ test('a published drag coordinate does not pull neighboring springs one physics 
   sim.tick();
   assert.ok(nodes[1].x > 50, 'spring propagation begins on the following step');
 });
+
+
+test('camera following centers current coordinates without changing zoom or mutating nodes', async () => {
+  const { resolveCameraFollowViewport } = await importSourceModule('src/components/graph/cameraFollow.ts');
+  const node = { id: 'target', x: 200, y: -80 };
+  const args = { nodeId: 'target', nodes: [node], visibleNodeIds: new Set(['target']),
+    viewport: { x: 0, y: 0, scale: 1.75 }, width: 800, height: 600, suspended: false };
+  assert.deepEqual(resolveCameraFollowViewport(args), { x: 50, y: 440, scale: 1.75 });
+  assert.deepEqual(node, { id: 'target', x: 200, y: -80 });
+  for (const override of [{ suspended: true }, { nodeId: null }, { nodeId: 'missing' },
+    { visibleNodeIds: new Set() }, { nodes: [{ ...node, x: NaN }] },
+    { viewport: { x: 50, y: 440, scale: 1.75 } }]) {
+    assert.equal(resolveCameraFollowViewport({ ...args, ...override }), null);
+  }
+  node.x = 300;
+  assert.deepEqual(resolveCameraFollowViewport(args), { x: -125, y: 440, scale: 1.75 });
+});

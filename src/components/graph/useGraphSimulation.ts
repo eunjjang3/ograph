@@ -375,6 +375,11 @@ export function useGraphSimulation(
     () => getGraphTopologySignature(simulationNodes, simulationLinks),
     [simulationNodes, simulationLinks]
   );
+  // Size affects Worker collision forces; labels/metadata and array identity do not.
+  const workerSizeSignature = useMemo(() => JSON.stringify(
+    simulationNodes.map(node => [node.id, node.size ?? 1] as const)
+      .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+  ), [simulationNodes]);
   const gravityCenterNodeIdsSignature = useMemo(
     () => getSortedNodeIdSetSignature(gravityCenterNodeIds),
     [gravityCenterNodeIds]
@@ -665,9 +670,7 @@ export function useGraphSimulation(
   }, [
     engine,
     topologySignature,
-    simulationNodes,
-    renderNodes,
-    renderLinks,
+    workerSizeSignature,
     chargeStrength,
     linkDistance,
     nodeRadius,
@@ -691,8 +694,8 @@ export function useGraphSimulation(
   ]);
 
   useEffect(() => {
-    if (engine !== 'main') return;
-
+    // Both engines share the rendered node objects. Payload-only updates must
+    // reach callbacks/renderers without restarting the Worker or its clock.
     try {
       const syncedInputs = payloadSyncedInputsRef.current;
       if (

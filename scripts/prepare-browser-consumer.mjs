@@ -170,6 +170,7 @@ import {
   type GraphViewport
 } from '@eunjjang/ograph';
 import './styles.css';
+import { CameraControls } from './camera-controls';
 
 type FixtureName =
   | 'empty'
@@ -558,11 +559,13 @@ function App() {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    {location.search.includes('camera-controls') ? <CameraControls /> : <App />}
   </StrictMode>
 );
 `
   );
+
+  writeText(join(fixtureRoot, 'src/camera-controls.tsx'), readFileSync(join(repoRoot, 'tests/fixtures/camera-controls.tsx'), 'utf8'));
 
   run('npm', ['install', '--silent', '--no-audit', '--no-fund'], { cwd: fixtureRoot });
   run('npm', ['run', 'build'], { cwd: fixtureRoot });

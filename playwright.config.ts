@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const consumerPort = Number(process.env.OGRAPH_BROWSER_PORT ?? 4179);
+
 export default defineConfig({
   testDir: './tests/browser',
   timeout: 30_000,
@@ -14,7 +16,7 @@ export default defineConfig({
   outputDir: '.tmp/playwright-results',
   snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}-{projectName}{ext}',
   use: {
-    baseURL: 'http://127.0.0.1:4179',
+    baseURL: `http://127.0.0.1:${consumerPort}`,
     trace: 'on-first-retry',
     viewport: {
       width: 900,
@@ -22,10 +24,10 @@ export default defineConfig({
     }
   },
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 4179',
+    command: `npm run dev -- --host 127.0.0.1 --port ${consumerPort} --strictPort`,
     cwd: './.tmp/browser-consumer',
-    url: 'http://127.0.0.1:4179',
-    reuseExistingServer: !process.env.CI,
+    url: `http://127.0.0.1:${consumerPort}`,
+    reuseExistingServer: false,
     timeout: 120_000
   },
   projects: [
