@@ -16,12 +16,36 @@ Do not rename the repository, package, or product during release hardening.
 ## Current Release State
 
 The `@eunjjang/ograph` package is published on npm as a public preview package.
-The registry's `latest` release is `0.4.0`, verified on 2026-11-28 KST.
-Versions `0.1.0`, `0.2.0`, `0.3.0`, and `0.3.1` remain consumed historical
-releases. This branch prepares `0.4.1`; it has not been published. Current
-releases use npm Trusted Publishing through the GitHub release workflow.
+The registry's `latest` release is `0.4.1`, verified on 2026-11-28 KST.
+Versions `0.1.0`, `0.2.0`, `0.3.0`, `0.3.1`, and `0.4.0` remain consumed
+historical releases. Current releases use npm Trusted Publishing through the
+GitHub release workflow.
 
-Registry and release evidence from 2026-11-16 KST:
+Current registry and release evidence from 2026-11-28 KST:
+
+- Registry `latest` and `npm view @eunjjang/ograph version` both report `0.4.1`.
+- GitHub release/tag `v0.4.1` and npm `gitHead` identify the same main commit:
+  `94eae75166448a98dfc97ac289c873f895e4f992`.
+- Release workflow [46072049025](https://github.com/eunjjang3/ograph/actions/runs/46072049025)
+  succeeded after the configured `npm` environment approval. Publishing used
+  OIDC Trusted Publishing; no local token publish or repeat publish was used.
+- The public package contains 21 files, two registry signatures, and an SLSA
+  provenance attestation.
+- A fresh React 19 / TypeScript 5 registry consumer installed `0.4.1`, verified
+  all five runtime exports and motion defaults, and typechecked `autoFit`,
+  `setCameraFollowNodeId`, tooltip styling/hiding, and typed custom tooltip UI.
+- `npm audit signatures` verified 24 installed package signatures and 11
+  attestations in that consumer fixture.
+- CI `46070121139`, CodeQL `46070121100`, and Scorecard `46070121307` passed
+  on the release commit before tagging. PRs #99, #100, and #101 are included.
+- The release browser gate reported 17 passed and one flaky test: the Canvas/main
+  camera-control check initially observed zoom `0.8` instead of `1.75`, then
+  passed its configured retry. This observation is retained for follow-up;
+  the successful workflow does not mean every test passed on its first attempt.
+- The initial registry version lookup returned 404 after publishing. Subsequent
+  metadata and fresh installation checks succeeded without rerunning publication.
+
+Historical 0.4.0 registry and release evidence from 2026-11-16 KST:
 
 - `npm view @eunjjang/ograph version --json` returns `0.4.0`.
 - `npm view @eunjjang/ograph dist-tags --json` points `latest` at `0.4.0`.
